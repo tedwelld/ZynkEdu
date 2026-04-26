@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/projects/">
+    <Project Path="ZynkEdu.Application/ZynkEdu.Application.csproj" />
+    <Project Path="ZynkEdu.Domain/ZynkEdu.Domain.csproj" />
+    <Project Path="ZynkEdu.Infrastructure/ZynkEdu.Infrastructure.csproj" />
+    <Project Path="ZynkEdu.Api/ZynkEdu.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ZynkEdu.Tests/ZynkEdu.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,19 @@
+<p-select
+    [options]="options"
+    [ngModel]="value"
+    (ngModelChange)="handleChange($event)"
+    [optionLabel]="optionLabel"
+    [optionValue]="optionValue"
+    [placeholder]="placeholder"
+    [filter]="filter"
+    [filterBy]="filterBy || optionLabel"
+    [filterPlaceholder]="filterPlaceholder"
+    [showClear]="showClear"
+    [disabled]="disabled"
+    [appendTo]="appendTo"
+    [styleClass]="styleClass"
+    [panelStyleClass]="panelStyleClass"
+    [inputId]="inputId"
+    [dataKey]="dataKey"
+    (onBlur)="markTouched()">
+</p-select>

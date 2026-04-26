@@ -1,0 +1,6 @@
+{
+  "ZynkEdu.Api, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\ZynkEdu.Api",
+  "ZynkEdu.Application, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\ZynkEdu.Application",
+  "ZynkEdu.Domain, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\ZynkEdu.Domain",
+  "ZynkEdu.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null": "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\ZynkEdu.Infrastructure"
+}

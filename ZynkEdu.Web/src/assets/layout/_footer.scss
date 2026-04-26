@@ -1,0 +1,160 @@
+.layout-footer {
+    position: relative;
+    overflow: hidden;
+    margin-top: 2rem;
+    border-top: 0;
+    padding: 4.5rem 1.5rem 1.5rem;
+    color: var(--primary-contrast-color);
+    background:
+        linear-gradient(
+            180deg,
+            color-mix(in srgb, var(--surface-ground) 94%, black 6%) 0%,
+            color-mix(in srgb, var(--surface-ground) 82%, var(--primary-color) 18%) 48%,
+            color-mix(in srgb, var(--primary-color) 92%, black 8%) 49%,
+            color-mix(in srgb, var(--primary-color) 86%, white 14%) 100%
+        );
+}
+
+.layout-footer::before,
+.layout-footer::after {
+    content: '';
+    position: absolute;
+    left: -8%;
+    right: -8%;
+    height: 6rem;
+    border-radius: 50% 50% 0 0;
+    pointer-events: none;
+}
+
+.layout-footer::before {
+    top: 43%;
+    background:
+        radial-gradient(circle at 10% 100%, color-mix(in srgb, var(--primary-color) 70%, transparent) 0, transparent 42%),
+        radial-gradient(circle at 40% 100%, color-mix(in srgb, var(--primary-color) 58%, transparent) 0, transparent 48%),
+        radial-gradient(circle at 70% 100%, color-mix(in srgb, var(--primary-color) 82%, black 18%) 0, transparent 46%),
+        radial-gradient(circle at 92% 100%, color-mix(in srgb, var(--primary-color) 76%, white 24%) 0, transparent 40%);
+    transform: translateY(-50%);
+    opacity: 0.9;
+}
+
+.layout-footer::after {
+    top: 48%;
+    background:
+        radial-gradient(circle at 0% 100%, color-mix(in srgb, var(--primary-color) 34%, transparent) 0, transparent 44%),
+        radial-gradient(circle at 24% 100%, color-mix(in srgb, var(--primary-color) 44%, transparent) 0, transparent 40%),
+        radial-gradient(circle at 52% 100%, color-mix(in srgb, var(--primary-color) 40%, black 60%) 0, transparent 42%),
+        radial-gradient(circle at 78% 100%, color-mix(in srgb, var(--primary-color) 32%, transparent) 0, transparent 40%),
+        radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--primary-color) 36%, transparent) 0, transparent 42%);
+    transform: translateY(-45%);
+}
+
+.layout-footer__inner {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 72rem;
+    margin: 0 auto;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.layout-footer__brand {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.layout-footer__title {
+    font-family: var(--zynkedu-heading-font);
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1;
+}
+
+.layout-footer__subtitle {
+    font-size: 0.95rem;
+    color: color-mix(in srgb, var(--primary-contrast-color) 74%, transparent);
+}
+
+.layout-footer__socials {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.layout-footer__social {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-contrast-color);
+    background: color-mix(in srgb, var(--primary-color) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary-contrast-color) 18%, transparent);
+    transition:
+        transform 160ms ease,
+        background-color 160ms ease,
+        box-shadow 160ms ease;
+    text-decoration: none;
+}
+
+.layout-footer__social:hover {
+    transform: translateY(-2px);
+    background: color-mix(in srgb, var(--primary-color) 28%, transparent);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+}
+
+.layout-footer__social i {
+    font-size: 1.1rem;
+}
+
+.layout-footer__social--whatsapp {
+    background: color-mix(in srgb, #25d366 24%, transparent);
+}
+
+.layout-footer__social--whatsapp:hover {
+    background: color-mix(in srgb, #25d366 36%, transparent);
+}
+
+.layout-footer__contact {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    font-size: 0.95rem;
+    color: color-mix(in srgb, var(--primary-contrast-color) 82%, transparent);
+}
+
+.layout-footer__contact span + span::before {
+    content: '•';
+    margin-right: 0.65rem;
+    color: color-mix(in srgb, var(--primary-contrast-color) 50%, transparent);
+}
+
+@media (max-width: 640px) {
+    .layout-footer {
+        padding-inline: 1rem;
+        padding-top: 3.75rem;
+    }
+
+    .layout-footer__title {
+        font-size: 1.7rem;
+    }
+
+    .layout-footer__contact {
+        gap: 0.35rem;
+    }
+
+    .layout-footer__contact span + span::before {
+        content: '';
+        margin-right: 0;
+    }
+}

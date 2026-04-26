@@ -1,0 +1,187 @@
+/* You can add global styles to this file, and also import other style files */
+@use './tailwind.css';
+@use './layout/layout.scss';
+@use 'primeicons/primeicons.css';
+@use './demo/demo.scss';
+
+:root {
+    --zynkedu-body-font: 'Manrope', system-ui, sans-serif;
+    --zynkedu-heading-font: 'Space Grotesk', system-ui, sans-serif;
+    --zynkedu-blue: #1d4ed8;
+    --zynkedu-cyan: #06b6d4;
+    --zynkedu-purple: #7c3aed;
+    --zynkedu-ink: #0f172a;
+    --zynkedu-surface: rgba(10, 18, 39, 0.72);
+}
+
+html,
+body {
+    min-height: 100%;
+    background:
+        radial-gradient(circle at top left, rgba(29, 78, 216, 0.15), transparent 30%),
+        radial-gradient(circle at top right, rgba(124, 58, 237, 0.12), transparent 26%),
+        linear-gradient(180deg, #f8fbff 0%, #eef4ff 52%, #f4f7fb 100%);
+    color: var(--text-color);
+    font-family: var(--zynkedu-body-font);
+}
+
+body.app-dark {
+    background:
+        radial-gradient(circle at top left, rgba(29, 78, 216, 0.2), transparent 30%),
+        radial-gradient(circle at top right, rgba(124, 58, 237, 0.18), transparent 26%),
+        linear-gradient(180deg, #020617 0%, #07111f 50%, #0b1324 100%);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.font-display {
+    font-family: var(--zynkedu-heading-font);
+    letter-spacing: -0.03em;
+}
+
+/* ✅ Cards should NOT clip overlays */
+.card,
+.workspace-card,
+.glass-panel {
+    border-radius: 1rem;
+    border: 1px solid color-mix(in srgb, var(--surface-border), transparent 20%);
+    background: color-mix(in srgb, var(--surface-card), rgba(255, 255, 255, 0.78) 20%);
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(18px);
+
+    /* 🔥 critical fix */
+    overflow: visible;
+    position: relative;
+    z-index: 1;
+}
+
+.workspace-card {
+    padding: 1.25rem;
+}
+
+.auth-login-page {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(2, 6, 23, 0.42), rgba(2, 6, 23, 0.55));
+}
+
+.auth-login-page::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.12), transparent 36%),
+        radial-gradient(circle at bottom right, rgba(15, 23, 42, 0.2), transparent 42%);
+    pointer-events: none;
+}
+
+.auth-login-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center center;
+    z-index: 0;
+}
+
+.auth-login-card {
+    position: relative;
+    z-index: 1;
+    width: min(100%, 34rem);
+    border-color: rgba(255, 255, 255, 0.28);
+    background: color-mix(in srgb, var(--surface-card), rgba(15, 23, 42, 0.18) 24%);
+}
+
+.metric-gradient {
+    background: linear-gradient(135deg, rgba(29, 78, 216, 0.12), rgba(124, 58, 237, 0.12));
+}
+
+.soft-shadow {
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.1);
+}
+
+.chart-canvas-wrap {
+    min-height: 320px;
+}
+
+/* Loader */
+.app-loader-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 6000; /* above everything */
+    display: grid;
+    place-items: center;
+    background: rgba(2, 6, 23, 0.35);
+    backdrop-filter: blur(10px);
+}
+
+/* 🔥 PRIME NG OVERLAY FIXES */
+
+/* Mask layer */
+.p-component-overlay,
+.p-overlay-mask,
+.p-dialog-mask,
+.p-drawer-mask {
+    z-index: 5000;
+}
+
+/* Dialog layer */
+.p-dialog,
+.p-drawer {
+    z-index: 5100;
+}
+
+/* Dropdowns, calendars, menus etc MUST be highest */
+.p-select-panel,
+.p-select-overlay,
+.p-multiselect-panel,
+.p-dropdown-panel,
+.p-cascadeselect-panel,
+.p-autocomplete-panel,
+.p-datepicker-panel,
+.p-overlaypanel,
+.p-menu,
+.p-colorpicker-panel {
+    z-index: 5200;
+}
+
+/* Buttons */
+.logout-button.p-button,
+.logout-button .p-button {
+    --p-button-primary-background: #dc2626;
+    --p-button-primary-hover-background: #b91c1c;
+    --p-button-primary-border-color: #dc2626;
+    --p-button-primary-hover-border-color: #b91c1c;
+}
+
+/* Skeleton loader */
+.skeleton-line {
+    height: 0.9rem;
+    border-radius: 999px;
+    background: linear-gradient(
+        90deg,
+        rgba(148, 163, 184, 0.15),
+        rgba(148, 163, 184, 0.3),
+        rgba(148, 163, 184, 0.15)
+    );
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 0 0;
+    }
+    100% {
+        background-position: 220px 0;
+    }
+}
