@@ -38,6 +38,9 @@ public sealed class AcademicCalendarService : IAcademicCalendarService
         var schoolId = RequireSchoolId();
         await EnsureDefaultTermsAsync(schoolId, cancellationToken);
 
+        ValidateTermDates(request.StartDate, request.EndDate);
+        await EnsureNoOverlapAsync(schoolId, termNumber, request.StartDate, request.EndDate, cancellationToken);
+
         var term = await _dbContext.AcademicTerms.FirstAsync(x => x.SchoolId == schoolId && x.TermNumber == termNumber, cancellationToken);
         term.Name = request.Name.Trim();
         term.StartDate = request.StartDate;
@@ -166,6 +169,36 @@ public sealed class AcademicCalendarService : IAcademicCalendarService
         if (termNumber is < 1 or > 3)
         {
             throw new InvalidOperationException("Only three terms are available in a calendar year.");
+        }
+    }
+
+    private static void ValidateTermDates(DateOnly? startDate, DateOnly? endDate)
+    {
+        if (startDate is null || endDate is null)
+        {
+            return;
+        }
+
+        if (endDate < startDate)
+        {
+            throw new InvalidOperationException("The term end date must be on or after the start date.");
+        }
+    }
+
+    private async Task EnsureNoOverlapAsync(int schoolId, int termNumber, DateOnly? startDate, DateOnly? endDate, CancellationToken cancellationToken)
+    {
+        if (startDate is null || endDate is null)
+        {
+            return;
+        }
+
+        var overlapExists = await _dbContext.AcademicTerms.AsNoTracking()
+            .Where(x => x.SchoolId == schoolId && x.TermNumber != termNumber && x.StartDate.HasValue && x.EndDate.HasValue)
+            .AnyAsync(x => startDate.Value <= x.EndDate!.Value && endDate.Value >= x.StartDate!.Value, cancellationToken);
+
+        if (overlapExists)
+        {
+            throw new InvalidOperationException("The selected term dates overlap another term in this school.");
         }
     }
 }

@@ -9,29 +9,48 @@ import { MessageService } from 'primeng/api';
 import { AuthService } from '../../core/auth/auth.service';
 import { SchoolResponse } from '../../core/api/api.models';
 
+interface FallingLetterGlyph {
+    char: string;
+    size: number;
+}
+
+interface FallingLetterStream {
+    left: number;
+    duration: string;
+    delay: string;
+    opacity: number;
+    letters: FallingLetterGlyph[];
+}
+
 @Component({
     selector: 'app-login',
     standalone: true,
     imports: [CommonModule, FormsModule, AutoCompleteModule, ButtonModule, InputTextModule, PasswordModule],
     template: `
         <div class="auth-login-page">
+            <div class="auth-login-letters" aria-hidden="true">
+                <div
+                    *ngFor="let stream of letterStreams; let streamIndex = index"
+                    class="auth-login-letter-stream"
+                    [style.left.%]="stream.left"
+                    [style.animationDuration]="stream.duration"
+                    [style.animationDelay]="stream.delay"
+                    [style.opacity]="stream.opacity"
+                >
+                    <span
+                        *ngFor="let letter of stream.letters; let letterIndex = index"
+                        class="auth-login-letter"
+                        [style.fontSize.rem]="letter.size"
+                    >
+                        {{ letter.char }}
+                    </span>
+                </div>
+            </div>
             <div class="auth-login-shell">
-                <aside class="auth-login-hero">
-                    <img class="auth-login-hero-image" src="/assets/images/login-background.png" alt="" aria-hidden="true" />
-                    <div class="auth-login-hero-overlay"></div>
-                    <div class="auth-login-hero-copy">
-                        <p class="auth-login-hero-kicker">A wise quote</p>
-                        <h2>Get<br />Everything<br />You Want</h2>
-                        <p>
-                            The right classroom, the right tools, and the right teachers help every learner move with confidence.
-                        </p>
-                    </div>
-                </aside>
-
                 <section class="workspace-card auth-login-card">
                     <div class="auth-login-brand-row">
                         <div class="auth-login-brand">
-                            <img src="/assets/images/zynkedu-icon.png" alt="ZynkEdu logo" class="auth-login-icon" />
+                            <div class="auth-login-mark" aria-hidden="true"></div>
                             <div>
                                 <p class="auth-login-brand-name">ZynkEdu</p>
                                 <p class="auth-login-brand-subtitle">Secure access for your workspace</p>
@@ -40,6 +59,12 @@ import { SchoolResponse } from '../../core/api/api.models';
                         <button type="button" class="auth-login-help" (click)="showHelp()">
                             Need help?
                         </button>
+                    </div>
+
+                    <div class="auth-login-badge-row">
+                        <span class="auth-login-badge">School</span>
+                        <span class="auth-login-badge">Platform</span>
+                        <span class="auth-login-badge">Parent</span>
                     </div>
 
                     <div class="auth-login-copy">
@@ -199,6 +224,7 @@ import { SchoolResponse } from '../../core/api/api.models';
 export class Login implements OnInit {
     private readonly auth = inject(AuthService);
     private readonly messages = inject(MessageService);
+    readonly letterStreams = createFallingLetterStreams();
 
     mode: 'staff' | 'platform' | 'parent' = 'staff';
     loading = false;
@@ -295,4 +321,28 @@ export class Login implements OnInit {
 
         return detail;
     }
+}
+
+function createFallingLetterStreams(): FallingLetterStream[] {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+
+    return Array.from({ length: 18 }, (_, index) => {
+        const left = 3 + ((index * 5.3) % 92);
+        const duration = `${12 + (index % 6) * 1.7}s`;
+        const delay = `-${(index % 7) * 1.4}s`;
+        const opacity = 0.14 + (index % 5) * 0.035;
+        const length = 14 + (index % 5);
+        const letters = Array.from({ length }, (_, letterIndex) => ({
+            char: alphabet[(index * 7 + letterIndex * 11) % alphabet.length],
+            size: 0.8 + ((letterIndex + index) % 5) * 0.22
+        }));
+
+        return {
+            left,
+            duration,
+            delay,
+            opacity,
+            letters
+        };
+    });
 }

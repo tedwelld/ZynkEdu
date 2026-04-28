@@ -36,17 +36,29 @@ internal sealed class RecordingSmsSender : ISmsSender
 
 internal sealed class RecordingEmailSender : IEmailSender
 {
-    public List<(string Destination, string Subject, string Message, string? AttachmentFileName, byte[]? AttachmentBytes)> Messages { get; } = new();
+    public List<(string Destination, string Subject, string Message, string? HtmlMessage, string? AttachmentFileName, byte[]? AttachmentBytes)> Messages { get; } = new();
 
     public Task SendAsync(string destination, string subject, string message, CancellationToken cancellationToken = default)
     {
-        Messages.Add((destination, subject, message, null, null));
+        Messages.Add((destination, subject, message, null, null, null));
+        return Task.CompletedTask;
+    }
+
+    public Task SendAsync(string destination, string subject, string message, string htmlMessage, CancellationToken cancellationToken = default)
+    {
+        Messages.Add((destination, subject, message, htmlMessage, null, null));
         return Task.CompletedTask;
     }
 
     public Task SendAsync(string destination, string subject, string message, byte[] attachmentBytes, string attachmentFileName, string attachmentContentType = "application/pdf", CancellationToken cancellationToken = default)
     {
-        Messages.Add((destination, subject, message, attachmentFileName, attachmentBytes));
+        Messages.Add((destination, subject, message, null, attachmentFileName, attachmentBytes));
+        return Task.CompletedTask;
+    }
+
+    public Task SendAsync(string destination, string subject, string message, string htmlMessage, byte[] attachmentBytes, string attachmentFileName, string attachmentContentType = "application/pdf", CancellationToken cancellationToken = default)
+    {
+        Messages.Add((destination, subject, message, htmlMessage, attachmentFileName, attachmentBytes));
         return Task.CompletedTask;
     }
 }

@@ -26,6 +26,8 @@ public sealed class ZynkEduDbContext : DbContext
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<PlatformSubjectCatalog> PlatformSubjectCatalogs => Set<PlatformSubjectCatalog>();
+    public DbSet<SchoolClass> SchoolClasses => Set<SchoolClass>();
+    public DbSet<SchoolClassSubject> SchoolClassSubjects => Set<SchoolClassSubject>();
     public DbSet<TeacherAssignment> TeacherAssignments => Set<TeacherAssignment>();
     public DbSet<Result> Results => Set<Result>();
     public DbSet<StudentNumberCounter> StudentNumberCounters => Set<StudentNumberCounter>();
@@ -157,6 +159,27 @@ public sealed class ZynkEduDbContext : DbContext
             entity.HasIndex(x => new { x.SchoolId, x.GradeLevel, x.Name }).IsUnique();
         });
 
+        modelBuilder.Entity<SchoolClass>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(100);
+            entity.Property(x => x.GradeLevel).HasMaxLength(100);
+            entity.HasIndex(x => new { x.SchoolId, x.Name }).IsUnique();
+            entity.HasIndex(x => new { x.SchoolId, x.GradeLevel });
+        });
+
+        modelBuilder.Entity<SchoolClassSubject>(entity =>
+        {
+            entity.HasIndex(x => new { x.SchoolClassId, x.SubjectId }).IsUnique();
+            entity.HasOne(x => x.SchoolClass)
+                .WithMany(x => x.Subjects)
+                .HasForeignKey(x => x.SchoolClassId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Subject)
+                .WithMany()
+                .HasForeignKey(x => x.SubjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<PlatformSubjectCatalog>(entity =>
         {
             entity.Property(x => x.Code).HasMaxLength(20);
@@ -169,7 +192,7 @@ public sealed class ZynkEduDbContext : DbContext
         modelBuilder.Entity<TeacherAssignment>(entity =>
         {
             entity.Property(x => x.Class).HasMaxLength(100);
-            entity.HasIndex(x => new { x.SchoolId, x.TeacherId, x.SubjectId, x.Class }).IsUnique();
+            entity.HasIndex(x => new { x.SchoolId, x.SubjectId, x.Class }).IsUnique();
         });
 
         modelBuilder.Entity<Result>(entity =>
@@ -293,6 +316,8 @@ public sealed class ZynkEduDbContext : DbContext
         ApplySchoolFilter<AttendanceRegisterEntry>(modelBuilder);
         ApplySchoolFilter<AttendanceDispatchLog>(modelBuilder);
         ApplySchoolFilter<Subject>(modelBuilder);
+        ApplySchoolFilter<SchoolClass>(modelBuilder);
+        ApplySchoolFilter<SchoolClassSubject>(modelBuilder);
         ApplySchoolFilter<TeacherAssignment>(modelBuilder);
         ApplySchoolFilter<Result>(modelBuilder);
         ApplySchoolFilter<StudentNumberCounter>(modelBuilder);

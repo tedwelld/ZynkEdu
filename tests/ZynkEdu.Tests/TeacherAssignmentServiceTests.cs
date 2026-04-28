@@ -36,9 +36,26 @@ public sealed class TeacherAssignmentServiceTests
             Name = "Math",
             GradeLevel = "ZGC Level"
         };
+        var schoolClass = new SchoolClass
+        {
+            SchoolId = 3,
+            Name = "Form 1A",
+            GradeLevel = "ZGC Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
 
         context.Users.Add(teacher);
         context.Subjects.Add(subject);
+        context.SchoolClasses.Add(schoolClass);
+        await context.SaveChangesAsync();
+        context.SchoolClassSubjects.Add(new SchoolClassSubject
+        {
+            SchoolId = 3,
+            SchoolClassId = schoolClass.Id,
+            SubjectId = subject.Id,
+            CreatedAt = DateTime.UtcNow
+        });
         await context.SaveChangesAsync();
 
         var service = new TeacherAssignmentService(context, currentUser);
@@ -48,6 +65,76 @@ public sealed class TeacherAssignmentServiceTests
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(request));
         Assert.Equal("This teacher assignment already exists.", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsAnotherTeacherForTheSameClassSubjectPair()
+    {
+        var currentUser = new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 30, UserId = 300, UserName = "school.admin" };
+        var databasePath = TestDatabase.CreateDatabasePath();
+        var (connection, context) = await TestDatabase.CreateContextAsync(databasePath, currentUser);
+        await using var _ = connection;
+
+        var hasher = new PasswordHasher<AppUser>();
+        var teacherOne = new AppUser
+        {
+            Username = "teacher-a",
+            PasswordHash = string.Empty,
+            Role = UserRole.Teacher,
+            SchoolId = 30,
+            DisplayName = "Teacher A",
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+        teacherOne.PasswordHash = hasher.HashPassword(teacherOne, "Password123!");
+
+        var teacherTwo = new AppUser
+        {
+            Username = "teacher-b",
+            PasswordHash = string.Empty,
+            Role = UserRole.Teacher,
+            SchoolId = 30,
+            DisplayName = "Teacher B",
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+        teacherTwo.PasswordHash = hasher.HashPassword(teacherTwo, "Password123!");
+
+        var subject = new Subject
+        {
+            SchoolId = 30,
+            Code = "MATH30",
+            Name = "Math",
+            GradeLevel = "ZGC Level"
+        };
+        var schoolClass = new SchoolClass
+        {
+            SchoolId = 30,
+            Name = "Form 1A",
+            GradeLevel = "ZGC Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        context.Users.AddRange(teacherOne, teacherTwo);
+        context.Subjects.Add(subject);
+        context.SchoolClasses.Add(schoolClass);
+        await context.SaveChangesAsync();
+        context.SchoolClassSubjects.Add(new SchoolClassSubject
+        {
+            SchoolId = 30,
+            SchoolClassId = schoolClass.Id,
+            SubjectId = subject.Id,
+            CreatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+
+        var service = new TeacherAssignmentService(context, currentUser);
+
+        await service.CreateAsync(new CreateTeacherAssignmentRequest(teacherOne.Id, subject.Id, "Form 1A"));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(new CreateTeacherAssignmentRequest(teacherTwo.Id, subject.Id, "Form 1A")));
+        Assert.Contains("already assigned to another teacher", ex.Message);
     }
 
     [Fact]
@@ -78,9 +165,26 @@ public sealed class TeacherAssignmentServiceTests
             Name = "Biology",
             GradeLevel = "O'Level"
         };
+        var schoolClass = new SchoolClass
+        {
+            SchoolId = 4,
+            Name = "Form 1A",
+            GradeLevel = "ZGC Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
 
         context.Users.Add(teacher);
         context.Subjects.Add(subject);
+        context.SchoolClasses.Add(schoolClass);
+        await context.SaveChangesAsync();
+        context.SchoolClassSubjects.Add(new SchoolClassSubject
+        {
+            SchoolId = 4,
+            SchoolClassId = schoolClass.Id,
+            SubjectId = subject.Id,
+            CreatedAt = DateTime.UtcNow
+        });
         await context.SaveChangesAsync();
 
         var service = new TeacherAssignmentService(context, currentUser);
@@ -125,9 +229,34 @@ public sealed class TeacherAssignmentServiceTests
             Name = "Chemistry",
             GradeLevel = "A'Level"
         };
+        var schoolClass = new SchoolClass
+        {
+            SchoolId = 5,
+            Name = "Form 1A",
+            GradeLevel = "ZGC Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
 
         context.Users.Add(teacher);
         context.Subjects.AddRange(primarySubject, mismatchedSubject);
+        context.SchoolClasses.Add(schoolClass);
+        await context.SaveChangesAsync();
+        context.SchoolClassSubjects.AddRange(
+            new SchoolClassSubject
+            {
+                SchoolId = 5,
+                SchoolClassId = schoolClass.Id,
+                SubjectId = primarySubject.Id,
+                CreatedAt = DateTime.UtcNow
+            },
+            new SchoolClassSubject
+            {
+                SchoolId = 5,
+                SchoolClassId = schoolClass.Id,
+                SubjectId = mismatchedSubject.Id,
+                CreatedAt = DateTime.UtcNow
+            });
         await context.SaveChangesAsync();
 
         var assignment = new TeacherAssignment
@@ -174,9 +303,42 @@ public sealed class TeacherAssignmentServiceTests
             Name = "Art",
             GradeLevel = "A'Level"
         };
+        var firstClass = new SchoolClass
+        {
+            SchoolId = 6,
+            Name = "Form 1A",
+            GradeLevel = "ZGC Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        var secondClass = new SchoolClass
+        {
+            SchoolId = 6,
+            Name = "Form 1B",
+            GradeLevel = "ZGC Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
 
         context.Users.Add(teacher);
         context.Subjects.Add(subject);
+        context.SchoolClasses.AddRange(firstClass, secondClass);
+        await context.SaveChangesAsync();
+        context.SchoolClassSubjects.AddRange(
+            new SchoolClassSubject
+            {
+                SchoolId = 6,
+                SchoolClassId = firstClass.Id,
+                SubjectId = subject.Id,
+                CreatedAt = DateTime.UtcNow
+            },
+            new SchoolClassSubject
+            {
+                SchoolId = 6,
+                SchoolClassId = secondClass.Id,
+                SubjectId = subject.Id,
+                CreatedAt = DateTime.UtcNow
+            });
         await context.SaveChangesAsync();
 
         var service = new TeacherAssignmentService(context, currentUser);
@@ -214,9 +376,42 @@ public sealed class TeacherAssignmentServiceTests
             Name = "Music",
             GradeLevel = "General"
         };
+        var form1Class = new SchoolClass
+        {
+            SchoolId = 7,
+            Name = "Form 1A",
+            GradeLevel = "ZGC Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        var form3Class = new SchoolClass
+        {
+            SchoolId = 7,
+            Name = "Form 3A Sciences",
+            GradeLevel = "O'Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
 
         context.Users.Add(teacher);
         context.Subjects.Add(subject);
+        context.SchoolClasses.AddRange(form1Class, form3Class);
+        await context.SaveChangesAsync();
+        context.SchoolClassSubjects.AddRange(
+            new SchoolClassSubject
+            {
+                SchoolId = 7,
+                SchoolClassId = form1Class.Id,
+                SubjectId = subject.Id,
+                CreatedAt = DateTime.UtcNow
+            },
+            new SchoolClassSubject
+            {
+                SchoolId = 7,
+                SchoolClassId = form3Class.Id,
+                SubjectId = subject.Id,
+                CreatedAt = DateTime.UtcNow
+            });
         await context.SaveChangesAsync();
 
         var service = new TeacherAssignmentService(context, currentUser);
@@ -224,5 +419,131 @@ public sealed class TeacherAssignmentServiceTests
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateBatchAsync(request));
         Assert.Contains("same level", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateBatchAsync_RejectsAnotherTeacherOwningTheSameClassSubjectPair()
+    {
+        var currentUser = new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 9, UserId = 99, UserName = "school.admin" };
+        var databasePath = TestDatabase.CreateDatabasePath();
+        var (connection, context) = await TestDatabase.CreateContextAsync(databasePath, currentUser);
+        await using var _ = connection;
+
+        var hasher = new PasswordHasher<AppUser>();
+        var teacherOne = new AppUser
+        {
+            Username = "teacher7",
+            PasswordHash = string.Empty,
+            Role = UserRole.Teacher,
+            SchoolId = 9,
+            DisplayName = "Teacher Seven",
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+        teacherOne.PasswordHash = hasher.HashPassword(teacherOne, "Password123!");
+
+        var teacherTwo = new AppUser
+        {
+            Username = "teacher8",
+            PasswordHash = string.Empty,
+            Role = UserRole.Teacher,
+            SchoolId = 9,
+            DisplayName = "Teacher Eight",
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+        teacherTwo.PasswordHash = hasher.HashPassword(teacherTwo, "Password123!");
+
+        var subject = new Subject
+        {
+            SchoolId = 9,
+            Code = "SCI9",
+            Name = "Science",
+            GradeLevel = "ZGC Level"
+        };
+        var schoolClass = new SchoolClass
+        {
+            SchoolId = 9,
+            Name = "Form 1A",
+            GradeLevel = "ZGC Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        context.Users.AddRange(teacherOne, teacherTwo);
+        context.Subjects.Add(subject);
+        context.SchoolClasses.Add(schoolClass);
+        await context.SaveChangesAsync();
+        context.SchoolClassSubjects.Add(new SchoolClassSubject
+        {
+            SchoolId = 9,
+            SchoolClassId = schoolClass.Id,
+            SubjectId = subject.Id,
+            CreatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+
+        await context.TeacherAssignments.AddAsync(new TeacherAssignment
+        {
+            SchoolId = 9,
+            TeacherId = teacherOne.Id,
+            SubjectId = subject.Id,
+            Class = "Form 1A"
+        });
+        await context.SaveChangesAsync();
+
+        var service = new TeacherAssignmentService(context, currentUser);
+        var request = new CreateTeacherAssignmentsBatchRequest(teacherTwo.Id, new[] { subject.Id }, new[] { "Form 1A" });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateBatchAsync(request));
+        Assert.Contains("already assigned to another teacher", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateAsync_RejectsClassesWithoutSubjects()
+    {
+        var currentUser = new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 8, UserId = 88, UserName = "school.admin" };
+        var databasePath = TestDatabase.CreateDatabasePath();
+        var (connection, context) = await TestDatabase.CreateContextAsync(databasePath, currentUser);
+        await using var _ = connection;
+
+        var hasher = new PasswordHasher<AppUser>();
+        var teacher = new AppUser
+        {
+            Username = "teacher6",
+            PasswordHash = string.Empty,
+            Role = UserRole.Teacher,
+            SchoolId = 8,
+            DisplayName = "Teacher Six",
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+        teacher.PasswordHash = hasher.HashPassword(teacher, "Password123!");
+
+        var subject = new Subject
+        {
+            SchoolId = 8,
+            Code = "PHY1",
+            Name = "Physics",
+            GradeLevel = "ZGC Level"
+        };
+        var schoolClass = new SchoolClass
+        {
+            SchoolId = 8,
+            Name = "Form 1A",
+            GradeLevel = "ZGC Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        context.Users.Add(teacher);
+        context.Subjects.Add(subject);
+        context.SchoolClasses.Add(schoolClass);
+        await context.SaveChangesAsync();
+
+        var service = new TeacherAssignmentService(context, currentUser);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(new CreateTeacherAssignmentRequest(teacher.Id, subject.Id, "Form 1A")));
+
+        Assert.Contains("Assign subjects to the selected class", ex.Message);
     }
 }

@@ -8,6 +8,7 @@ import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
+import { extractApiErrorMessage } from '../../core/api/api-error';
 import { AcademicTermResponse, CreateSchoolCalendarEventRequest, SchoolCalendarEventResponse } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 
@@ -216,6 +217,13 @@ export class AdminCalendar implements OnInit {
             next: () => {
                 this.messages.add({ severity: 'success', summary: 'Term saved', detail: `${term.name} dates updated.` });
                 this.loadData();
+            },
+            error: (error) => {
+                this.messages.add({
+                    severity: 'error',
+                    summary: 'Term save failed',
+                    detail: extractApiErrorMessage(error, 'Check that the term dates do not overlap another term.')
+                });
             }
         });
     }

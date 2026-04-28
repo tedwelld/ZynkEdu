@@ -33,6 +33,22 @@ public sealed class AttendanceService : IAttendanceService
         }
 
         var assignments = await assignmentsQuery.ToListAsync(cancellationToken);
+        HashSet<string>? assignedClassNames = null;
+        if (_currentUserContext.Role == UserRole.Teacher)
+        {
+            assignedClassNames = new HashSet<string>(assignments.Select(x => x.Class), StringComparer.OrdinalIgnoreCase);
+            if (assignedClassNames.Count == 0)
+            {
+                return Array.Empty<AttendanceClassOptionResponse>();
+            }
+        }
+
+        var registryClasses = await _dbContext.SchoolClasses.AsNoTracking()
+            .Where(x => x.SchoolId == resolvedSchoolId && x.IsActive)
+            .Include(x => x.Subjects)
+                .ThenInclude(x => x.Subject)
+            .ToListAsync(cancellationToken);
+
         var studentCounts = await _dbContext.Students.AsNoTracking()
             .Where(x => x.SchoolId == resolvedSchoolId)
             .GroupBy(x => x.Class)
@@ -45,7 +61,9 @@ public sealed class AttendanceService : IAttendanceService
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        var classNames = classes
+        var classNames = (assignedClassNames is null
+                ? registryClasses.Select(x => x.Name).Union(classes, StringComparer.OrdinalIgnoreCase)
+                : registryClasses.Where(x => assignedClassNames.Contains(x.Name)).Select(x => x.Name).Union(classes.Where(assignedClassNames.Contains), StringComparer.OrdinalIgnoreCase))
             .Union(assignments.Select(x => x.Class), StringComparer.OrdinalIgnoreCase)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(x => x)
@@ -56,12 +74,20 @@ public sealed class AttendanceService : IAttendanceService
             var classAssignments = assignments
                 .Where(assignment => string.Equals(assignment.Class, className, StringComparison.OrdinalIgnoreCase))
                 .ToList();
+            var registryClass = registryClasses.FirstOrDefault(x => string.Equals(x.Name, className, StringComparison.OrdinalIgnoreCase));
+            var subjectNames = registryClass?.Subjects
+                .Select(x => x.Subject.Name)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList()
+                ?? classAssignments.Select(x => x.Subject.Name).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x).ToList();
 
             return new AttendanceClassOptionResponse(
                 className,
                 classAssignments.Select(x => x.Teacher.DisplayName).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x).ToList(),
-                classAssignments.Select(x => x.Subject.Name).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x).ToList(),
-                SchoolLevelCatalog.TryGetClassLevel(className, out var level) ? level : string.Empty,
+                subjectNames,
+                registryClass?.GradeLevel ?? (SchoolLevelCatalog.TryGetClassLevel(className, out var level) ? level : string.Empty),
                 studentCounts.TryGetValue(className, out var count) ? count : 0);
         }).ToList();
     }

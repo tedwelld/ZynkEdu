@@ -252,6 +252,18 @@ export interface SubjectResponse {
     gradeLevel: string;
 }
 
+export interface SchoolClassResponse {
+    id: number;
+    schoolId: number;
+    className: string;
+    gradeLevel: string;
+    isActive: boolean;
+    isReadyForTeaching: boolean;
+    subjectIds: number[];
+    subjectNames: string[];
+    createdAt: string;
+}
+
 export interface PlatformSubjectCatalogResponse {
     id: number;
     code: string;
@@ -359,6 +371,21 @@ export interface UpdateSubjectRequest {
     name: string;
     code?: string | null;
     gradeLevel?: string | null;
+}
+
+export interface CreateSchoolClassRequest {
+    className: string;
+    gradeLevel: string;
+}
+
+export interface UpdateSchoolClassRequest {
+    className: string;
+    gradeLevel: string;
+    isActive: boolean;
+}
+
+export interface AssignClassSubjectsRequest {
+    subjectIds: number[];
 }
 
 export interface CreateStudentRequest {

@@ -17,7 +17,8 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuSec
                     { label: 'Admins', icon: 'pi pi-fw pi-user', routerLink: ['/platform/admins'] },
                     { label: 'Attendance', icon: 'pi pi-fw pi-check-square', routerLink: ['/platform/attendance'] },
                     { label: 'Students', icon: 'pi pi-fw pi-users', routerLink: ['/platform/students'] },
-                    { label: 'Teachers', icon: 'pi pi-fw pi-id-card', routerLink: ['/platform/teachers'] }
+                    { label: 'Teachers', icon: 'pi pi-fw pi-id-card', routerLink: ['/platform/teachers'] },
+                    { label: 'Classes', icon: 'pi pi-fw pi-sitemap', routerLink: ['/platform/classes'] }
                 ]
             },
             {
@@ -85,6 +86,7 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuSec
                 { label: 'Attendance', icon: 'pi pi-fw pi-check-square', routerLink: ['/admin/attendance'] },
                 { label: 'Students', icon: 'pi pi-fw pi-users', routerLink: ['/admin/students'] },
                 { label: 'Teachers', icon: 'pi pi-fw pi-id-card', routerLink: ['/admin/teachers'] },
+                { label: 'Classes', icon: 'pi pi-fw pi-sitemap', routerLink: ['/admin/classes'] },
                 { label: 'Calendar', icon: 'pi pi-fw pi-calendar', routerLink: ['/admin/calendar'] }
             ]
         },

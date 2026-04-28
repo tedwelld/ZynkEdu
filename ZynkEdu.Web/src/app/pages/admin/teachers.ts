@@ -15,8 +15,8 @@ import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { extractApiErrorMessage } from '../../core/api/api-error';
 import { AuthService } from '../../core/auth/auth.service';
-import { AttendanceClassOptionResponse, DashboardResponse, SchoolResponse, SubjectResponse, TeacherPerformanceDto, UserResponse } from '../../core/api/api.models';
-import { getClassLevel, normalizeSchoolLevel, SchoolLevel } from '../../core/school-levels';
+import { DashboardResponse, SchoolClassResponse, SchoolResponse, SubjectResponse, TeacherPerformanceDto, UserResponse } from '../../core/api/api.models';
+import { normalizeSchoolLevel, SchoolLevel } from '../../core/school-levels';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 
@@ -205,7 +205,7 @@ export class AdminTeachers implements OnInit {
     dashboard: DashboardResponse | null = null;
     schools: SchoolResponse[] = [];
     subjects: SubjectResponse[] = [];
-    attendanceClasses: AttendanceClassOptionResponse[] = [];
+    classes: SchoolClassResponse[] = [];
     selectedSchoolId: number | null = null;
     pendingFocusTeacherId: number | null = null;
     searchTerm = '';
@@ -270,14 +270,14 @@ export class AdminTeachers implements OnInit {
             dashboard: this.api.getAdminDashboard(schoolId),
             schools: this.api.getSchools(),
             subjects: this.api.getSubjects(schoolId),
-            attendanceClasses: this.api.getAttendanceClasses(schoolId)
+            classes: this.api.getClasses(schoolId)
         }).subscribe({
-            next: ({ teachers, dashboard, schools, subjects, attendanceClasses }) => {
+            next: ({ teachers, dashboard, schools, subjects, classes }) => {
                 this.teachers = teachers;
                 this.dashboard = dashboard;
                 this.schools = this.isPlatformAdmin ? schools : schools.filter((school) => school.id === this.auth.schoolId());
                 this.subjects = subjects;
-                this.attendanceClasses = attendanceClasses;
+                this.classes = classes;
                 this.selectedSchoolId = this.isPlatformAdmin ? this.selectedSchoolId ?? this.schools[0]?.id ?? null : this.auth.schoolId();
                 this.draft.schoolId = this.isPlatformAdmin ? this.draft.schoolId ?? this.selectedSchoolId : this.auth.schoolId();
                 this.draft.subjectIds = this.draft.subjectIds.filter((subjectId) => this.subjects.some((subject) => subject.id === subjectId));
@@ -348,29 +348,32 @@ export class AdminTeachers implements OnInit {
     }
 
     get subjectOptions(): { label: string; value: number | null }[] {
-        if (this.draft.classes.length > 0 && !this.selectedClassLevel) {
+        const allowedSubjectIds = this.allowedSubjectIdsForClasses(this.draft.classes);
+        if (this.draft.classes.length > 0 && allowedSubjectIds.size === 0) {
             return [];
         }
 
         return [
             { label: 'Select subject', value: null },
             ...this.subjects
-                .filter((subject) => !this.selectedClassLevel || normalizeSchoolLevel(subject.gradeLevel) === this.selectedClassLevel || normalizeSchoolLevel(subject.gradeLevel) === 'General')
+                .filter((subject) => allowedSubjectIds.size === 0 || allowedSubjectIds.has(subject.id))
                 .map((subject) => ({ label: `${subject.name} (${normalizeSchoolLevel(subject.gradeLevel)})`, value: subject.id }))
         ];
     }
 
     get classOptions(): { label: string; value: string }[] {
-        return this.attendanceClasses.map((item) => {
-            const level = item.level ? ` | ${item.level}` : '';
-            return { label: `${item.className} (${item.studentCount})${level}`, value: item.className };
+        return this.classes.map((item) => {
+            const readiness = item.isReadyForTeaching ? 'Ready' : 'Setup needed';
+            return { label: `${item.className} (${item.subjectNames.length} subjects) · ${readiness} · ${normalizeSchoolLevel(item.gradeLevel)}`, value: item.className };
         });
     }
 
     get selectedClassLevel(): SchoolLevel | null {
         const levels = this.draft.classes
-            .map((className) => getClassLevel(className))
-            .filter((level): level is Exclude<SchoolLevel, 'General'> => level !== null);
+            .map((className) => this.classes.find((entry) => entry.className === className))
+            .filter((entry): entry is SchoolClassResponse => !!entry)
+            .map((entry) => normalizeSchoolLevel(entry.gradeLevel))
+            .filter((level): level is Exclude<SchoolLevel, 'General'> => level !== 'General');
 
         if (levels.length === 0) {
             return null;
@@ -535,22 +538,44 @@ export class AdminTeachers implements OnInit {
 
     onClassesChange(classes: string[]): void {
         this.draft.classes = classes;
-
-        if (!this.selectedClassLevel) {
+        const allowedSubjectIds = this.allowedSubjectIdsForClasses(classes);
+        if (allowedSubjectIds.size === 0) {
+            this.draft.subjectIds = [];
             return;
         }
-
-        const allowedSubjectIds = new Set(
-            this.subjects
-                .filter((subject) => normalizeSchoolLevel(subject.gradeLevel) === this.selectedClassLevel || normalizeSchoolLevel(subject.gradeLevel) === 'General')
-                .map((subject) => subject.id)
-        );
 
         this.draft.subjectIds = this.draft.subjectIds.filter((subjectId) => allowedSubjectIds.has(subjectId));
         if (this.draft.subjectIds.length === 0) {
             const firstSubjectId = this.subjectOptions.find((option) => option.value !== null)?.value ?? null;
             this.draft.subjectIds = firstSubjectId ? [firstSubjectId] : [];
         }
+    }
+
+    private allowedSubjectIdsForClasses(classNames: string[]): Set<number> {
+        const selectedClasses = classNames
+            .map((className) => this.classes.find((entry) => entry.className === className))
+            .filter((entry): entry is SchoolClassResponse => !!entry);
+
+        if (selectedClasses.length === 0) {
+            return new Set<number>();
+        }
+
+        const distinctLevels = Array.from(new Set(selectedClasses.map((entry) => normalizeSchoolLevel(entry.gradeLevel))));
+        if (distinctLevels.length > 1) {
+            return new Set<number>();
+        }
+
+        const allowed = new Set(selectedClasses[0]?.subjectIds ?? []);
+        for (const schoolClass of selectedClasses.slice(1)) {
+            const classSubjects = new Set(schoolClass.subjectIds);
+            for (const subjectId of Array.from(allowed)) {
+                if (!classSubjects.has(subjectId)) {
+                    allowed.delete(subjectId);
+                }
+            }
+        }
+
+        return allowed;
     }
 
     private readErrorMessage(error: unknown, fallback: string): string {

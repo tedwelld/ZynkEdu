@@ -649,6 +649,73 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.ToTable("SchoolCalendarEvents");
                 });
 
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.SchoolClass", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("GradeLevel")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolId", "GradeLevel");
+
+                    b.HasIndex("SchoolId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("SchoolClasses");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.SchoolClassSubject", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SchoolClassId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubjectId");
+
+                    b.HasIndex("SchoolClassId", "SubjectId")
+                        .IsUnique();
+
+                    b.ToTable("SchoolClassSubjects");
+                });
+
             modelBuilder.Entity("ZynkEdu.Domain.Entities.StaffAdmin", b =>
                 {
                     b.Property<int>("Id")
@@ -870,7 +937,7 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TeacherId");
 
-                    b.HasIndex("SchoolId", "TeacherId", "SubjectId", "Class")
+                    b.HasIndex("SchoolId", "SubjectId", "Class")
                         .IsUnique();
 
                     b.ToTable("TeacherAssignments");
@@ -1058,6 +1125,25 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.Navigation("AcademicTerm");
                 });
 
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.SchoolClassSubject", b =>
+                {
+                    b.HasOne("ZynkEdu.Domain.Entities.SchoolClass", "SchoolClass")
+                        .WithMany("Subjects")
+                        .HasForeignKey("SchoolClassId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ZynkEdu.Domain.Entities.Subject", "Subject")
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SchoolClass");
+
+                    b.Navigation("Subject");
+                });
+
             modelBuilder.Entity("ZynkEdu.Domain.Entities.StaffAdmin", b =>
                 {
                     b.HasOne("ZynkEdu.Domain.Entities.AppUser", "Account")
@@ -1165,6 +1251,11 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("ZynkEdu.Domain.Entities.Notification", b =>
                 {
                     b.Navigation("Recipients");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.SchoolClass", b =>
+                {
+                    b.Navigation("Subjects");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.Student", b =>

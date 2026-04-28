@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ZynkEdu.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+72bd41c20c32ae74e1ab2e8fdd5d6f3bca385d33")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bc4c3407847ad0cdd65b0ca105c11aaf76269d9b")]
 [assembly: System.Reflection.AssemblyProductAttribute("ZynkEdu.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ZynkEdu.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

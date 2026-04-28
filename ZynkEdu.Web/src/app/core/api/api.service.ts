@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import {
     AcademicTermResponse,
+    AssignClassSubjectsRequest,
     AuditLogResponse,
     BulkStudentSubjectEnrollmentResponse,
     AttendanceClassOptionResponse,
@@ -12,6 +13,7 @@ import {
     CreateSchoolRequest,
     CreateSchoolWithAdminRequest,
     CreateSchoolCalendarEventRequest,
+    CreateSchoolClassRequest,
     CreateSchoolUserRequest,
     CreateTeacherWithAssignmentRequest,
     CreateStudentRequest,
@@ -29,6 +31,7 @@ import {
     TimetableResponse,
     SchoolResponse,
     SchoolCalendarEventResponse,
+    SchoolClassResponse,
     SearchHit,
     SendNotificationRequest,
     SendResultSlipRequest,
@@ -45,6 +48,7 @@ import {
     UpdateSchoolRequest,
     UpdateSchoolUserRequest,
     UpdateSubjectRequest,
+    UpdateSchoolClassRequest,
     UpdateStudentRequest,
     UpdateStudentStatusRequest,
     UpdateTeacherAssignmentRequest,
@@ -108,6 +112,31 @@ export class ApiService {
             params.set('schoolId', String(schoolId));
         }
         return this.http.get<AttendanceRegisterResponse>(`${API_BASE_URL}/attendance/register?${params.toString()}`);
+    }
+
+    getClasses(schoolId?: number | null): Observable<SchoolClassResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<SchoolClassResponse[]>(`${API_BASE_URL}/classes${query}`);
+    }
+
+    createClass(request: CreateSchoolClassRequest, schoolId?: number | null): Observable<SchoolClassResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<SchoolClassResponse>(`${API_BASE_URL}/classes${query}`, request);
+    }
+
+    updateClass(id: number, request: UpdateSchoolClassRequest, schoolId?: number | null): Observable<SchoolClassResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.put<SchoolClassResponse>(`${API_BASE_URL}/classes/${id}${query}`, request);
+    }
+
+    assignClassSubjects(id: number, request: AssignClassSubjectsRequest, schoolId?: number | null): Observable<SchoolClassResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.put<SchoolClassResponse>(`${API_BASE_URL}/classes/${id}/subjects${query}`, request);
+    }
+
+    deleteClass(id: number, schoolId?: number | null): Observable<void> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.delete<void>(`${API_BASE_URL}/classes/${id}${query}`);
     }
 
     getAttendanceDailySummaries(attendanceDate: string, schoolId?: number | null): Observable<AttendanceDailySummaryResponse[]> {

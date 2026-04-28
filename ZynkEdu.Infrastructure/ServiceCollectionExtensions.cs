@@ -37,6 +37,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISchoolCodeGenerator, SchoolCodeGenerator>();
         services.AddScoped<ISubjectCodeGenerator, SubjectCodeGenerator>();
         services.AddScoped<IAuditLogService, AuditLogService>();
+        services.AddScoped<ISchoolClassService, SchoolClassService>();
         services.AddScoped<IPlatformSubjectCatalogService, PlatformSubjectCatalogService>();
         services.AddScoped<IStudentNumberGenerator, StudentNumberGenerator>();
         services.AddScoped<IAuthService, AuthService>();
@@ -52,6 +53,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITimetableService, TimetableService>();
         services.AddScoped<IAcademicCalendarService, AcademicCalendarService>();
         services.AddScoped<IAttendanceDispatchService, AttendanceDispatchService>();
+        services.AddScoped<IReportEmailTemplateService, ReportEmailTemplateService>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<ISmsSender, LoggingSmsSender>();
         services.AddHostedService<NotificationDispatchHostedService>();

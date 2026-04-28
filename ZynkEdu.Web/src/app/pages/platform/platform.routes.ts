@@ -8,6 +8,7 @@ export const platformRoutes: Routes = [
     { path: 'attendance', loadComponent: () => import('../admin/attendance').then((m) => m.AdminAttendance) },
     { path: 'students', loadComponent: () => import('../admin/students').then((m) => m.AdminStudents) },
     { path: 'teachers', loadComponent: () => import('../admin/teachers').then((m) => m.AdminTeachers) },
+    { path: 'classes', loadComponent: () => import('../admin/classes').then((m) => m.AdminClasses) },
     { path: 'calendar', loadComponent: () => import('../admin/calendar').then((m) => m.AdminCalendar) },
     { path: 'subjects', loadComponent: () => import('../admin/subjects').then((m) => m.AdminSubjects) },
     { path: 'assignments', loadComponent: () => import('../admin/assignments').then((m) => m.AdminAssignments) },

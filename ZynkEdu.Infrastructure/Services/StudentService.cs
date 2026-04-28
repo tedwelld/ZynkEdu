@@ -29,7 +29,7 @@ public sealed class StudentService : IStudentService
     public async Task<StudentResponse> CreateAsync(CreateStudentRequest request, int? schoolId = null, CancellationToken cancellationToken = default)
     {
         var resolvedSchoolId = ResolveSchoolId(schoolId);
-        ValidateLevelAndClass(request.Level, request.Class);
+        await ValidateLevelAndClassAsync(resolvedSchoolId, request.Level, request.Class, cancellationToken);
         var subjectIds = request.SubjectIds.Distinct().ToArray();
         if (subjectIds.Length == 0)
         {
@@ -194,7 +194,8 @@ public sealed class StudentService : IStudentService
 
     public async Task<StudentResponse> UpdateAsync(int id, UpdateStudentRequest request, CancellationToken cancellationToken = default)
     {
-        ValidateLevelAndClass(request.Level, request.Class);
+        var resolvedSchoolId = RequireSchoolId();
+        await ValidateLevelAndClassAsync(resolvedSchoolId, request.Level, request.Class, cancellationToken);
         var subjectIds = request.SubjectIds.Distinct().ToArray();
         if (subjectIds.Length == 0)
         {
@@ -203,7 +204,7 @@ public sealed class StudentService : IStudentService
 
         var query = _currentUserContext.Role == UserRole.PlatformAdmin
             ? _dbContext.Students
-            : _dbContext.Students.Where(x => x.SchoolId == RequireSchoolId());
+            : _dbContext.Students.Where(x => x.SchoolId == resolvedSchoolId);
 
         var student = await query
             .Include(x => x.SubjectEnrollments)
@@ -492,12 +493,25 @@ public sealed class StudentService : IStudentService
         return new HashSet<string>(classes, StringComparer.OrdinalIgnoreCase);
     }
 
-    private static void ValidateLevelAndClass(string level, string className)
+    private async Task ValidateLevelAndClassAsync(int schoolId, string level, string className, CancellationToken cancellationToken)
     {
         var normalizedLevel = NormalizeLevel(level);
-        var allowedClasses = SchoolLevelCatalog.GetClassesForLevel(normalizedLevel);
+        var trimmedClass = className.Trim();
 
-        if (!allowedClasses.Contains(className.Trim()))
+        var schoolClass = await _dbContext.SchoolClasses.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.SchoolId == schoolId && x.Name == trimmedClass, cancellationToken);
+
+        if (schoolClass is null)
+        {
+            throw new InvalidOperationException("Create the class before adding students.");
+        }
+
+        if (!schoolClass.IsActive)
+        {
+            throw new InvalidOperationException("The selected class is not active.");
+        }
+
+        if (!string.Equals(SchoolLevelCatalog.NormalizeLevel(schoolClass.GradeLevel), normalizedLevel, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("The selected class does not match the selected level.");
         }

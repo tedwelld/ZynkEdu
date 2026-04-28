@@ -15,6 +15,7 @@ public sealed class ResultService : IResultService
     private readonly IAuditLogService _auditLogService;
     private readonly IEmailSender _emailSender;
     private readonly ISmsSender _smsSender;
+    private readonly IReportEmailTemplateService _reportEmailTemplateService;
 
     public ResultService(
         ZynkEduDbContext dbContext,
@@ -22,7 +23,8 @@ public sealed class ResultService : IResultService
         INotificationService notificationService,
         IAuditLogService auditLogService,
         IEmailSender emailSender,
-        ISmsSender smsSender)
+        ISmsSender smsSender,
+        IReportEmailTemplateService reportEmailTemplateService)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
@@ -30,6 +32,7 @@ public sealed class ResultService : IResultService
         _auditLogService = auditLogService;
         _emailSender = emailSender;
         _smsSender = smsSender;
+        _reportEmailTemplateService = reportEmailTemplateService;
     }
 
     public async Task<ResultResponse> CreateAsync(CreateResultRequest request, CancellationToken cancellationToken = default)
@@ -192,76 +195,7 @@ public sealed class ResultService : IResultService
             return Array.Empty<ParentPreviewReportResponse>();
         }
 
-        var schoolNames = await _dbContext.Schools.AsNoTracking()
-            .Where(x => students.Select(student => student.SchoolId).Contains(x.Id))
-            .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
-
-        return students.Select(student =>
-        {
-            var subjectRows = student.SubjectEnrollments
-                .Select(enrollment => enrollment.Subject)
-                .Where(subject => subject is not null)
-                .GroupBy(subject => subject!.Id)
-                .Select(group =>
-                {
-                    var subjectId = group.Key;
-                    var subjectName = group.First().Name;
-                    var subjectResults = student.Results
-                        .Where(result => result.SubjectId == subjectId)
-                        .OrderByDescending(result => result.CreatedAt)
-                        .ToList();
-
-                    var actualResult = subjectResults.FirstOrDefault();
-                    var averageMark = subjectResults.Count == 0 ? 0m : Math.Round(subjectResults.Average(result => result.Score), 1);
-
-                    return new ParentReportSubjectResponse(
-                        subjectId,
-                        subjectName,
-                        averageMark,
-                        actualResult?.Score,
-                        actualResult?.Grade,
-                        actualResult?.Teacher.DisplayName,
-                        actualResult?.Comment,
-                        actualResult?.Term,
-                        actualResult?.CreatedAt);
-                })
-                .OrderBy(row => row.SubjectName)
-                .ToList();
-
-            if (subjectRows.Count == 0)
-            {
-                subjectRows = student.Results
-                    .Select(result => new ParentReportSubjectResponse(
-                        result.SubjectId,
-                        result.Subject.Name,
-                        result.Score,
-                        result.Score,
-                        result.Grade,
-                        result.Teacher.DisplayName,
-                        result.Comment,
-                        result.Term,
-                        result.CreatedAt))
-                    .GroupBy(row => row.SubjectId)
-                    .Select(group => group.OrderByDescending(item => item.CreatedAt).First())
-                    .OrderBy(row => row.SubjectName)
-                    .ToList();
-            }
-
-            var overallAverage = student.Results.Count == 0
-                ? 0m
-                : Math.Round(student.Results.Average(result => result.Score), 1);
-
-            return new ParentPreviewReportResponse(
-                student.Id,
-                student.FullName,
-                student.StudentNumber,
-                student.Class,
-                student.Level,
-                student.EnrollmentYear,
-                schoolNames.TryGetValue(student.SchoolId, out var schoolName) ? schoolName : $"School {student.SchoolId}",
-                overallAverage,
-                subjectRows);
-        }).ToList();
+        return await BuildParentPreviewReportsAsync(students, cancellationToken);
     }
 
     public async Task<ResultSlipSendResponse> SendSlipAsync(
@@ -292,10 +226,11 @@ public sealed class ResultService : IResultService
         var student = await studentQuery.FirstOrDefaultAsync(cancellationToken)
             ?? throw new InvalidOperationException("Student was not found in this school.");
 
+        var preview = await BuildParentPreviewReportForStudentAsync(student.Id, cancellationToken);
+        var emailTemplate = _reportEmailTemplateService.BuildParentResultSlip(preview);
+
         var emailSent = false;
         var smsSent = false;
-        var message = $"Your ZynkEdu result slip for {student.FullName} ({student.StudentNumber}) is attached.";
-        var subject = $"ZynkEdu results - {student.FullName}";
 
         if (request.SendEmail)
         {
@@ -306,8 +241,9 @@ public sealed class ResultService : IResultService
 
             await _emailSender.SendAsync(
                 student.ParentEmail,
-                subject,
-                message,
+                emailTemplate.Subject,
+                emailTemplate.TextBody,
+                emailTemplate.HtmlBody,
                 slipPdf,
                 string.IsNullOrWhiteSpace(slipFileName) ? $"result-slip-{student.StudentNumber}.pdf" : slipFileName,
                 "application/pdf",
@@ -432,5 +368,108 @@ public sealed class ResultService : IResultService
             result.IsLocked,
             result.CreatedAt,
             result.CreatedAt.Year);
+    }
+
+    private async Task<IReadOnlyList<ParentPreviewReportResponse>> BuildParentPreviewReportsAsync(IEnumerable<Student> students, CancellationToken cancellationToken)
+    {
+        var schoolNames = await _dbContext.Schools.AsNoTracking()
+            .Where(x => students.Select(student => student.SchoolId).Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
+
+        var reports = new List<ParentPreviewReportResponse>();
+        foreach (var student in students)
+        {
+            reports.Add(BuildParentPreviewReport(student, schoolNames));
+        }
+
+        return reports;
+    }
+
+    private async Task<ParentPreviewReportResponse> BuildParentPreviewReportForStudentAsync(int studentId, CancellationToken cancellationToken)
+    {
+        var student = await _dbContext.Students.AsNoTracking()
+            .Where(x => x.Id == studentId)
+            .Include(x => x.SubjectEnrollments)
+                .ThenInclude(x => x.Subject)
+            .Include(x => x.Results)
+                .ThenInclude(x => x.Subject)
+            .Include(x => x.Results)
+                .ThenInclude(x => x.Teacher)
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new InvalidOperationException("Student was not found in this school.");
+
+        var schoolName = await _dbContext.Schools.AsNoTracking()
+            .Where(x => x.Id == student.SchoolId)
+            .Select(x => x.Name)
+            .FirstOrDefaultAsync(cancellationToken) ?? $"School {student.SchoolId}";
+
+        return BuildParentPreviewReport(student, new Dictionary<int, string> { [student.SchoolId] = schoolName });
+    }
+
+    private static ParentPreviewReportResponse BuildParentPreviewReport(Student student, IReadOnlyDictionary<int, string> schoolNames)
+    {
+        var subjectRows = student.SubjectEnrollments
+            .Select(enrollment => enrollment.Subject)
+            .Where(subject => subject is not null)
+            .GroupBy(subject => subject!.Id)
+            .Select(group =>
+            {
+                var subjectId = group.Key;
+                var subjectName = group.First().Name;
+                var subjectResults = student.Results
+                    .Where(result => result.SubjectId == subjectId)
+                    .OrderByDescending(result => result.CreatedAt)
+                    .ToList();
+
+                var actualResult = subjectResults.FirstOrDefault();
+                var averageMark = subjectResults.Count == 0 ? 0m : Math.Round(subjectResults.Average(result => result.Score), 1);
+
+                return new ParentReportSubjectResponse(
+                    subjectId,
+                    subjectName,
+                    averageMark,
+                    actualResult?.Score,
+                    actualResult?.Grade,
+                    actualResult?.Teacher.DisplayName,
+                    actualResult?.Comment,
+                    actualResult?.Term,
+                    actualResult?.CreatedAt);
+            })
+            .OrderBy(row => row.SubjectName)
+            .ToList();
+
+        if (subjectRows.Count == 0)
+        {
+            subjectRows = student.Results
+                .Select(result => new ParentReportSubjectResponse(
+                    result.SubjectId,
+                    result.Subject.Name,
+                    result.Score,
+                    result.Score,
+                    result.Grade,
+                    result.Teacher.DisplayName,
+                    result.Comment,
+                    result.Term,
+                    result.CreatedAt))
+                .GroupBy(row => row.SubjectId)
+                .Select(group => group.OrderByDescending(item => item.CreatedAt).First())
+                .OrderBy(row => row.SubjectName)
+                .ToList();
+        }
+
+        var overallAverage = student.Results.Count == 0
+            ? 0m
+            : Math.Round(student.Results.Average(result => result.Score), 1);
+
+        return new ParentPreviewReportResponse(
+            student.Id,
+            student.FullName,
+            student.StudentNumber,
+            student.Class,
+            student.Level,
+            student.EnrollmentYear,
+            schoolNames.TryGetValue(student.SchoolId, out var schoolName) ? schoolName : $"School {student.SchoolId}",
+            overallAverage,
+            subjectRows);
     }
 }

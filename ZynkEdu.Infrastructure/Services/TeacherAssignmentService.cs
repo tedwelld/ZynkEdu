@@ -22,7 +22,7 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
     {
         var resolvedSchoolId = ResolveSchoolId(schoolId);
         var trimmedClass = request.Class.Trim();
-        var classLevel = ResolveClassLevel(trimmedClass);
+        var schoolClass = await GetRequiredSchoolClassAsync(resolvedSchoolId, trimmedClass, cancellationToken);
 
         var teacher = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == request.TeacherId && x.SchoolId == resolvedSchoolId, cancellationToken);
         if (teacher is null || teacher.Role != UserRole.Teacher)
@@ -36,18 +36,10 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
             throw new InvalidOperationException("Subject was not found in this school.");
         }
 
-        EnsureSubjectMatchesClassLevel(subject.GradeLevel, classLevel);
-
-        var existingAssignment = await _dbContext.TeacherAssignments.AsNoTracking().FirstOrDefaultAsync(x =>
-            x.SchoolId == resolvedSchoolId &&
-            x.TeacherId == request.TeacherId &&
-            x.SubjectId == request.SubjectId &&
-            x.Class == trimmedClass, cancellationToken);
-
-        if (existingAssignment is not null)
-        {
-            throw new InvalidOperationException("This teacher assignment already exists.");
-        }
+        EnsureClassHasSubjects(schoolClass);
+        EnsureSubjectMatchesClassLevel(subject.GradeLevel, schoolClass.GradeLevel);
+        EnsureSubjectIsAssignedToClass(subject.Id, schoolClass);
+        await EnsureAssignmentOwnershipAsync(resolvedSchoolId, subject.Id, trimmedClass, request.TeacherId, null, cancellationToken);
 
         var assignment = new TeacherAssignment
         {
@@ -83,12 +75,18 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
             throw new InvalidOperationException("Choose at least one class.");
         }
 
-        var classLevel = ResolveBatchClassLevel(classes);
+        var schoolClasses = await GetRequiredSchoolClassesAsync(resolvedSchoolId, classes, cancellationToken);
+        var classLevel = ResolveBatchClassLevel(schoolClasses);
 
         var teacher = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == request.TeacherId && x.SchoolId == resolvedSchoolId, cancellationToken);
         if (teacher is null || teacher.Role != UserRole.Teacher)
         {
             throw new InvalidOperationException("Teacher was not found in this school.");
+        }
+
+        foreach (var schoolClass in schoolClasses)
+        {
+            EnsureClassHasSubjects(schoolClass);
         }
 
         var subjects = await _dbContext.Subjects
@@ -104,15 +102,24 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
         foreach (var subject in subjects)
         {
             EnsureSubjectMatchesClassLevel(subject.GradeLevel, classLevel);
+            foreach (var schoolClass in schoolClasses)
+            {
+                EnsureSubjectIsAssignedToClass(subject.Id, schoolClass);
+            }
         }
 
         var existingKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var existingAssignments = await _dbContext.TeacherAssignments.AsNoTracking()
-            .Where(x => x.SchoolId == resolvedSchoolId && x.TeacherId == teacher.Id && subjectIds.Contains(x.SubjectId) && classes.Contains(x.Class))
+            .Where(x => x.SchoolId == resolvedSchoolId && subjectIds.Contains(x.SubjectId) && classes.Contains(x.Class))
             .ToListAsync(cancellationToken);
 
         foreach (var existing in existingAssignments)
         {
+            if (existing.TeacherId != teacher.Id)
+            {
+                throw new InvalidOperationException($"The class and subject pair {existing.Class} / {subjectLookupName(existing.SubjectId, subjects)} is already assigned to another teacher.");
+            }
+
             existingKeys.Add(BuildAssignmentKey(existing.SubjectId, existing.Class));
         }
 
@@ -213,7 +220,7 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
         var assignment = await _dbContext.TeacherAssignments.FirstOrDefaultAsync(x => x.Id == id && x.SchoolId == resolvedSchoolId, cancellationToken)
             ?? throw new InvalidOperationException("Teacher assignment was not found in this school.");
         var trimmedClass = request.Class.Trim();
-        var classLevel = ResolveClassLevel(trimmedClass);
+        var schoolClass = await GetRequiredSchoolClassAsync(resolvedSchoolId, trimmedClass, cancellationToken);
 
         var teacher = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == request.TeacherId && x.SchoolId == resolvedSchoolId, cancellationToken);
         if (teacher is null || teacher.Role != UserRole.Teacher)
@@ -227,19 +234,10 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
             throw new InvalidOperationException("Subject was not found in this school.");
         }
 
-        EnsureSubjectMatchesClassLevel(subject.GradeLevel, classLevel);
-
-        var duplicateAssignment = await _dbContext.TeacherAssignments.AsNoTracking().FirstOrDefaultAsync(x =>
-            x.Id != id &&
-            x.SchoolId == resolvedSchoolId &&
-            x.TeacherId == request.TeacherId &&
-            x.SubjectId == request.SubjectId &&
-            x.Class == trimmedClass, cancellationToken);
-
-        if (duplicateAssignment is not null)
-        {
-            throw new InvalidOperationException("This teacher assignment already exists.");
-        }
+        EnsureClassHasSubjects(schoolClass);
+        EnsureSubjectMatchesClassLevel(subject.GradeLevel, schoolClass.GradeLevel);
+        EnsureSubjectIsAssignedToClass(subject.Id, schoolClass);
+        await EnsureAssignmentOwnershipAsync(resolvedSchoolId, subject.Id, trimmedClass, request.TeacherId, id, cancellationToken);
 
         assignment.TeacherId = request.TeacherId;
         assignment.SubjectId = request.SubjectId;
@@ -278,28 +276,56 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
 
     private static string BuildAssignmentKey(int subjectId, string className) => $"{subjectId}|{className.Trim()}";
 
-    private static string ResolveClassLevel(string className)
+    private static string subjectLookupName(int subjectId, IReadOnlyList<Subject> subjects)
+        => subjects.FirstOrDefault(subject => subject.Id == subjectId)?.Name ?? $"Subject {subjectId}";
+
+    private async Task<SchoolClass> GetRequiredSchoolClassAsync(int schoolId, string className, CancellationToken cancellationToken)
     {
-        if (SchoolLevelCatalog.TryGetClassLevel(className, out var level))
+        var schoolClass = await _dbContext.SchoolClasses
+            .Include(x => x.Subjects)
+                .ThenInclude(x => x.Subject)
+            .FirstOrDefaultAsync(x => x.SchoolId == schoolId && x.Name == className, cancellationToken);
+
+        if (schoolClass is null)
         {
-            return level;
+            throw new InvalidOperationException("The selected class was not found in this school.");
         }
 
-        throw new InvalidOperationException("The selected class does not belong to a supported level.");
+        if (!schoolClass.IsActive)
+        {
+            throw new InvalidOperationException("The selected class is not active.");
+        }
+
+        return schoolClass;
     }
 
-    private static string ResolveBatchClassLevel(IEnumerable<string> classes)
+    private async Task<IReadOnlyList<SchoolClass>> GetRequiredSchoolClassesAsync(int schoolId, IEnumerable<string> classNames, CancellationToken cancellationToken)
     {
-        var resolvedLevels = new List<string>();
-        foreach (var className in classes)
-        {
-            if (!SchoolLevelCatalog.TryGetClassLevel(className, out var level))
-            {
-                throw new InvalidOperationException("The selected classes do not belong to a supported level.");
-            }
+        var classList = classNames.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var schoolClasses = await _dbContext.SchoolClasses
+            .Include(x => x.Subjects)
+                .ThenInclude(x => x.Subject)
+            .Where(x => x.SchoolId == schoolId && classList.Contains(x.Name))
+            .ToListAsync(cancellationToken);
 
-            resolvedLevels.Add(level);
+        if (schoolClasses.Count != classList.Length)
+        {
+            throw new InvalidOperationException("One or more selected classes were not found in this school.");
         }
+
+        if (schoolClasses.Any(schoolClass => !schoolClass.IsActive))
+        {
+            throw new InvalidOperationException("One or more selected classes are not active.");
+        }
+
+        return schoolClasses;
+    }
+
+    private static string ResolveBatchClassLevel(IEnumerable<SchoolClass> classes)
+    {
+        var resolvedLevels = classes
+            .Select(classItem => SchoolLevelCatalog.NormalizeLevel(classItem.GradeLevel))
+            .ToArray();
 
         var distinctLevels = resolvedLevels
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -321,14 +347,66 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
     private static void EnsureSubjectMatchesClassLevel(string subjectLevel, string classLevel)
     {
         var normalizedSubjectLevel = SchoolLevelCatalog.NormalizeLevel(subjectLevel);
+        var normalizedClassLevel = SchoolLevelCatalog.NormalizeLevel(classLevel);
+
         if (normalizedSubjectLevel == SchoolLevelCatalog.General)
         {
             return;
         }
 
-        if (!string.Equals(normalizedSubjectLevel, classLevel, StringComparison.OrdinalIgnoreCase))
+        if (normalizedClassLevel == SchoolLevelCatalog.General)
+        {
+            if (normalizedSubjectLevel != SchoolLevelCatalog.General)
+            {
+                throw new InvalidOperationException($"The selected subject is for {normalizedSubjectLevel}, which does not match the selected class level.");
+            }
+
+            return;
+        }
+
+        if (!string.Equals(normalizedSubjectLevel, normalizedClassLevel, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException($"The selected subject is for {normalizedSubjectLevel}, which does not match the selected class level.");
         }
+    }
+
+    private static void EnsureClassHasSubjects(SchoolClass schoolClass)
+    {
+        if (schoolClass.Subjects.Count == 0)
+        {
+            throw new InvalidOperationException("Assign subjects to the selected class before creating teacher assignments.");
+        }
+    }
+
+    private static void EnsureSubjectIsAssignedToClass(int subjectId, SchoolClass schoolClass)
+    {
+        if (schoolClass.Subjects.All(link => link.SubjectId != subjectId))
+        {
+            throw new InvalidOperationException("The selected subject is not assigned to the selected class.");
+        }
+    }
+
+    private async Task EnsureAssignmentOwnershipAsync(int schoolId, int subjectId, string className, int teacherId, int? currentAssignmentId, CancellationToken cancellationToken)
+    {
+        var existing = await _dbContext.TeacherAssignments.AsNoTracking()
+            .Where(x => x.SchoolId == schoolId && x.SubjectId == subjectId && x.Class == className)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existing is null)
+        {
+            return;
+        }
+
+        if (currentAssignmentId is not null && existing.Id == currentAssignmentId.Value)
+        {
+            return;
+        }
+
+        if (existing.TeacherId != teacherId)
+        {
+            throw new InvalidOperationException("This class and subject pair is already assigned to another teacher.");
+        }
+
+        throw new InvalidOperationException("This teacher assignment already exists.");
     }
 }

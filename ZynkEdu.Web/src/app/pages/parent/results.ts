@@ -4,10 +4,9 @@ import { ChartModule } from 'primeng/chart';
 import { ButtonModule } from 'primeng/button';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { ApiService } from '../../core/api/api.service';
 import { ParentPreviewReportResponse } from '../../core/api/api.models';
+import { buildParentPreviewReportPdf } from '../../shared/report/report-pdf';
 
 type ReportChart = {
     data: any;
@@ -196,47 +195,7 @@ export class ParentResults implements OnInit {
     }
 
     exportReportPdf(report: ParentPreviewReportResponse): void {
-        const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-        const createdLabel = new Date().toLocaleString();
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(18);
-        doc.text('Parent preview report', 40, 42);
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.text(`Student: ${report.studentName}`, 40, 60);
-        doc.text(`School: ${report.schoolName}`, 40, 74);
-        doc.text(`Class: ${report.class} | Level: ${report.level}`, 40, 88);
-        doc.text(`Generated: ${createdLabel}`, 40, 102);
-        doc.text(`Overall average: ${report.overallAverageMark.toFixed(1)}%`, 40, 116);
-
-        autoTable(doc, {
-            startY: 136,
-            head: [['Subject', 'Average', 'Actual', 'Grade', 'Teacher', 'Comment', 'Term']],
-            body: report.subjects.map((subject) => [
-                subject.subjectName,
-                `${subject.averageMark.toFixed(1)}%`,
-                subject.actualMark === null || subject.actualMark === undefined ? 'N/A' : `${subject.actualMark.toFixed(1)}%`,
-                subject.grade ?? 'N/A',
-                subject.teacherName ?? 'N/A',
-                subject.teacherComment ?? 'No comment yet.',
-                subject.term ?? 'N/A'
-            ]),
-            theme: 'striped',
-            styles: { fontSize: 8, cellPadding: 5, valign: 'top' },
-            headStyles: { fillColor: [37, 99, 235] },
-            columnStyles: {
-                0: { cellWidth: 92 },
-                1: { cellWidth: 48 },
-                2: { cellWidth: 48 },
-                3: { cellWidth: 40 },
-                4: { cellWidth: 70 },
-                5: { cellWidth: 150 },
-                6: { cellWidth: 48 }
-            }
-        });
-
+        const doc = buildParentPreviewReportPdf(report);
         doc.save(`parent-preview-${report.studentNumber}.pdf`);
     }
 

@@ -70,7 +70,8 @@ public sealed class ResultAuthorizationTests
             new StubNotificationService(),
             new StubAuditLogService(),
             new RecordingEmailSender(),
-            new RecordingSmsSender());
+            new RecordingSmsSender(),
+            new ReportEmailTemplateService());
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => service.CreateAsync(new CreateResultRequest(
             student.Id,
@@ -111,7 +112,8 @@ public sealed class ResultAuthorizationTests
             new StubNotificationService(),
             new StubAuditLogService(),
             emailSender,
-            smsSender);
+            smsSender,
+            new ReportEmailTemplateService());
 
         var slipBytes = new byte[] { 1, 2, 3, 4 };
         var response = await service.SendSlipAsync(student.Id, new SendResultSlipRequest(true, true), slipBytes, "student-slip.pdf", null);
@@ -120,6 +122,7 @@ public sealed class ResultAuthorizationTests
         Assert.True(response.SmsSent);
         Assert.Single(emailSender.Messages);
         Assert.Equal("parent@example.com", emailSender.Messages[0].Destination);
+        Assert.NotNull(emailSender.Messages[0].HtmlMessage);
         Assert.Equal("student-slip.pdf", emailSender.Messages[0].AttachmentFileName);
         Assert.Equal(slipBytes, emailSender.Messages[0].AttachmentBytes);
         Assert.Single(smsSender.Messages);

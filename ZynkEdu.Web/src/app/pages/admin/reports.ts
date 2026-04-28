@@ -6,15 +6,15 @@ import { MessageService } from 'primeng/api';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { getClassLevel } from '../../core/school-levels';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
-import { ResultResponse, SchoolResponse, UserResponse } from '../../core/api/api.models';
+import { ParentPreviewReportResponse, ResultResponse, SchoolResponse, StudentResponse, UserResponse } from '../../core/api/api.models';
+import { buildAdminResultsReportPdf, buildParentPreviewReportPdf } from '../../shared/report/report-pdf';
 
 interface PreviewRow {
     year: number;
@@ -418,77 +418,15 @@ export class AdminReports implements OnInit {
         }
 
         try {
-            const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
-            const margin = 40;
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const title = 'Results report';
-            const description = 'Filtered by year, class, student name, and teacher name. Grouped by school and class for easy review.';
-            const scope = this.selectedScopeLabel;
-            const filters = this.selectedFilterSummary();
-
-            doc.setTextColor(17, 24, 39);
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(20);
-            doc.text(title, margin, 46);
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            doc.setTextColor(75, 85, 99);
-            doc.text(description, margin, 64, { maxWidth: pageWidth - margin * 2 });
-            doc.text(`Scope: ${scope}`, margin, 82);
-            doc.text(`Filters: ${filters}`, margin, 96);
-            doc.text(`Generated: ${this.formatDate(new Date())}`, margin, 110);
-
-            let currentY = 126;
-            for (const schoolGroup of this.groupedResultsBySchoolAndClass()) {
-                doc.setFont('helvetica', 'bold');
-                doc.setFontSize(13);
-                doc.setTextColor(17, 24, 39);
-                doc.text(schoolGroup.schoolName, margin, currentY);
-                currentY += 14;
-
-                for (const classGroup of schoolGroup.classes) {
-                    doc.setFont('helvetica', 'bold');
-                    doc.setFontSize(11);
-                    doc.setTextColor(37, 99, 235);
-                    doc.text(`${classGroup.className} (${classGroup.rows.length} row(s))`, margin, currentY);
-                    currentY += 10;
-
-                    autoTable(doc, {
-                        startY: currentY,
-                        head: [['Year', 'Student', 'Subject', 'Teacher', 'Score', 'Grade', 'Term', 'Date']],
-                        body: classGroup.rows.map((result) => [
-                            result.resultYear.toString(),
-                            `${result.studentName} (${result.studentNumber})`,
-                            result.subjectName,
-                            result.teacherName,
-                            `${result.score.toFixed(1)}%`,
-                            result.grade,
-                            result.term,
-                            this.formatDate(result.createdAt)
-                        ]),
-                        theme: 'striped',
-                        styles: {
-                            fontSize: 8,
-                            cellPadding: 4
-                        },
-                        headStyles: {
-                            fillColor: [37, 99, 235]
-                        },
-                        margin: {
-                            left: margin,
-                            right: margin
-                        }
-                    });
-
-                    currentY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 18 : currentY + 110;
-                    if (currentY > doc.internal.pageSize.getHeight() - 120) {
-                        doc.addPage();
-                        currentY = 40;
-                    }
-                }
-            }
-
-            doc.save(this.fileNameForReport());
+            buildAdminResultsReportPdf(
+                'Results report',
+                'Filtered by year, class, student name, and teacher name. Grouped by school and class for easy review.',
+                this.selectedScopeLabel,
+                this.selectedFilterSummary(),
+                new Date(),
+                this.groupedResultsBySchoolAndClass(),
+                this.fileNameForReport()
+            );
             this.messages.add({ severity: 'success', summary: 'PDF ready', detail: 'The filtered report was generated successfully.' });
         } catch {
             this.messages.add({ severity: 'error', summary: 'PDF failed', detail: 'The PDF report could not be generated.' });
@@ -501,25 +439,33 @@ export class AdminReports implements OnInit {
             return;
         }
 
-        try {
-            const pdf = this.buildStudentSlipPdf(this.selectedStudentResults);
-            const blob = pdf.output('blob');
-            this.api.sendResultSlip(
-                this.selectedStudentId,
-                { sendEmail: true, sendSms: true },
-                blob,
-                this.selectedSchoolId
-            ).subscribe({
-                next: () => {
-                    this.messages.add({ severity: 'success', summary: 'Slip sent', detail: 'The selected student slip was sent to the registered parent contact.' });
-                },
-                error: () => {
-                    this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The parent slip could not be sent.' });
+        this.api.getStudentById(this.selectedStudentId).subscribe({
+            next: (student) => {
+                try {
+                    const report = this.parentReportForSelectedStudent(student);
+                    const pdf = buildParentPreviewReportPdf(report);
+                    const blob = pdf.output('blob');
+                    this.api.sendResultSlip(
+                        this.selectedStudentId as number,
+                        { sendEmail: true, sendSms: true },
+                        blob,
+                        this.selectedSchoolId
+                    ).subscribe({
+                        next: () => {
+                            this.messages.add({ severity: 'success', summary: 'Slip sent', detail: 'The selected student slip was sent to the registered parent contact.' });
+                        },
+                        error: () => {
+                            this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The parent slip could not be sent.' });
+                        }
+                    });
+                } catch {
+                    this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The parent slip could not be prepared.' });
                 }
-            });
-        } catch {
-            this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The parent slip could not be prepared.' });
-        }
+            },
+            error: () => {
+                this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The selected student could not be loaded.' });
+            }
+        });
     }
 
     exportExcel(): void {
@@ -599,50 +545,6 @@ export class AdminReports implements OnInit {
             }));
     }
 
-    private buildStudentSlipPdf(results: ResultResponse[]): jsPDF {
-        const student = results[0];
-        const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-        const margin = 40;
-        const schoolName = this.schoolNameForResult(student);
-        const subjectRows = results
-            .slice()
-            .sort((left, right) => left.subjectName.localeCompare(right.subjectName));
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(18);
-        doc.text('Parent result slip', margin, 42);
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.text(`Student: ${student.studentName}`, margin, 60);
-        doc.text(`Student number: ${student.studentNumber}`, margin, 74);
-        doc.text(`School: ${schoolName}`, margin, 88);
-        doc.text(`Class: ${student.studentClass} | Year: ${student.resultYear}`, margin, 102);
-        const overallAverage = subjectRows.length === 0 ? 0 : subjectRows.reduce((sum, result) => sum + result.score, 0) / subjectRows.length;
-        doc.text(`Overall average: ${overallAverage.toFixed(1)}%`, margin, 116);
-        doc.text(`Generated: ${this.formatDate(new Date())}`, margin, 130);
-
-        autoTable(doc, {
-            startY: 148,
-            head: [['Subject', 'Teacher', 'Score', 'Grade', 'Term', 'Comment', 'Date']],
-            body: subjectRows.map((result) => [
-                result.subjectName,
-                result.teacherName,
-                `${result.score.toFixed(1)}%`,
-                result.grade,
-                result.term,
-                result.comment || 'No teacher comment yet.',
-                this.formatDate(result.createdAt)
-            ]),
-            theme: 'striped',
-            styles: { fontSize: 8, cellPadding: 5, valign: 'top' },
-            headStyles: { fillColor: [37, 99, 235] },
-            margin: { left: margin, right: margin }
-        });
-
-        return doc;
-    }
-
     private uniqueStudents(results: ResultResponse[]): { label: string; value: number }[] {
         const map = new Map<number, string>();
         for (const result of results) {
@@ -656,6 +558,39 @@ export class AdminReports implements OnInit {
 
     private schoolNameForResult(result: ResultResponse): string {
         return this.schools.find((school) => school.id === result.schoolId)?.name ?? `School ${result.schoolId}`;
+    }
+
+    private parentReportForSelectedStudent(student: StudentResponse): ParentPreviewReportResponse {
+        const studentResults = this.selectedStudentResults;
+        const firstResult = studentResults[0];
+        if (!firstResult) {
+            throw new Error('No student results');
+        }
+
+        return {
+            studentId: firstResult.studentId,
+            studentName: firstResult.studentName,
+            studentNumber: firstResult.studentNumber,
+            class: student.class,
+            level: student.level || (getClassLevel(firstResult.studentClass) ?? 'General'),
+            enrollmentYear: student.enrollmentYear,
+            schoolName: this.schoolNameForResult(firstResult),
+            overallAverageMark: studentResults.length === 0 ? 0 : studentResults.reduce((sum, result) => sum + result.score, 0) / studentResults.length,
+            subjects: studentResults
+                .slice()
+                .sort((left, right) => left.subjectName.localeCompare(right.subjectName))
+                .map((result) => ({
+                    subjectId: result.subjectId,
+                    subjectName: result.subjectName,
+                    averageMark: result.score,
+                    actualMark: result.score,
+                    grade: result.grade,
+                    teacherName: result.teacherName,
+                    teacherComment: result.comment,
+                    term: result.term,
+                    createdAt: result.createdAt
+                }))
+        } as ParentPreviewReportResponse;
     }
 
     private uniqueTeachers(results: ResultResponse[]): { label: string; value: number }[] {

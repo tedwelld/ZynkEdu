@@ -8,14 +8,13 @@ import { InputTextModule } from 'primeng/inputtext';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { CreateResultRequest, ResultResponse, StudentResponse, TeacherAssignmentResponse } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
+import { buildTeacherClassResultsPdf } from '../../shared/report/report-pdf';
 
 interface ResultEntryRow {
     student: StudentResponse;
@@ -353,33 +352,21 @@ export class TeacherResults implements OnInit {
             return;
         }
 
-        const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(18);
-        doc.text(`Class results - ${this.selectedClass}`, 40, 42);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.text(`Subject: ${this.selectedSubjectName}`, 40, 60);
-        doc.text(`Term: ${this.termFilter}`, 40, 74);
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 88);
-
-        autoTable(doc, {
-            startY: 106,
-            head: [['Student', 'Number', 'Test', 'Assignment', 'Exam', 'Total', 'Grade']],
-            body: this.entryRows.map((row) => [
-                row.student.fullName,
-                row.student.studentNumber,
-                row.testScore?.toFixed(1) ?? '',
-                row.assignmentScore?.toFixed(1) ?? '',
-                row.examScore?.toFixed(1) ?? '',
-                row.finalScore?.toFixed(1) ?? '',
-                row.grade
-            ]),
-            theme: 'striped',
-            styles: { fontSize: 8.5, cellPadding: 5 },
-            headStyles: { fillColor: [37, 99, 235] }
-        });
-
+        const doc = buildTeacherClassResultsPdf(
+            this.selectedClass,
+            this.selectedSubjectName,
+            this.termFilter,
+            new Date(),
+            this.entryRows.map((row) => ({
+                studentName: row.student.fullName,
+                studentNumber: row.student.studentNumber,
+                testScore: row.testScore,
+                assignmentScore: row.assignmentScore,
+                examScore: row.examScore,
+                finalScore: row.finalScore,
+                grade: row.grade
+            }))
+        );
         doc.save(`class-results-${this.selectedClass}.pdf`);
     }
 
