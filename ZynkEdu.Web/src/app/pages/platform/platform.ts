@@ -181,7 +181,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 <div class="space-y-4">
                     <div *ngIf="adminDrawerMode === 'create'">
                         <label class="block text-sm font-semibold mb-2">School</label>
-                        <app-dropdown [options]="schoolSelectOptions" [(ngModel)]="adminDraft.schoolId" optionLabel="label" optionValue="value" class="w-full" appendTo="body"></app-dropdown>
+                        <app-dropdown [options]="schoolSelectOptions" [(ngModel)]="adminDraft.schoolId" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()"></app-dropdown>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Username</label>

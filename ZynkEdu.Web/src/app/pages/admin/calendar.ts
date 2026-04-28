@@ -28,9 +28,16 @@ interface CalendarEventDraft {
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">School calendar</p>
                     <h1 class="text-3xl font-display font-bold m-0">Three-term setup and events</h1>
-                    <p class="text-muted-color mt-2 max-w-2xl">Set the start and end dates for Term 1, Term 2, and Term 3, then add school events for any term.</p>
+                    <p class="text-muted-color mt-2 max-w-2xl">Set term dates, add events, and switch between list, month, and week views.</p>
                 </div>
-                <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                <div class="flex items-center gap-3">
+                    <div class="flex rounded-2xl border border-surface-200 dark:border-surface-700 p-1">
+                        <button pButton type="button" label="List" class="p-button-text p-button-sm" [severity]="viewMode === 'list' ? 'primary' : 'secondary'" (click)="viewMode = 'list'"></button>
+                        <button pButton type="button" label="Month" class="p-button-text p-button-sm" [severity]="viewMode === 'month' ? 'primary' : 'secondary'" (click)="viewMode = 'month'"></button>
+                        <button pButton type="button" label="Week" class="p-button-text p-button-sm" [severity]="viewMode === 'week' ? 'primary' : 'secondary'" (click)="viewMode = 'week'"></button>
+                    </div>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                </div>
             </div>
 
             <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -70,7 +77,7 @@ interface CalendarEventDraft {
                     <div class="space-y-4">
                         <div>
                             <label class="block text-sm font-semibold mb-2">Term</label>
-                            <app-dropdown [options]="termOptions" [(ngModel)]="eventDraft.academicTermId" optionLabel="label" optionValue="value" class="w-full" appendTo="body"></app-dropdown>
+                            <app-dropdown [options]="termOptions" [(ngModel)]="eventDraft.academicTermId" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()"></app-dropdown>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-2">Title</label>
@@ -92,7 +99,7 @@ interface CalendarEventDraft {
                     <div class="flex items-center justify-between gap-3 mb-4">
                         <div>
                             <h2 class="text-xl font-display font-bold mb-1">Term events</h2>
-                            <p class="text-sm text-muted-color">Simple overview of the school calendar.</p>
+                            <p class="text-sm text-muted-color">Overview grouped by month or week.</p>
                         </div>
                         <span class="text-sm text-muted-color">{{ events.length }} total</span>
                     </div>
@@ -102,16 +109,40 @@ interface CalendarEventDraft {
                     </div>
 
                     <div *ngIf="!loading" class="space-y-3">
-                        <div *ngFor="let event of events" class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
-                                    <div class="font-semibold">{{ event.title }}</div>
-                                    <div class="text-sm text-muted-color">{{ event.description || 'No description provided.' }}</div>
-                                    <div class="text-xs text-muted-color mt-1">{{ event.termName }} · {{ event.eventDate | date: 'mediumDate' }}</div>
+                        <ng-container *ngIf="viewMode === 'list'; else groupedEventsTemplate">
+                            <div *ngFor="let event of events" class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div class="font-semibold">{{ event.title }}</div>
+                                        <div class="text-sm text-muted-color">{{ event.description || 'No description provided.' }}</div>
+                                        <div class="text-xs text-muted-color mt-1">{{ event.termName }} - {{ event.eventDate | date: 'mediumDate' }}</div>
+                                    </div>
+                                    <div class="flex flex-col items-end gap-2">
+                                        <p-tag [value]="eventType(event)" [severity]="eventTypeSeverity(event)"></p-tag>
+                                        <button pButton type="button" icon="pi pi-trash" class="p-button-text p-button-sm p-button-danger" (click)="deleteEvent(event)"></button>
+                                    </div>
                                 </div>
-                                <button pButton type="button" icon="pi pi-trash" class="p-button-text p-button-sm p-button-danger" (click)="deleteEvent(event)"></button>
                             </div>
-                        </div>
+                        </ng-container>
+
+                        <ng-template #groupedEventsTemplate>
+                            <div *ngFor="let group of groupedEventsByPeriod" class="space-y-3">
+                                <div class="text-xs uppercase tracking-[0.2em] text-muted-color font-semibold">{{ group.label }}</div>
+                                <div *ngFor="let event of group.items" class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <div class="font-semibold">{{ event.title }}</div>
+                                            <div class="text-sm text-muted-color">{{ event.description || 'No description provided.' }}</div>
+                                            <div class="text-xs text-muted-color mt-1">{{ event.termName }} - {{ event.eventDate | date: 'mediumDate' }}</div>
+                                        </div>
+                                        <div class="flex flex-col items-end gap-2">
+                                            <p-tag [value]="eventType(event)" [severity]="eventTypeSeverity(event)"></p-tag>
+                                            <button pButton type="button" icon="pi pi-trash" class="p-button-text p-button-sm p-button-danger" (click)="deleteEvent(event)"></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </ng-template>
                     </div>
                 </article>
             </div>
@@ -126,6 +157,7 @@ export class AdminCalendar implements OnInit {
     loading = true;
     terms: AcademicTermResponse[] = [];
     events: SchoolCalendarEventResponse[] = [];
+    viewMode: 'list' | 'month' | 'week' = 'list';
     skeletonRows = Array.from({ length: 4 });
     eventDraft: CalendarEventDraft = {
         academicTermId: null,
@@ -136,6 +168,21 @@ export class AdminCalendar implements OnInit {
 
     get termOptions(): { label: string; value: number }[] {
         return this.terms.map((term) => ({ label: term.name, value: term.id }));
+    }
+
+    get groupedEventsByPeriod(): { label: string; items: SchoolCalendarEventResponse[] }[] {
+        const groups = new Map<string, SchoolCalendarEventResponse[]>();
+        for (const event of this.events) {
+            const date = new Date(event.eventDate);
+            const key = this.viewMode === 'week'
+                ? `Week of ${this.startOfWeek(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
+                : date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+            const items = groups.get(key) ?? [];
+            items.push(event);
+            groups.set(key, items);
+        }
+
+        return Array.from(groups.entries()).map(([label, items]) => ({ label, items }));
     }
 
     ngOnInit(): void {
@@ -214,5 +261,48 @@ export class AdminCalendar implements OnInit {
 
     termEvents(termId: number): SchoolCalendarEventResponse[] {
         return this.events.filter((event) => event.academicTermId === termId);
+    }
+
+    eventType(event: SchoolCalendarEventResponse): string {
+        const text = `${event.title} ${event.description || ''}`.toLowerCase();
+        if (text.includes('exam')) {
+            return 'Exam';
+        }
+
+        if (text.includes('holiday')) {
+            return 'Holiday';
+        }
+
+        if (text.includes('meeting')) {
+            return 'Meeting';
+        }
+
+        return 'Event';
+    }
+
+    eventTypeSeverity(event: SchoolCalendarEventResponse): 'success' | 'warning' | 'help' | 'secondary' {
+        const type = this.eventType(event);
+        if (type === 'Exam') {
+            return 'warning';
+        }
+
+        if (type === 'Holiday') {
+            return 'help';
+        }
+
+        if (type === 'Meeting') {
+            return 'success';
+        }
+
+        return 'secondary';
+    }
+
+    private startOfWeek(date: Date): Date {
+        const result = new Date(date);
+        const day = result.getDay();
+        const offset = (day + 6) % 7;
+        result.setDate(result.getDate() - offset);
+        result.setHours(0, 0, 0, 0);
+        return result;
     }
 }

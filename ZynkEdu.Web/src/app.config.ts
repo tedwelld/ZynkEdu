@@ -14,7 +14,6 @@ import { ConfirmationService, MessageService } from 'primeng/api';
 import { providePrimeNG } from 'primeng/config';
 
 import { authInterceptor } from './app/core/auth/auth.interceptor';
-import { loadingInterceptor } from './app/core/loading/loading.interceptor';
 import { appRoutes } from './app.routes';
 
 export const appConfig: ApplicationConfig = {
@@ -31,7 +30,7 @@ export const appConfig: ApplicationConfig = {
 
         provideHttpClient(
             withFetch(),
-            withInterceptors([loadingInterceptor, authInterceptor])
+            withInterceptors([authInterceptor])
         ),
 
         provideAnimationsAsync(),

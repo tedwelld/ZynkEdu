@@ -14,32 +14,26 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuSec
                 items: [
                     { label: 'Dashboard', icon: 'pi pi-fw pi-shield', routerLink: ['/platform/dashboard'] },
                     { label: 'Schools', icon: 'pi pi-fw pi-building', routerLink: ['/platform/schools'] },
-                    { label: 'Admins', icon: 'pi pi-fw pi-user', routerLink: ['/platform/admins'] }
-                ]
-            },
-            {
-                label: 'School',
-                items: [
-                    { label: 'School Data', icon: 'pi pi-fw pi-home', routerLink: ['/admin/dashboard'] },
-                    { label: 'Attendance', icon: 'pi pi-fw pi-check-square', routerLink: ['/admin/attendance'] },
-                    { label: 'Students', icon: 'pi pi-fw pi-users', routerLink: ['/admin/students'] },
-                    { label: 'Teachers', icon: 'pi pi-fw pi-id-card', routerLink: ['/admin/teachers'] },
-                    { label: 'Calendar', icon: 'pi pi-fw pi-calendar', routerLink: ['/admin/calendar'] }
+                    { label: 'Admins', icon: 'pi pi-fw pi-user', routerLink: ['/platform/admins'] },
+                    { label: 'Attendance', icon: 'pi pi-fw pi-check-square', routerLink: ['/platform/attendance'] },
+                    { label: 'Students', icon: 'pi pi-fw pi-users', routerLink: ['/platform/students'] },
+                    { label: 'Teachers', icon: 'pi pi-fw pi-id-card', routerLink: ['/platform/teachers'] }
                 ]
             },
             {
                 label: 'Academics',
                 items: [
-                    { label: 'Subjects', icon: 'pi pi-fw pi-book', routerLink: ['/admin/subjects'] },
-                    { label: 'Assignments', icon: 'pi pi-fw pi-sitemap', routerLink: ['/admin/assignments'] },
-                    { label: 'Results', icon: 'pi pi-fw pi-chart-line', routerLink: ['/admin/results'] }
+                    { label: 'Calendar', icon: 'pi pi-fw pi-calendar', routerLink: ['/platform/calendar'] },
+                    { label: 'Subjects', icon: 'pi pi-fw pi-book', routerLink: ['/platform/subjects'] },
+                    { label: 'Assignments', icon: 'pi pi-fw pi-sitemap', routerLink: ['/platform/assignments'] },
+                    { label: 'Results', icon: 'pi pi-fw pi-chart-line', routerLink: ['/platform/results'] }
                 ]
             },
             {
-                label: 'Messages',
+                label: 'Communications',
                 items: [
-                    { label: 'Notifications', icon: 'pi pi-fw pi-bell', routerLink: ['/admin/notifications'] },
-                    { label: 'Reports', icon: 'pi pi-fw pi-file-pdf', routerLink: ['/admin/reports'] }
+                    { label: 'Notifications', icon: 'pi pi-fw pi-bell', routerLink: ['/platform/notifications'] },
+                    { label: 'Reports', icon: 'pi pi-fw pi-file-pdf', routerLink: ['/platform/reports'] }
                 ]
             }
         ];

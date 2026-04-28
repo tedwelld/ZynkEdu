@@ -20,6 +20,9 @@ public sealed record UpdateStudentRequest(
     [Required, EmailAddress] string ParentEmail,
     [Required, MinLength(7)] string ParentPhone);
 
+public sealed record UpdateStudentStatusRequest(
+    [Required, MinLength(2)] string Status);
+
 public sealed record StudentResponse(
     int Id,
     int SchoolId,
@@ -27,12 +30,19 @@ public sealed record StudentResponse(
     string FullName,
     string Class,
     string Level,
+    string Status,
     int EnrollmentYear,
     IReadOnlyList<int> SubjectIds,
     IReadOnlyList<string> Subjects,
     string ParentEmail,
     string ParentPhone,
     DateTime CreatedAt);
+
+public sealed record BulkStudentSubjectEnrollmentResponse(
+    int SchoolCount,
+    int StudentCount,
+    int SubjectCount,
+    int EnrollmentCount);
 
 public sealed record StudentCommentResponse(
     int ResultId,

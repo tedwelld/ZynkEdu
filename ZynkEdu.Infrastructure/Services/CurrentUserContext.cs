@@ -19,6 +19,8 @@ public sealed class CurrentUserContext : ICurrentUserContext
 
     public bool IsAuthenticated => User?.Identity?.IsAuthenticated == true;
 
+    public bool IsPlatformAdmin => Role == UserRole.PlatformAdmin;
+
     public bool HasSchoolScope => Role is UserRole.Admin or UserRole.Teacher;
 
     public int? UserId => int.TryParse(User?.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;

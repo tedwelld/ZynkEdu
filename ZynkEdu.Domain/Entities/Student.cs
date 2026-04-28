@@ -9,6 +9,7 @@ public sealed class Student : EntityBase, ISchoolScoped
     public string FullName { get; set; } = string.Empty;
     public string Class { get; set; } = string.Empty;
     public string Level { get; set; } = string.Empty;
+    public string Status { get; set; } = "Active";
     public int EnrollmentYear { get; set; }
     public int? GuardianId { get; set; }
     public Guardian? Guardian { get; set; }

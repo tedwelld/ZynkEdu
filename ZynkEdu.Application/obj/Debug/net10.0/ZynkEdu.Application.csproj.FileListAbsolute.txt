@@ -28,3 +28,4 @@ C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Application\obj\Debug\net10.0\Zy
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Application\obj\Debug\net10.0\refint\ZynkEdu.Application.dll
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Application\obj\Debug\net10.0\ZynkEdu.Application.pdb
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Application\obj\Debug\net10.0\ref\ZynkEdu.Application.dll
+C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Application\obj\Debug\net10.0\ZynkEdu.Application.sourcelink.json

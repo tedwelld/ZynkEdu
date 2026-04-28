@@ -8,7 +8,7 @@ namespace ZynkEdu.Api.Controllers;
 
 [ApiController]
 [Route("api/students")]
-[Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+[Authorize(Roles = RoleNames.AdminTeacherOrPlatformAdmin)]
 public sealed class StudentsController : ControllerBase
 {
     private readonly IStudentService _studentService;
@@ -19,6 +19,7 @@ public sealed class StudentsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
     public async Task<ActionResult<StudentResponse>> Create([FromBody] CreateStudentRequest request, [FromQuery] int? schoolId, CancellationToken cancellationToken)
     {
         return Ok(await _studentService.CreateAsync(request, schoolId, cancellationToken));
@@ -38,15 +39,31 @@ public sealed class StudentsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
     public async Task<ActionResult<StudentResponse>> Update(int id, [FromBody] UpdateStudentRequest request, CancellationToken cancellationToken)
     {
         return Ok(await _studentService.UpdateAsync(id, request, cancellationToken));
     }
 
+    [HttpPut("{id:int}/status")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    public async Task<ActionResult<StudentResponse>> UpdateStatus(int id, [FromBody] UpdateStudentStatusRequest request, CancellationToken cancellationToken)
+    {
+        return Ok(await _studentService.UpdateStatusAsync(id, request, cancellationToken));
+    }
+
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         await _studentService.DeleteAsync(id, cancellationToken);
         return NoContent();
+    }
+
+    [HttpPost("enroll-all-subjects")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    public async Task<ActionResult<BulkStudentSubjectEnrollmentResponse>> EnrollAllSubjects([FromQuery] int? schoolId, CancellationToken cancellationToken)
+    {
+        return Ok(await _studentService.EnrollAllSubjectsAsync(schoolId, cancellationToken));
     }
 }

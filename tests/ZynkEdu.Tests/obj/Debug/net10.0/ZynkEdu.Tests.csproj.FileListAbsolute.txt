@@ -498,3 +498,7 @@ C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\ru
 C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\runtimes\linux-riscv64\native\libe_sqlite3.so
 C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\ZynkEdu.Api.dll
 C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\ZynkEdu.Api.pdb
+C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\obj\Debug\net10.0\ZynkEdu.Tests.sourcelink.json
+C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\BouncyCastle.Cryptography.dll
+C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\MailKit.dll
+C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\MimeKit.dll

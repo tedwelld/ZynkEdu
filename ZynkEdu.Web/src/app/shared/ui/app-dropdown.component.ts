@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, forwardRef, Input } from '@angular/core';
+import { Component, EventEmitter, Output, forwardRef, Input } from '@angular/core';
 import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { SelectModule } from 'primeng/select';
 
@@ -31,6 +31,7 @@ export class AppDropdownComponent implements ControlValueAccessor {
     @Input() panelStyleClass = '';
     @Input() inputId = '';
     @Input() dataKey = '';
+    @Output() opened = new EventEmitter<void>();
 
     value: unknown = null;
 
@@ -56,6 +57,10 @@ export class AppDropdownComponent implements ControlValueAccessor {
     handleChange(value: unknown): void {
         this.value = value;
         this.onChange(value);
+    }
+
+    handleShow(): void {
+        this.opened.emit();
     }
 
     markTouched(): void {

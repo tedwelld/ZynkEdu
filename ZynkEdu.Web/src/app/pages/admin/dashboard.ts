@@ -1,6 +1,5 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ChartData, ChartOptions } from 'chart.js';
 import { ChartModule } from 'primeng/chart';
@@ -8,25 +7,17 @@ import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { ProgressBarModule } from 'primeng/progressbar';
 import { SkeletonModule } from 'primeng/skeleton';
-import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
-import { TooltipModule } from 'primeng/tooltip';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { DashboardResponse, NotificationResponse, ResultResponse, StudentResponse } from '../../core/api/api.models';
 import { LayoutService } from '../../layout/service/layout.service';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 
-interface HeatmapCell {
-    className: string;
-    subject: string;
-    score: number;
-}
-
 @Component({
     standalone: true,
     selector: 'app-admin-dashboard',
-    imports: [CommonModule, FormsModule, RouterLink, ChartModule, ButtonModule, DialogModule, MetricCardComponent, ProgressBarModule, SkeletonModule, TableModule, TagModule, TooltipModule],
+    imports: [CommonModule, RouterLink, ChartModule, ButtonModule, DialogModule, MetricCardComponent, ProgressBarModule, SkeletonModule, TagModule],
     template: `
         <section class="space-y-8">
             <header class="workspace-card overflow-hidden relative">
@@ -34,7 +25,7 @@ interface HeatmapCell {
                 <div class="relative grid gap-6 xl:grid-cols-[1.35fr_0.65fr] items-center">
                     <div class="space-y-4">
                         <p class="text-sm uppercase tracking-[0.28em] text-muted-color font-semibold">School data</p>
-                        <h1 class="text-4xl md:text-5xl font-display font-bold m-0">Executive overview for school performance, risk, and action.</h1>
+                        <h1 class="text-4xl md:text-5xl font-display font-bold m-0">Executive overview for school performance and action.</h1>
                         <p class="text-surface-600 dark:text-surface-300 max-w-3xl text-lg">
                             A clear control room for school admins: insight cards, live visual metrics, and direct paths to students, teachers, and notifications.
                         </p>
@@ -48,7 +39,7 @@ interface HeatmapCell {
                         <div class="flex items-center justify-between">
                             <div>
                                 <span class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Platform pulse</span>
-                                <div class="mt-2 text-2xl font-display font-bold">{{ dashboard?.overallAverageScore ?? 0 | number: '1.0-1' }}% average score</div>
+                                <div class="mt-2 text-2xl font-display font-bold">{{ (dashboard?.overallAverageScore ?? 0) | number: '1.0-1' }}% average score</div>
                             </div>
                             <div class="w-16 h-16 rounded-3xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center text-white">
                                 <i class="pi pi-chart-line text-2xl"></i>
@@ -57,7 +48,7 @@ interface HeatmapCell {
                         <div class="mt-6 space-y-3">
                             <div class="flex items-center justify-between text-sm">
                                 <span class="text-muted-color">Pass rate</span>
-                                <span class="font-semibold">{{ dashboard?.passRate ?? 0 | number: '1.0-1' }}%</span>
+                                <span class="font-semibold">{{ (dashboard?.passRate ?? 0) | number: '1.0-1' }}%</span>
                             </div>
                             <p-progressBar [value]="dashboard?.passRate ?? 0" [showValue]="false" styleClass="h-3"></p-progressBar>
                         </div>
@@ -66,10 +57,10 @@ interface HeatmapCell {
             </header>
 
             <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <app-metric-card [label]="'Total Students'" [value]="studentCount" [delta]="studentTrend" hint="Live roster" icon="pi pi-users" tone="blue" [direction]="studentTrendDirection"></app-metric-card>
-                <app-metric-card [label]="'Avg Performance'" [value]="averageScore" [delta]="averageTrend" hint="Across all classes" icon="pi pi-chart-bar" tone="purple" [direction]="averageDirection"></app-metric-card>
-                <app-metric-card [label]="'Weak Subjects'" [value]="weakSubjectCount" [delta]="weakSubjectHint" hint="Below target" icon="pi pi-exclamation-triangle" tone="orange" [direction]="weakDirection"></app-metric-card>
-                <app-metric-card [label]="'Notifications Sent'" [value]="todayNotifications" [delta]="notificationTrend" hint="Today" icon="pi pi-bell" tone="green" [direction]="notificationDirection"></app-metric-card>
+                <app-metric-card [label]="'Total Students'" [value]="studentCount" [delta]="studentTrend" hint="Live roster" icon="pi pi-users" tone="blue" [direction]="studentTrendDirection" routerLink="/admin/students"></app-metric-card>
+                <app-metric-card [label]="'Avg Performance'" [value]="averageScore" [delta]="averageTrend" hint="Across all classes" icon="pi pi-chart-bar" tone="purple" [direction]="averageDirection" routerLink="/admin/results"></app-metric-card>
+                <app-metric-card [label]="'Weak Subjects'" [value]="weakSubjectCount" [delta]="weakSubjectHint" hint="Below target" icon="pi pi-exclamation-triangle" tone="orange" [direction]="weakDirection" routerLink="/admin/subjects"></app-metric-card>
+                <app-metric-card [label]="'Notifications Sent'" [value]="todayNotifications" [delta]="notificationTrend" hint="Today" icon="pi pi-bell" tone="green" [direction]="notificationDirection" routerLink="/admin/notifications"></app-metric-card>
             </section>
 
             <section class="workspace-card">
@@ -99,7 +90,7 @@ interface HeatmapCell {
                             <div class="font-semibold text-blue-600 dark:text-blue-300">Executive view</div>
                         </div>
                     </div>
-                    <div class="chart-canvas-wrap flex-1">
+                    <div class="chart-canvas-wrap flex-1 min-h-[16rem]">
                         <p-chart type="line" [data]="lineData" [options]="lineOptions" class="w-full h-full"></p-chart>
                     </div>
                 </article>
@@ -112,46 +103,10 @@ interface HeatmapCell {
                         </div>
                         <i class="pi pi-chart-pie text-2xl text-violet-500"></i>
                     </div>
-                    <div class="chart-canvas-wrap flex-1 flex items-center justify-center">
+                    <div class="chart-canvas-wrap flex-1 min-h-[14rem] flex items-center justify-center">
                         <p-chart type="pie" [data]="pieData" [options]="pieOptions" class="w-full h-full"></p-chart>
                     </div>
                 </article>
-            </section>
-
-            <section class="workspace-card h-full flex flex-col min-h-[34rem]">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 class="text-xl font-display font-bold mb-1">Performance heatmap</h2>
-                        <p class="text-sm text-muted-color">Classes versus subjects, blended from the current school data.</p>
-                    </div>
-                    <span class="text-sm text-muted-color">{{ heatmapRows.length }} class bands</span>
-                </div>
-
-                <div *ngIf="loading" class="space-y-3">
-                    <div class="grid grid-cols-6 gap-3">
-                        <p-skeleton *ngFor="let _ of skeletonRows" height="4rem" borderRadius="1rem"></p-skeleton>
-                    </div>
-                </div>
-
-                <div *ngIf="!loading" class="overflow-x-auto flex-1">
-                    <div class="min-w-[720px] grid gap-2" [style.gridTemplateColumns]="'160px repeat(' + subjectLabels.length + ', minmax(0, 1fr))'">
-                        <div class="text-xs uppercase tracking-[0.25em] text-muted-color py-2">Class</div>
-                        <div *ngFor="let subject of subjectLabels" class="text-xs uppercase tracking-[0.18em] text-muted-color py-2 text-center">{{ subject }}</div>
-                        <ng-container *ngFor="let row of heatmapRows">
-                            <div class="py-3 font-semibold">{{ row.className }}</div>
-                            <button
-                                *ngFor="let cell of row.cells"
-                                type="button"
-                                class="rounded-2xl py-4 px-3 text-sm font-semibold transition-transform hover:-translate-y-0.5"
-                                [ngClass]="heatmapTone(cell.score)"
-                                [pTooltip]="cell.subject + ' ' + cell.score.toFixed(1) + '%'"
-                                tooltipPosition="top"
-                            >
-                                {{ cell.score.toFixed(0) }}%
-                            </button>
-                        </ng-container>
-                    </div>
-                </div>
             </section>
 
             <p-dialog [(visible)]="studentDrawerVisible" [modal]="true" [draggable]="false" [dismissableMask]="true" [style]="{ width: 'min(42rem, 96vw)' }" header="Student profile" appendTo="body">
@@ -183,7 +138,7 @@ interface HeatmapCell {
                                 <h4 class="font-display font-bold mb-0">Results trend</h4>
                                 <span class="text-sm text-muted-color">{{ studentResults.length }} entries</span>
                             </div>
-                            <div class="chart-canvas-wrap">
+                            <div class="chart-canvas-wrap min-h-[12rem]">
                                 <p-chart type="line" [data]="studentLineData" [options]="studentLineOptions"></p-chart>
                             </div>
                         </div>
@@ -216,8 +171,6 @@ export class AdminDashboard implements OnInit {
     dashboard: DashboardResponse | null = null;
     students: StudentResponse[] = [];
     notifications: NotificationResponse[] = [];
-    heatmapRows: { className: string; cells: HeatmapCell[] }[] = [];
-    subjectLabels: string[] = [];
     loading = true;
     studentDrawerVisible = false;
     selectedStudent: StudentResponse | null = null;
@@ -260,7 +213,6 @@ export class AdminDashboard implements OnInit {
                 this.dashboard = dashboard;
                 this.students = students;
                 this.notifications = notifications;
-                this.subjectLabels = dashboard.subjectPerformance.map((entry) => entry.subject);
                 this.studentCount = students.length.toString();
                 this.studentTrend = `+${Math.max(1, Math.min(12, students.length % 12 || 1))} this week`;
                 this.studentTrendDirection = 'up';
@@ -271,7 +223,6 @@ export class AdminDashboard implements OnInit {
                 this.weakSubjectHint = `${dashboard.subjectPerformance.filter((subject) => subject.averageScore < 65).length} alert(s)`;
                 this.todayNotifications = notifications.filter((item) => this.isToday(item.createdAt)).length.toString();
                 this.notificationTrend = `${notifications.length} total sent`;
-                this.buildHeatmap();
                 this.buildCharts();
                 this.loading = false;
             },
@@ -294,35 +245,6 @@ export class AdminDashboard implements OnInit {
                 this.buildStudentChart(results);
             }
         });
-    }
-
-    heatmapTone(score: number): string {
-        if (score >= 80) {
-            return 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-300/30 dark:border-emerald-500/20';
-        }
-
-        if (score >= 65) {
-            return 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-300/30 dark:border-blue-500/20';
-        }
-
-        return 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-300/30 dark:border-rose-500/20';
-    }
-
-    private buildHeatmap(): void {
-        if (!this.dashboard) {
-            return;
-        }
-
-        const subjects = this.dashboard.subjectPerformance;
-        const classes = this.dashboard.classPerformance;
-        this.heatmapRows = classes.map((classRow) => ({
-            className: classRow.class,
-            cells: subjects.map((subject) => ({
-                className: classRow.class,
-                subject: subject.subject,
-                score: Math.min(100, Math.max(0, classRow.averageScore * 0.6 + subject.averageScore * 0.4))
-            }))
-        }));
     }
 
     private buildCharts(): void {

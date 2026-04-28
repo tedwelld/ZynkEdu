@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using ZynkEdu.Application.Abstractions;
+using ZynkEdu.Application.Contracts;
 using ZynkEdu.Domain.Entities;
 using ZynkEdu.Domain.Enums;
 using ZynkEdu.Infrastructure.Options;
@@ -13,6 +14,7 @@ internal sealed class TestCurrentUserContext : ICurrentUserContext
 {
     public bool IsAuthenticated => true;
     public bool HasSchoolScope => Role is UserRole.Admin or UserRole.Teacher;
+    public bool IsPlatformAdmin => Role == UserRole.PlatformAdmin;
     public int? UserId { get; init; }
     public int? SchoolId { get; init; }
     public string? UserName { get; init; }
@@ -34,13 +36,28 @@ internal sealed class RecordingSmsSender : ISmsSender
 
 internal sealed class RecordingEmailSender : IEmailSender
 {
-    public List<(string Destination, string Subject, string Message)> Messages { get; } = new();
+    public List<(string Destination, string Subject, string Message, string? AttachmentFileName, byte[]? AttachmentBytes)> Messages { get; } = new();
 
     public Task SendAsync(string destination, string subject, string message, CancellationToken cancellationToken = default)
     {
-        Messages.Add((destination, subject, message));
+        Messages.Add((destination, subject, message, null, null));
         return Task.CompletedTask;
     }
+
+    public Task SendAsync(string destination, string subject, string message, byte[] attachmentBytes, string attachmentFileName, string attachmentContentType = "application/pdf", CancellationToken cancellationToken = default)
+    {
+        Messages.Add((destination, subject, message, attachmentFileName, attachmentBytes));
+        return Task.CompletedTask;
+    }
+}
+
+internal sealed class NoOpAuditLogService : IAuditLogService
+{
+    public Task LogAsync(int? schoolId, string action, string entityType, string entityId, string summary, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task<IReadOnlyList<AuditLogResponse>> GetRecentAsync(int? schoolId = null, int take = 10, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<AuditLogResponse>>(Array.Empty<AuditLogResponse>());
 }
 
 internal static class TestDatabase

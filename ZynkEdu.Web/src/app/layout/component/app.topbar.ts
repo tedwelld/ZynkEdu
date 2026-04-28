@@ -93,6 +93,7 @@ export class AppTopbar {
     searchResults: SearchHit[] = [];
     profileItems: MenuItem[] = [
         { label: 'Dashboard', icon: 'pi pi-fw pi-home', command: () => void this.router.navigateByUrl(this.homeRoute()) },
+        { label: 'Account settings', icon: 'pi pi-fw pi-cog', command: () => void this.router.navigateByUrl('/account/settings') },
         { label: 'Logout', icon: 'pi pi-fw pi-sign-out', command: () => this.auth.logout() }
     ];
 

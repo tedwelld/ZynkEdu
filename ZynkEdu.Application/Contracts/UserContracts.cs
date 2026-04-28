@@ -11,8 +11,8 @@ public sealed record CreateTeacherWithAssignmentRequest(
     [Required, MinLength(3)] string Username,
     [Required, MinLength(2)] string DisplayName,
     [Required, MinLength(8)] string Password,
-    [Required] int SubjectId,
-    [Required, MinLength(1)] string Class);
+    [Required, MinLength(1)] int[] SubjectIds,
+    [Required, MinLength(1)] string[] Classes);
 
 public sealed record UpdateSchoolUserRequest(
     [Required, MinLength(2)] string DisplayName,

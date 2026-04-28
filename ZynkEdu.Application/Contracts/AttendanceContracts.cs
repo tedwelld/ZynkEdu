@@ -4,6 +4,7 @@ public sealed record AttendanceClassOptionResponse(
     string ClassName,
     IReadOnlyList<string> TeacherNames,
     IReadOnlyList<string> SubjectNames,
+    string Level,
     int StudentCount);
 
 public sealed record AttendanceStudentRegisterResponse(

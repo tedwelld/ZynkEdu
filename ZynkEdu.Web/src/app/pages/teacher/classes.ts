@@ -14,6 +14,7 @@ import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { ResultResponse, StudentResponse, TeacherAssignmentResponse } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
+import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 
 interface ClassStudentModalState {
     averageScore: number;
@@ -24,14 +25,14 @@ interface ClassStudentModalState {
 @Component({
     standalone: true,
     selector: 'app-teacher-classes',
-    imports: [CommonModule, FormsModule, RouterLink, ButtonModule, DialogModule, AppDropdownComponent, SkeletonModule, TableModule, TagModule],
+    imports: [CommonModule, FormsModule, RouterLink, ButtonModule, DialogModule, AppDropdownComponent, MetricCardComponent, SkeletonModule, TableModule, TagModule],
     template: `
         <section class="space-y-6">
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">My classes</p>
                     <h1 class="text-3xl font-display font-bold m-0">Classes and learners</h1>
-                    <p class="text-muted-color mt-2 max-w-2xl">Use the dropdown or the side buttons to switch classes and inspect the students in each one.</p>
+                    <p class="text-muted-color mt-2 max-w-2xl">Use the dropdown to switch classes, then jump straight into attendance or results from the cards and quick actions.</p>
                 </div>
                 <div class="flex gap-3">
                     <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="contrast" (click)="exportClassPdf()"></button>
@@ -39,21 +40,29 @@ interface ClassStudentModalState {
                 </div>
             </div>
 
+            <section class="grid gap-4 md:grid-cols-3">
+                <app-metric-card label="Students" [value]="classStudents.length.toString()" delta="Selected class" hint="Roster size" icon="pi pi-users" tone="blue" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></app-metric-card>
+                <app-metric-card label="Results" [value]="classResults.length.toString()" delta="Selected class" hint="Published rows" icon="pi pi-chart-line" tone="purple" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></app-metric-card>
+                <app-metric-card label="Average" [value]="classAverage.toFixed(1) + '%'" delta="Current class" hint="Performance" icon="pi pi-bolt" tone="green" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></app-metric-card>
+            </section>
+
             <article class="workspace-card grid gap-4 xl:grid-cols-[0.7fr_1.3fr] items-start">
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-semibold mb-2">Choose class</label>
-                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClass" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (ngModelChange)="loadClassData()"></app-dropdown>
-                    </div>
-
-                    <div class="space-y-2">
-                        <button *ngFor="let cls of classOptions" pButton type="button" class="w-full justify-start" [label]="cls.value" [severity]="cls.value === selectedClass ? 'primary' : 'secondary'" (click)="selectedClass = cls.value; loadClassData()"></button>
+                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClass" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadClassData()" (ngModelChange)="loadClassData()"></app-dropdown>
                     </div>
 
                     <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
                         <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Class load</div>
                         <div class="text-2xl font-display font-bold mt-2">{{ selectedClass || 'No class selected' }}</div>
                         <div class="text-sm text-muted-color mt-1">{{ classStudents.length }} students · {{ classResults.length }} results</div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-3">
+                        <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="secondary" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
+                        <button pButton type="button" label="Enter results" icon="pi pi-table" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></button>
+                        <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="help" routerLink="/teacher/profile"></button>
                     </div>
                 </div>
 
@@ -129,6 +138,12 @@ interface ClassStudentModalState {
                         <div class="text-sm text-muted-color">Latest comment: {{ studentState.latestComment || 'No teacher comment yet.' }}</div>
                     </div>
 
+                    <div class="flex flex-wrap gap-3">
+                        <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="secondary" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
+                        <button pButton type="button" label="Enter results" icon="pi pi-table" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></button>
+                        <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="help" routerLink="/teacher/profile"></button>
+                    </div>
+
                     <div class="flex justify-end">
                         <button pButton type="button" label="Close" severity="secondary" (click)="studentModalVisible = false"></button>
                     </div>
@@ -173,6 +188,14 @@ export class TeacherClasses implements OnInit {
 
     get classOptions(): { label: string; value: string }[] {
         return Array.from(new Set(this.assignments.map((assignment) => assignment.class))).map((value) => ({ label: value, value }));
+    }
+
+    get classAverage(): number {
+        if (this.classResults.length === 0) {
+            return 0;
+        }
+
+        return this.classResults.reduce((total, row) => total + row.score, 0) / this.classResults.length;
     }
 
     loadClassData(): void {

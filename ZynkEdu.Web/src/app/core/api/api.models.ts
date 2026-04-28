@@ -1,7 +1,9 @@
 export type WorkspaceRole = 'PlatformAdmin' | 'Admin' | 'Teacher' | 'Parent';
+export type NotificationAudience = 'All' | 'Individual' | 'Class';
 
 export interface SchoolResponse {
     id: number;
+    schoolCode: string;
     name: string;
     address: string;
     adminContactEmail?: string | null;
@@ -105,6 +107,19 @@ export interface SchoolPerformanceDto {
     resultCount: number;
 }
 
+export interface AuditLogResponse {
+    id: number;
+    schoolId?: number | null;
+    actorUserId?: number | null;
+    actorRole: string;
+    actorName: string;
+    action: string;
+    entityType: string;
+    entityId: string;
+    summary: string;
+    createdAt: string;
+}
+
 export interface StudentResponse {
     id: number;
     schoolId: number;
@@ -112,6 +127,7 @@ export interface StudentResponse {
     fullName: string;
     class: string;
     level: string;
+    status: string;
     enrollmentYear: number;
     subjectIds: number[];
     subjects: string[];
@@ -120,12 +136,20 @@ export interface StudentResponse {
     createdAt: string;
 }
 
+export interface BulkStudentSubjectEnrollmentResponse {
+    schoolCount: number;
+    studentCount: number;
+    subjectCount: number;
+    enrollmentCount: number;
+}
+
 export type AttendanceStatus = 'Present' | 'Absent' | 'Late' | 'Excused';
 
 export interface AttendanceClassOptionResponse {
     className: string;
     teacherNames: string[];
     subjectNames: string[];
+    level: string;
     studentCount: number;
 }
 
@@ -223,7 +247,28 @@ export interface ParentPreviewReportResponse {
 export interface SubjectResponse {
     id: number;
     schoolId: number;
+    code: string;
     name: string;
+    gradeLevel: string;
+}
+
+export interface PlatformSubjectCatalogResponse {
+    id: number;
+    code: string;
+    name: string;
+    gradeLevel: string;
+    sourceSchoolId?: number | null;
+    sourceSchoolName?: string | null;
+}
+
+export interface ImportSchoolSubjectsRequest {
+    sourceSchoolId: number;
+    subjectIds: number[];
+}
+
+export interface ImportSubjectsResultResponse {
+    importedCount: number;
+    skippedCount: number;
 }
 
 export interface TeacherAssignmentResponse {
@@ -233,6 +278,7 @@ export interface TeacherAssignmentResponse {
     teacherName: string;
     subjectId: number;
     subjectName: string;
+    gradeLevel: string;
     class: string;
 }
 
@@ -252,6 +298,7 @@ export interface ResultResponse {
     studentId: number;
     studentName: string;
     studentNumber: string;
+    studentClass: string;
     subjectId: number;
     subjectName: string;
     teacherId: number;
@@ -260,7 +307,10 @@ export interface ResultResponse {
     grade: string;
     term: string;
     comment?: string | null;
+    approvalStatus: string;
+    isLocked: boolean;
     createdAt: string;
+    resultYear: number;
 }
 
 export interface ResultFilterPeriod {
@@ -289,8 +339,8 @@ export interface CreateTeacherWithAssignmentRequest {
     username: string;
     displayName: string;
     password: string;
-    subjectId: number;
-    class: string;
+    subjectIds: number[];
+    classes: string[];
 }
 
 export interface UpdateSchoolUserRequest {
@@ -301,10 +351,14 @@ export interface UpdateSchoolUserRequest {
 
 export interface CreateSubjectRequest {
     name: string;
+    code?: string | null;
+    gradeLevel?: string | null;
 }
 
 export interface UpdateSubjectRequest {
     name: string;
+    code?: string | null;
+    gradeLevel?: string | null;
 }
 
 export interface CreateStudentRequest {
@@ -319,10 +373,30 @@ export interface CreateStudentRequest {
 
 export interface UpdateStudentRequest extends CreateStudentRequest {}
 
+export interface UpdateStudentStatusRequest {
+    status: string;
+}
+
 export interface CreateTeacherAssignmentRequest {
     teacherId: number;
     subjectId: number;
     class: string;
+}
+
+export interface CreateTeacherAssignmentsBatchRequest {
+    teacherId: number;
+    subjectIds: number[];
+    classes: string[];
+}
+
+export interface TeacherAssignmentBatchResponse {
+    schoolId: number;
+    teacherId: number;
+    teacherName: string;
+    requestedCount: number;
+    createdCount: number;
+    skippedCount: number;
+    assignments: TeacherAssignmentResponse[];
 }
 
 export interface UpdateTeacherAssignmentRequest extends CreateTeacherAssignmentRequest {}
@@ -330,8 +404,11 @@ export interface UpdateTeacherAssignmentRequest extends CreateTeacherAssignmentR
 export interface SendNotificationRequest {
     title: string;
     message: string;
-    type: 'Email' | 'SMS' | 'Push' | string;
+    type: 'Email' | 'Sms' | 'Push' | string;
     studentIds?: number[] | null;
+    audience?: NotificationAudience;
+    schoolId?: number | null;
+    className?: string | null;
 }
 
 export interface NotificationRecipientResponse {
@@ -352,6 +429,20 @@ export interface NotificationResponse {
     createdBy: number;
     createdAt: string;
     recipients: NotificationRecipientResponse[];
+}
+
+export interface SendResultSlipRequest {
+    sendEmail: boolean;
+    sendSms: boolean;
+}
+
+export interface ResultSlipSendResponse {
+    studentId: number;
+    studentName: string;
+    parentEmail: string;
+    parentPhone: string;
+    emailSent: boolean;
+    smsSent: boolean;
 }
 
 export interface TimetableResponse {

@@ -8,4 +8,12 @@ public interface ISmsSender
 public interface IEmailSender
 {
     Task SendAsync(string destination, string subject, string message, CancellationToken cancellationToken = default);
+    Task SendAsync(
+        string destination,
+        string subject,
+        string message,
+        byte[] attachmentBytes,
+        string attachmentFileName,
+        string attachmentContentType = "application/pdf",
+        CancellationToken cancellationToken = default);
 }

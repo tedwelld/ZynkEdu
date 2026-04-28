@@ -48,6 +48,7 @@ public sealed record UpdateSchoolRequest(
 
 public sealed record SchoolResponse(
     int Id,
+    string SchoolCode,
     string Name,
     string Address,
     string? AdminContactEmail,

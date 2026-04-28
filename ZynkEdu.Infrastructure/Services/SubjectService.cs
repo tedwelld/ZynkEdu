@@ -11,25 +11,36 @@ public sealed class SubjectService : ISubjectService
 {
     private readonly ZynkEduDbContext _dbContext;
     private readonly ICurrentUserContext _currentUserContext;
+    private readonly ISubjectCodeGenerator _subjectCodeGenerator;
+    private readonly IAuditLogService _auditLogService;
 
-    public SubjectService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext)
+    public SubjectService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext, ISubjectCodeGenerator subjectCodeGenerator, IAuditLogService auditLogService)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
+        _subjectCodeGenerator = subjectCodeGenerator;
+        _auditLogService = auditLogService;
     }
 
     public async Task<SubjectResponse> CreateAsync(CreateSubjectRequest request, int? schoolId = null, CancellationToken cancellationToken = default)
     {
         var resolvedSchoolId = ResolveSchoolId(schoolId);
+        var gradeLevel = NormalizeGradeLevel(request.GradeLevel);
+        var code = string.IsNullOrWhiteSpace(request.Code)
+            ? await _subjectCodeGenerator.GenerateAsync(request.Name, resolvedSchoolId, gradeLevel, null, cancellationToken)
+            : NormalizeCode(request.Code);
         var subject = new Subject
         {
             SchoolId = resolvedSchoolId,
-            Name = request.Name.Trim()
+            Code = code,
+            Name = request.Name.Trim(),
+            GradeLevel = gradeLevel
         };
 
         _dbContext.Subjects.Add(subject);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return new SubjectResponse(subject.Id, subject.SchoolId, subject.Name);
+        await _auditLogService.LogAsync(resolvedSchoolId, "Created", "Subject", subject.Id.ToString(), $"Created subject {subject.Name} ({subject.Code}).", cancellationToken);
+        return new SubjectResponse(subject.Id, subject.SchoolId, subject.Code ?? string.Empty, subject.Name, subject.GradeLevel);
     }
 
     public async Task<IReadOnlyList<SubjectResponse>> GetAllAsync(int? schoolId = null, CancellationToken cancellationToken = default)
@@ -44,7 +55,7 @@ public sealed class SubjectService : ISubjectService
 
         return await query
             .OrderBy(x => x.Name)
-            .Select(x => new SubjectResponse(x.Id, x.SchoolId, x.Name))
+            .Select(x => new SubjectResponse(x.Id, x.SchoolId, x.Code ?? string.Empty, x.Name, x.GradeLevel))
             .ToListAsync(cancellationToken);
     }
 
@@ -55,8 +66,14 @@ public sealed class SubjectService : ISubjectService
             ?? throw new InvalidOperationException("Subject was not found in this school.");
 
         subject.Name = request.Name.Trim();
+        subject.Code = string.IsNullOrWhiteSpace(request.Code)
+            ? await _subjectCodeGenerator.GenerateAsync(subject.Name, subject.SchoolId, NormalizeGradeLevel(request.GradeLevel), subject.Id, cancellationToken)
+            : NormalizeCode(request.Code);
+        subject.GradeLevel = NormalizeGradeLevel(request.GradeLevel);
+
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return new SubjectResponse(subject.Id, subject.SchoolId, subject.Name);
+        await _auditLogService.LogAsync(subject.SchoolId, "Updated", "Subject", subject.Id.ToString(), $"Updated subject {subject.Name} ({subject.Code}).", cancellationToken);
+        return new SubjectResponse(subject.Id, subject.SchoolId, subject.Code ?? string.Empty, subject.Name, subject.GradeLevel);
     }
 
     public async Task DeleteAsync(int id, int? schoolId = null, CancellationToken cancellationToken = default)
@@ -67,6 +84,7 @@ public sealed class SubjectService : ISubjectService
 
         _dbContext.Subjects.Remove(subject);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(subject.SchoolId, "Deleted", "Subject", subject.Id.ToString(), $"Deleted subject {subject.Name} ({subject.Code}).", cancellationToken);
     }
 
     private int ResolveSchoolId(int? schoolId)
@@ -85,4 +103,15 @@ public sealed class SubjectService : ISubjectService
     }
 
     private int RequireSchoolId() => ResolveSchoolId(null);
+
+    private static string NormalizeCode(string code)
+    {
+        var value = code.Trim().ToUpperInvariant();
+        return value.Length > 20 ? value[..20] : value;
+    }
+
+    private static string NormalizeGradeLevel(string? gradeLevel)
+    {
+        return SchoolLevelCatalog.NormalizeLevel(gradeLevel);
+    }
 }

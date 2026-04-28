@@ -1,11 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { CheckboxModule } from 'primeng/checkbox';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
@@ -13,45 +15,25 @@ import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { extractApiErrorMessage } from '../../core/api/api-error';
 import { AuthService } from '../../core/auth/auth.service';
-import { DashboardResponse, SchoolResponse, SubjectResponse, TeacherPerformanceDto, UserResponse } from '../../core/api/api.models';
+import { AttendanceClassOptionResponse, DashboardResponse, SchoolResponse, SubjectResponse, TeacherPerformanceDto, UserResponse } from '../../core/api/api.models';
+import { getClassLevel, normalizeSchoolLevel, SchoolLevel } from '../../core/school-levels';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
-
-const TEACHER_CLASS_OPTIONS = [
-    'Form 1A',
-    'Form 1B',
-    'Form 1C',
-    'Form 2A',
-    'Form 2B',
-    'Form 2C',
-    'Form 3A Sciences',
-    'Form 3B Commercials',
-    'Form 3C Arts',
-    'Form 4A Sciences',
-    'Form 4B Commercials',
-    'Form 4C Arts',
-    'Form 5 Arts',
-    'Form 5 Commercials',
-    'Form 5 Sciences',
-    'Form 6 Arts',
-    'Form 6 Commercials',
-    'Form 6 Sciences'
-];
 
 @Component({
     standalone: true,
     selector: 'app-admin-teachers',
-    imports: [CommonModule, FormsModule, ButtonModule, CheckboxModule, DialogModule, InputTextModule, MetricCardComponent, AppDropdownComponent, SkeletonModule, TableModule, TagModule],
+    imports: [CommonModule, FormsModule, ButtonModule, CheckboxModule, DialogModule, InputTextModule, MetricCardComponent, AppDropdownComponent, MultiSelectModule, SkeletonModule, TableModule, TagModule],
     template: `
         <section class="space-y-6">
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Teachers</p>
                     <h1 class="text-3xl font-display font-bold m-0">Teacher management with performance context</h1>
-                    <p class="text-muted-color mt-2 max-w-2xl">Create, edit, and review teachers with live school performance snapshots.</p>
+                    <p class="text-muted-color mt-2 max-w-2xl">Create, edit, and review teachers with live school performance snapshots and full class/subject coverage.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <app-dropdown *ngIf="isPlatformAdmin" [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-64" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
+                    <app-dropdown *ngIf="isPlatformAdmin" [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-64" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (opened)="refreshData()" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
                     <button pButton type="button" label="Add Teacher" icon="pi pi-plus" (click)="openCreate()"></button>
                     <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
                 </div>
@@ -150,15 +132,46 @@ const TEACHER_CLASS_OPTIONS = [
                             [filter]="true"
                             filterBy="label"
                             filterPlaceholder="Search schools"
+                            (opened)="refreshData()"
                         ></app-dropdown>
                     </div>
                     <div *ngIf="drawerMode === 'create'">
-                        <label class="block text-sm font-semibold mb-2">Subject</label>
-                        <app-dropdown [options]="subjectOptions" [(ngModel)]="draft.subjectId" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search subjects"></app-dropdown>
+                        <label class="block text-sm font-semibold mb-2">Subjects</label>
+                        <p-multiSelect
+                            [options]="subjectOptions"
+                            [(ngModel)]="draft.subjectIds"
+                            optionLabel="label"
+                            optionValue="value"
+                            display="chip"
+                            class="w-full"
+                            [filter]="true"
+                            filterPlaceholder="Search subjects"
+                            appendTo="body"
+                            [disabled]="subjectOptions.length === 0"
+                            placeholder="Select subjects"
+                            (onClick)="refreshData()"
+                        ></p-multiSelect>
                     </div>
                     <div *ngIf="drawerMode === 'create'">
-                        <label class="block text-sm font-semibold mb-2">Class</label>
-                        <app-dropdown [options]="classOptions" [(ngModel)]="draft.class" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes"></app-dropdown>
+                        <label class="block text-sm font-semibold mb-2">Classes</label>
+                        <p-multiSelect
+                            [options]="classOptions"
+                            [(ngModel)]="draft.classes"
+                            optionLabel="label"
+                            optionValue="value"
+                            display="chip"
+                            class="w-full"
+                            [filter]="true"
+                            filterPlaceholder="Search classes"
+                            appendTo="body"
+                            [disabled]="classOptions.length === 0"
+                            placeholder="Select classes"
+                            (onClick)="refreshData()"
+                            (ngModelChange)="onClassesChange($event)"
+                        ></p-multiSelect>
+                        <div *ngIf="draft.classes.length > 0 && !selectedClassLevel" class="mt-2 text-sm text-red-500">
+                            Choose classes from the same level before saving.
+                        </div>
                     </div>
                     <div *ngIf="drawerMode === 'create'">
                         <label class="block text-sm font-semibold mb-2">Password</label>
@@ -183,6 +196,7 @@ const TEACHER_CLASS_OPTIONS = [
 export class AdminTeachers implements OnInit {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
+    private readonly route = inject(ActivatedRoute);
     private readonly messages = inject(MessageService);
     private readonly confirmation = inject(ConfirmationService);
 
@@ -191,24 +205,41 @@ export class AdminTeachers implements OnInit {
     dashboard: DashboardResponse | null = null;
     schools: SchoolResponse[] = [];
     subjects: SubjectResponse[] = [];
+    attendanceClasses: AttendanceClassOptionResponse[] = [];
     selectedSchoolId: number | null = null;
+    pendingFocusTeacherId: number | null = null;
     searchTerm = '';
     statusFilter = '';
     drawerVisible = false;
     drawerMode: 'create' | 'edit' = 'create';
     skeletonRows = Array.from({ length: 5 });
-    draft: { id?: number; username: string; displayName: string; password: string; isActive: boolean; schoolId: number | null; subjectId: number | null; class: string } = {
+    draft: { id?: number; username: string; displayName: string; password: string; isActive: boolean; schoolId: number | null; subjectIds: number[]; classes: string[] } = {
         username: '',
         displayName: '',
         password: '',
         isActive: true,
         schoolId: null,
-        subjectId: null,
-        class: ''
+        subjectIds: [],
+        classes: []
     };
 
     ngOnInit(): void {
+        this.applySchoolScopeFromQuery();
         this.loadData();
+    }
+
+    private applySchoolScopeFromQuery(): void {
+        const schoolIdText = this.route.snapshot.queryParamMap.get('schoolId');
+        const schoolId = schoolIdText ? Number(schoolIdText) : null;
+        if (Number.isFinite(schoolId)) {
+            this.selectedSchoolId = schoolId;
+        }
+
+        const focusText = this.route.snapshot.queryParamMap.get('focus');
+        const focusId = focusText ? Number(focusText) : null;
+        if (Number.isFinite(focusId)) {
+            this.pendingFocusTeacherId = focusId;
+        }
     }
 
     loadData(): void {
@@ -238,19 +269,46 @@ export class AdminTeachers implements OnInit {
             teachers: this.api.getTeachers(schoolId),
             dashboard: this.api.getAdminDashboard(schoolId),
             schools: this.api.getSchools(),
-            subjects: this.api.getSubjects(schoolId)
+            subjects: this.api.getSubjects(schoolId),
+            attendanceClasses: this.api.getAttendanceClasses(schoolId)
         }).subscribe({
-            next: ({ teachers, dashboard, schools, subjects }) => {
+            next: ({ teachers, dashboard, schools, subjects, attendanceClasses }) => {
                 this.teachers = teachers;
                 this.dashboard = dashboard;
                 this.schools = this.isPlatformAdmin ? schools : schools.filter((school) => school.id === this.auth.schoolId());
                 this.subjects = subjects;
+                this.attendanceClasses = attendanceClasses;
+                this.selectedSchoolId = this.isPlatformAdmin ? this.selectedSchoolId ?? this.schools[0]?.id ?? null : this.auth.schoolId();
+                this.draft.schoolId = this.isPlatformAdmin ? this.draft.schoolId ?? this.selectedSchoolId : this.auth.schoolId();
+                this.draft.subjectIds = this.draft.subjectIds.filter((subjectId) => this.subjects.some((subject) => subject.id === subjectId));
+                this.draft.classes = this.draft.classes.filter((className) => this.classOptions.some((option) => option.value === className));
+                if (this.draft.subjectIds.length === 0 && this.subjectOptions[0]?.value !== null) {
+                    const firstSubject = this.subjectOptions.find((option) => option.value !== null)?.value;
+                    this.draft.subjectIds = firstSubject ? [firstSubject] : [];
+                }
+                if (this.draft.classes.length === 0 && this.classOptions[0]?.value) {
+                    this.draft.classes = [this.classOptions[0].value];
+                }
+                this.onClassesChange(this.draft.classes);
+                this.openPendingTeacherFocus();
                 this.loading = false;
             },
             error: () => {
                 this.loading = false;
             }
         });
+    }
+
+    private openPendingTeacherFocus(): void {
+        if (!this.pendingFocusTeacherId) {
+            return;
+        }
+
+        const teacher = this.teachers.find((entry) => entry.id === this.pendingFocusTeacherId);
+        this.pendingFocusTeacherId = null;
+        if (teacher) {
+            this.openEdit(teacher);
+        }
     }
 
     get filteredTeachers(): UserResponse[] {
@@ -290,14 +348,36 @@ export class AdminTeachers implements OnInit {
     }
 
     get subjectOptions(): { label: string; value: number | null }[] {
+        if (this.draft.classes.length > 0 && !this.selectedClassLevel) {
+            return [];
+        }
+
         return [
             { label: 'Select subject', value: null },
-            ...this.subjects.map((subject) => ({ label: subject.name, value: subject.id }))
+            ...this.subjects
+                .filter((subject) => !this.selectedClassLevel || normalizeSchoolLevel(subject.gradeLevel) === this.selectedClassLevel || normalizeSchoolLevel(subject.gradeLevel) === 'General')
+                .map((subject) => ({ label: `${subject.name} (${normalizeSchoolLevel(subject.gradeLevel)})`, value: subject.id }))
         ];
     }
 
     get classOptions(): { label: string; value: string }[] {
-        return TEACHER_CLASS_OPTIONS.map((value) => ({ label: value, value }));
+        return this.attendanceClasses.map((item) => {
+            const level = item.level ? ` | ${item.level}` : '';
+            return { label: `${item.className} (${item.studentCount})${level}`, value: item.className };
+        });
+    }
+
+    get selectedClassLevel(): SchoolLevel | null {
+        const levels = this.draft.classes
+            .map((className) => getClassLevel(className))
+            .filter((level): level is Exclude<SchoolLevel, 'General'> => level !== null);
+
+        if (levels.length === 0) {
+            return null;
+        }
+
+        const distinct = Array.from(new Set(levels));
+        return distinct.length === 1 ? distinct[0] : null;
     }
 
     schoolNameFor(schoolId: number): string {
@@ -306,6 +386,10 @@ export class AdminTeachers implements OnInit {
 
     onSchoolChange(schoolId: number | null): void {
         this.selectedSchoolId = schoolId;
+        this.loadData();
+    }
+
+    refreshData(): void {
         this.loadData();
     }
 
@@ -328,15 +412,18 @@ export class AdminTeachers implements OnInit {
 
     openCreate(): void {
         this.drawerMode = 'create';
-            this.draft = {
-                username: '',
-                displayName: '',
-                password: '',
-                isActive: true,
-                schoolId: this.isPlatformAdmin ? this.selectedSchoolId ?? this.schools[0]?.id ?? null : this.auth.schoolId(),
-                subjectId: this.subjects[0]?.id ?? null,
-                class: this.classOptions[0]?.value ?? ''
-            };
+        const firstSubjectId = this.subjects[0]?.id ?? null;
+        const firstClass = this.classOptions[0]?.value ?? '';
+        this.draft = {
+            username: '',
+            displayName: '',
+            password: '',
+            isActive: true,
+            schoolId: this.isPlatformAdmin ? this.selectedSchoolId ?? this.schools[0]?.id ?? null : this.auth.schoolId(),
+            subjectIds: firstSubjectId ? [firstSubjectId] : [],
+            classes: firstClass ? [firstClass] : []
+        };
+        this.onClassesChange(this.draft.classes);
         this.drawerVisible = true;
     }
 
@@ -349,16 +436,19 @@ export class AdminTeachers implements OnInit {
             password: '',
             isActive: teacher.isActive,
             schoolId: teacher.schoolId,
-            subjectId: null,
-            class: ''
+            subjectIds: [],
+            classes: []
         };
         this.drawerVisible = true;
     }
 
     saveTeacher(): void {
         if (this.drawerMode === 'create') {
-            if (!this.draft.schoolId || !this.draft.subjectId || !this.draft.class.trim() || !this.draft.username.trim() || !this.draft.displayName.trim() || !this.draft.password.trim()) {
-                this.messages.add({ severity: 'warn', summary: 'Missing details', detail: 'Choose a school, subject, and class before saving the teacher.' });
+            if (!this.draft.schoolId || this.draft.subjectIds.length === 0 || this.draft.classes.length === 0 || !this.selectedClassLevel || !this.draft.username.trim() || !this.draft.displayName.trim() || !this.draft.password.trim()) {
+                const detail = this.draft.classes.length > 0 && !this.selectedClassLevel
+                    ? 'Choose classes from the same level before saving the teacher.'
+                    : 'Choose a school, subject(s), and class(es) before saving the teacher.';
+                this.messages.add({ severity: 'warn', summary: 'Missing details', detail });
                 return;
             }
 
@@ -381,19 +471,19 @@ export class AdminTeachers implements OnInit {
                 username: this.draft.username,
                 displayName: this.draft.displayName,
                 password: this.draft.password,
-                subjectId: this.draft.subjectId,
-                class: this.draft.class.trim()
+                subjectIds: [...new Set(this.draft.subjectIds)],
+                classes: [...new Set(this.draft.classes.map((value) => value.trim()).filter(Boolean))]
             }, this.draft.schoolId ?? undefined).subscribe({
                 next: () => {
                     this.messages.add({ severity: 'success', summary: 'Teacher created', detail: `${this.draft.displayName} added with an assignment.` });
                     this.drawerVisible = false;
                     this.loadData();
                 },
-            error: (error) => {
-                this.messages.add({ severity: 'error', summary: 'Save failed', detail: this.readErrorMessage(error, 'The teacher could not be saved.') });
-            }
-        });
-        return;
+                error: (error) => {
+                    this.messages.add({ severity: 'error', summary: 'Save failed', detail: this.readErrorMessage(error, 'The teacher could not be saved.') });
+                }
+            });
+            return;
         }
 
         if (!this.draft.id) {
@@ -441,6 +531,26 @@ export class AdminTeachers implements OnInit {
     clearFilters(): void {
         this.searchTerm = '';
         this.statusFilter = '';
+    }
+
+    onClassesChange(classes: string[]): void {
+        this.draft.classes = classes;
+
+        if (!this.selectedClassLevel) {
+            return;
+        }
+
+        const allowedSubjectIds = new Set(
+            this.subjects
+                .filter((subject) => normalizeSchoolLevel(subject.gradeLevel) === this.selectedClassLevel || normalizeSchoolLevel(subject.gradeLevel) === 'General')
+                .map((subject) => subject.id)
+        );
+
+        this.draft.subjectIds = this.draft.subjectIds.filter((subjectId) => allowedSubjectIds.has(subjectId));
+        if (this.draft.subjectIds.length === 0) {
+            const firstSubjectId = this.subjectOptions.find((option) => option.value !== null)?.value ?? null;
+            this.draft.subjectIds = firstSubjectId ? [firstSubjectId] : [];
+        }
     }
 
     private readErrorMessage(error: unknown, fallback: string): string {

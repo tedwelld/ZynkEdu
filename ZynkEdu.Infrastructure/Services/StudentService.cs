@@ -12,15 +12,18 @@ public sealed class StudentService : IStudentService
     private readonly ZynkEduDbContext _dbContext;
     private readonly ICurrentUserContext _currentUserContext;
     private readonly IStudentNumberGenerator _studentNumberGenerator;
+    private readonly IAuditLogService _auditLogService;
 
     public StudentService(
         ZynkEduDbContext dbContext,
         ICurrentUserContext currentUserContext,
-        IStudentNumberGenerator studentNumberGenerator)
+        IStudentNumberGenerator studentNumberGenerator,
+        IAuditLogService auditLogService)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
         _studentNumberGenerator = studentNumberGenerator;
+        _auditLogService = auditLogService;
     }
 
     public async Task<StudentResponse> CreateAsync(CreateStudentRequest request, int? schoolId = null, CancellationToken cancellationToken = default)
@@ -77,6 +80,7 @@ public sealed class StudentService : IStudentService
                 FullName = request.FullName.Trim(),
                 Class = request.Class.Trim(),
                 Level = NormalizeLevel(request.Level),
+                Status = "Active",
                 EnrollmentYear = request.EnrollmentYear,
                 ParentEmail = parentEmail,
                 ParentPhone = parentPhone,
@@ -111,6 +115,7 @@ public sealed class StudentService : IStudentService
             }));
 
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await _auditLogService.LogAsync(resolvedSchoolId, "Created", "Student", student.Id.ToString(), $"Created student {student.FullName} ({student.StudentNumber}).", cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
             return await MapAsync(student.Id, cancellationToken);
@@ -126,9 +131,28 @@ public sealed class StudentService : IStudentService
         var query = _currentUserContext.Role == UserRole.PlatformAdmin && resolvedSchoolId is null
             ? _dbContext.Students.AsNoTracking()
             : _dbContext.Students.AsNoTracking().Where(x => x.SchoolId == resolvedSchoolId);
+
+        HashSet<string>? assignedClasses = null;
+        if (_currentUserContext.Role == UserRole.Teacher)
+        {
+            assignedClasses = await ResolveTeacherAssignedClassesAsync(resolvedSchoolId ?? throw new UnauthorizedAccessException("A school-scoped user is required."), cancellationToken);
+            if (assignedClasses.Count == 0)
+            {
+                return Array.Empty<StudentResponse>();
+            }
+
+            query = query.Where(x => assignedClasses.Contains(x.Class));
+        }
+
         if (!string.IsNullOrWhiteSpace(classFilter))
         {
-            query = query.Where(x => x.Class == classFilter.Trim());
+            var trimmedClass = classFilter.Trim();
+            if (assignedClasses is not null && !assignedClasses.Contains(trimmedClass))
+            {
+                return Array.Empty<StudentResponse>();
+            }
+
+            query = query.Where(x => x.Class == trimmedClass);
         }
 
         var students = await query
@@ -149,6 +173,17 @@ public sealed class StudentService : IStudentService
         var query = _currentUserContext.Role == UserRole.PlatformAdmin && resolvedSchoolId is null
             ? _dbContext.Students.AsNoTracking()
             : _dbContext.Students.AsNoTracking().Where(x => x.SchoolId == resolvedSchoolId);
+
+        if (_currentUserContext.Role == UserRole.Teacher)
+        {
+            var assignedClasses = await ResolveTeacherAssignedClassesAsync(resolvedSchoolId ?? throw new UnauthorizedAccessException("A school-scoped user is required."), cancellationToken);
+            if (assignedClasses.Count == 0)
+            {
+                return null;
+            }
+
+            query = query.Where(x => assignedClasses.Contains(x.Class));
+        }
 
         var student = await query
             .Include(x => x.SubjectEnrollments)
@@ -259,9 +294,25 @@ public sealed class StudentService : IStudentService
             }));
 
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await _auditLogService.LogAsync(student.SchoolId, "Updated", "Student", student.Id.ToString(), $"Updated student {student.FullName}.", cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return await MapAsync(student.Id, cancellationToken);
         });
+    }
+
+    public async Task<StudentResponse> UpdateStatusAsync(int id, UpdateStudentStatusRequest request, CancellationToken cancellationToken = default)
+    {
+        var query = _currentUserContext.Role == UserRole.PlatformAdmin
+            ? _dbContext.Students
+            : _dbContext.Students.Where(x => x.SchoolId == RequireSchoolId());
+
+        var student = await query.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException("Student was not found in this school.");
+
+        student.Status = NormalizeStatus(request.Status);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(student.SchoolId, "Updated status", "Student", student.Id.ToString(), $"{student.FullName} is now {student.Status}.", cancellationToken);
+        return await MapAsync(student.Id, cancellationToken);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -281,6 +332,90 @@ public sealed class StudentService : IStudentService
 
         _dbContext.Students.Remove(student);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(student.SchoolId, "Deleted", "Student", student.Id.ToString(), $"Deleted student {student.FullName}.", cancellationToken);
+    }
+
+    public async Task<BulkStudentSubjectEnrollmentResponse> EnrollAllSubjectsAsync(int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        var scopeSchoolIds = await ResolveSchoolScopeAsync(schoolId, cancellationToken);
+        if (scopeSchoolIds.Count == 0)
+        {
+            return new BulkStudentSubjectEnrollmentResponse(0, 0, 0, 0);
+        }
+
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            var schoolCount = 0;
+            var studentCount = 0;
+            var subjectCount = 0;
+            var enrollmentCount = 0;
+
+            foreach (var targetSchoolId in scopeSchoolIds)
+            {
+                var subjectIds = await _dbContext.Subjects.AsNoTracking()
+                    .Where(x => x.SchoolId == targetSchoolId)
+                    .OrderBy(x => x.Name)
+                    .Select(x => x.Id)
+                    .ToListAsync(cancellationToken);
+
+                var studentIds = await _dbContext.Students.AsNoTracking()
+                    .Where(x => x.SchoolId == targetSchoolId)
+                    .OrderBy(x => x.Id)
+                    .Select(x => x.Id)
+                    .ToListAsync(cancellationToken);
+
+                if (subjectIds.Count == 0 || studentIds.Count == 0)
+                {
+                    continue;
+                }
+
+                var existingEnrollments = await _dbContext.StudentSubjectEnrollments
+                    .Where(x => x.SchoolId == targetSchoolId && studentIds.Contains(x.StudentId))
+                    .ToListAsync(cancellationToken);
+
+                if (existingEnrollments.Count > 0)
+                {
+                    _dbContext.StudentSubjectEnrollments.RemoveRange(existingEnrollments);
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+                }
+
+                var enrollments = new List<StudentSubjectEnrollment>(studentIds.Count * subjectIds.Count);
+                foreach (var studentId in studentIds)
+                {
+                    foreach (var subjectId in subjectIds)
+                    {
+                        enrollments.Add(new StudentSubjectEnrollment
+                        {
+                            SchoolId = targetSchoolId,
+                            StudentId = studentId,
+                            SubjectId = subjectId
+                        });
+                    }
+                }
+
+                _dbContext.StudentSubjectEnrollments.AddRange(enrollments);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+
+                schoolCount++;
+                studentCount += studentIds.Count;
+                subjectCount += subjectIds.Count;
+                enrollmentCount += enrollments.Count;
+            }
+
+            await _auditLogService.LogAsync(
+                scopeSchoolIds.Count == 1 ? scopeSchoolIds[0] : null,
+                "Bulk enrolled subjects",
+                "StudentSubjectEnrollment",
+                scopeSchoolIds.Count == 1 ? scopeSchoolIds[0].ToString() : "all-schools",
+                $"Enrolled {studentCount} student(s) in {subjectCount} subject(s) across {schoolCount} school(s).",
+                cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+            return new BulkStudentSubjectEnrollmentResponse(schoolCount, studentCount, subjectCount, enrollmentCount);
+        });
     }
 
     private async Task<StudentResponse> MapAsync(int id, CancellationToken cancellationToken)
@@ -318,16 +453,49 @@ public sealed class StudentService : IStudentService
         return RequireSchoolId();
     }
 
+    private async Task<IReadOnlyList<int>> ResolveSchoolScopeAsync(int? schoolId, CancellationToken cancellationToken)
+    {
+        if (_currentUserContext.Role == UserRole.PlatformAdmin)
+        {
+            if (schoolId.HasValue)
+            {
+                return [schoolId.Value];
+            }
+
+            return await _dbContext.Schools.AsNoTracking()
+                .OrderBy(x => x.Id)
+                .Select(x => x.Id)
+                .ToListAsync(cancellationToken);
+        }
+
+        return [RequireSchoolId()];
+    }
+
+    private async Task<HashSet<string>> ResolveTeacherAssignedClassesAsync(int schoolId, CancellationToken cancellationToken)
+    {
+        if (_currentUserContext.Role != UserRole.Teacher)
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        if (_currentUserContext.UserId is not int teacherId)
+        {
+            throw new UnauthorizedAccessException("Teacher identity is missing.");
+        }
+
+        var classes = await _dbContext.TeacherAssignments.AsNoTracking()
+            .Where(x => x.SchoolId == schoolId && x.TeacherId == teacherId)
+            .Select(x => x.Class)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return new HashSet<string>(classes, StringComparer.OrdinalIgnoreCase);
+    }
+
     private static void ValidateLevelAndClass(string level, string className)
     {
         var normalizedLevel = NormalizeLevel(level);
-        var allowedClasses = normalizedLevel switch
-        {
-            "ZGC Level" => new[] { "Form 1A", "Form 1B", "Form 1C", "Form 2A", "Form 2B", "Form 2C" },
-            "O'Level" => new[] { "Form 3A Sciences", "Form 3B Commercials", "Form 3C Arts", "Form 4A Sciences", "Form 4B Commercials", "Form 4C Arts" },
-            "A'Level" => new[] { "Form 5 Arts", "Form 5 Commercials", "Form 5 Sciences", "Form 6 Arts", "Form 6 Commercials", "Form 6 Sciences" },
-            _ => Array.Empty<string>()
-        };
+        var allowedClasses = SchoolLevelCatalog.GetClassesForLevel(normalizedLevel);
 
         if (!allowedClasses.Contains(className.Trim()))
         {
@@ -337,23 +505,13 @@ public sealed class StudentService : IStudentService
 
     private static string NormalizeLevel(string level)
     {
-        var value = level.Trim();
-        if (value.Equals("ZGC", StringComparison.OrdinalIgnoreCase) || value.Equals("ZGC Level", StringComparison.OrdinalIgnoreCase))
+        var normalized = SchoolLevelCatalog.NormalizeLevel(level);
+        if (!SchoolLevelCatalog.IsKnownLevel(normalized) || normalized == SchoolLevelCatalog.General)
         {
-            return "ZGC Level";
+            throw new InvalidOperationException("The selected level is not supported.");
         }
 
-        if (value.Equals("OLevel", StringComparison.OrdinalIgnoreCase) || value.Equals("O'Level", StringComparison.OrdinalIgnoreCase) || value.Equals("O Level", StringComparison.OrdinalIgnoreCase))
-        {
-            return "O'Level";
-        }
-
-        if (value.Equals("ALevel", StringComparison.OrdinalIgnoreCase) || value.Equals("A'Level", StringComparison.OrdinalIgnoreCase) || value.Equals("A Level", StringComparison.OrdinalIgnoreCase))
-        {
-            return "A'Level";
-        }
-
-        throw new InvalidOperationException("The selected level is not supported.");
+        return normalized;
     }
 
     private static StudentResponse Map(Student student)
@@ -378,11 +536,38 @@ public sealed class StudentService : IStudentService
             student.FullName,
             student.Class,
             student.Level,
+            student.Status,
             student.EnrollmentYear,
             subjectIds,
             subjects,
             student.ParentEmail,
             student.ParentPhone,
             student.CreatedAt);
+    }
+
+    private static string NormalizeStatus(string status)
+    {
+        var value = status.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "Active";
+        }
+
+        if (value.Equals("Active", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Active";
+        }
+
+        if (value.Equals("Suspended", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Suspended";
+        }
+
+        if (value.Equals("Archived", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Archived";
+        }
+
+        throw new InvalidOperationException("The selected status is not supported.");
     }
 }

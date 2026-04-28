@@ -6,7 +6,6 @@ using ZynkEdu.Application.Abstractions;
 using ZynkEdu.Infrastructure.Messaging;
 using ZynkEdu.Infrastructure.Options;
 using ZynkEdu.Infrastructure.Persistence;
-using ZynkEdu.Infrastructure.Seeding;
 using ZynkEdu.Infrastructure.Services;
 
 namespace ZynkEdu.Infrastructure;
@@ -34,6 +33,10 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<ICurrentUserContext, CurrentUserContext>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<ISchoolCodeGenerator, SchoolCodeGenerator>();
+        services.AddScoped<ISubjectCodeGenerator, SubjectCodeGenerator>();
+        services.AddScoped<IAuditLogService, AuditLogService>();
+        services.AddScoped<IPlatformSubjectCatalogService, PlatformSubjectCatalogService>();
         services.AddScoped<IStudentNumberGenerator, StudentNumberGenerator>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ISchoolService, SchoolService>();
@@ -48,7 +51,6 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITimetableService, TimetableService>();
         services.AddScoped<IAcademicCalendarService, AcademicCalendarService>();
         services.AddScoped<IAttendanceDispatchService, AttendanceDispatchService>();
-        services.AddScoped<DemoDataSeeder>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<ISmsSender, LoggingSmsSender>();
         services.AddHostedService<NotificationDispatchHostedService>();

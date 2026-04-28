@@ -12,15 +12,24 @@ public sealed class ResultService : IResultService
     private readonly ZynkEduDbContext _dbContext;
     private readonly ICurrentUserContext _currentUserContext;
     private readonly INotificationService _notificationService;
+    private readonly IAuditLogService _auditLogService;
+    private readonly IEmailSender _emailSender;
+    private readonly ISmsSender _smsSender;
 
     public ResultService(
         ZynkEduDbContext dbContext,
         ICurrentUserContext currentUserContext,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IAuditLogService auditLogService,
+        IEmailSender emailSender,
+        ISmsSender smsSender)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
         _notificationService = notificationService;
+        _auditLogService = auditLogService;
+        _emailSender = emailSender;
+        _smsSender = smsSender;
     }
 
     public async Task<ResultResponse> CreateAsync(CreateResultRequest request, CancellationToken cancellationToken = default)
@@ -60,11 +69,14 @@ public sealed class ResultService : IResultService
             Grade = GetGrade(request.Score),
             Term = request.Term.Trim(),
             Comment = request.Comment?.Trim(),
+            ApprovalStatus = "Pending",
+            IsLocked = false,
             CreatedAt = DateTime.UtcNow
         };
 
         _dbContext.Results.Add(result);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(schoolId, "Created", "Result", result.Id.ToString(), $"Created result for {student.FullName} in {subject.Name} with score {result.Score}.", cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(result.Comment) || result.Score >= 0)
         {
@@ -81,6 +93,7 @@ public sealed class ResultService : IResultService
             student.Id,
             student.FullName,
             student.StudentNumber,
+            student.Class,
             subject.Id,
             subject.Name,
             teacher.Id,
@@ -89,7 +102,10 @@ public sealed class ResultService : IResultService
             result.Grade,
             result.Term,
             result.Comment,
-            result.CreatedAt);
+            result.ApprovalStatus,
+            result.IsLocked,
+            result.CreatedAt,
+            result.CreatedAt.Year);
     }
 
     public async Task<IReadOnlyList<ResultResponse>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -103,7 +119,7 @@ public sealed class ResultService : IResultService
             .Include(x => x.Subject)
             .Include(x => x.Teacher)
             .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new ResultResponse(x.Id, x.SchoolId, x.StudentId, x.Student.FullName, x.Student.StudentNumber, x.SubjectId, x.Subject.Name, x.TeacherId, x.Teacher.DisplayName, x.Score, x.Grade, x.Term, x.Comment, x.CreatedAt))
+            .Select(x => new ResultResponse(x.Id, x.SchoolId, x.StudentId, x.Student.FullName, x.Student.StudentNumber, x.Student.Class, x.SubjectId, x.Subject.Name, x.TeacherId, x.Teacher.DisplayName, x.Score, x.Grade, x.Term, x.Comment, x.ApprovalStatus, x.IsLocked, x.CreatedAt, x.CreatedAt.Year))
             .ToListAsync(cancellationToken);
     }
 
@@ -119,7 +135,7 @@ public sealed class ResultService : IResultService
             .Include(x => x.Subject)
             .Include(x => x.Teacher)
             .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new ResultResponse(x.Id, x.SchoolId, x.StudentId, x.Student.FullName, x.Student.StudentNumber, x.SubjectId, x.Subject.Name, x.TeacherId, x.Teacher.DisplayName, x.Score, x.Grade, x.Term, x.Comment, x.CreatedAt))
+            .Select(x => new ResultResponse(x.Id, x.SchoolId, x.StudentId, x.Student.FullName, x.Student.StudentNumber, x.Student.Class, x.SubjectId, x.Subject.Name, x.TeacherId, x.Teacher.DisplayName, x.Score, x.Grade, x.Term, x.Comment, x.ApprovalStatus, x.IsLocked, x.CreatedAt, x.CreatedAt.Year))
             .ToListAsync(cancellationToken);
     }
 
@@ -135,7 +151,7 @@ public sealed class ResultService : IResultService
             .Include(x => x.Subject)
             .Include(x => x.Teacher)
             .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new ResultResponse(x.Id, x.SchoolId, x.StudentId, x.Student.FullName, x.Student.StudentNumber, x.SubjectId, x.Subject.Name, x.TeacherId, x.Teacher.DisplayName, x.Score, x.Grade, x.Term, x.Comment, x.CreatedAt))
+            .Select(x => new ResultResponse(x.Id, x.SchoolId, x.StudentId, x.Student.FullName, x.Student.StudentNumber, x.Student.Class, x.SubjectId, x.Subject.Name, x.TeacherId, x.Teacher.DisplayName, x.Score, x.Grade, x.Term, x.Comment, x.ApprovalStatus, x.IsLocked, x.CreatedAt, x.CreatedAt.Year))
             .ToListAsync(cancellationToken);
     }
 
@@ -248,6 +264,95 @@ public sealed class ResultService : IResultService
         }).ToList();
     }
 
+    public async Task<ResultSlipSendResponse> SendSlipAsync(
+        int studentId,
+        SendResultSlipRequest request,
+        byte[] slipPdf,
+        string slipFileName,
+        int? schoolId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!request.SendEmail && !request.SendSms)
+        {
+            throw new InvalidOperationException("Choose at least one delivery channel.");
+        }
+
+        if (slipPdf.Length == 0)
+        {
+            throw new InvalidOperationException("A result slip PDF is required.");
+        }
+
+        var schoolFilter = ResolveSchoolScope(schoolId);
+        var studentQuery = _dbContext.Students.AsNoTracking().Where(x => x.Id == studentId);
+        if (schoolFilter is not null)
+        {
+            studentQuery = studentQuery.Where(x => x.SchoolId == schoolFilter);
+        }
+
+        var student = await studentQuery.FirstOrDefaultAsync(cancellationToken)
+            ?? throw new InvalidOperationException("Student was not found in this school.");
+
+        var emailSent = false;
+        var smsSent = false;
+        var message = $"Your ZynkEdu result slip for {student.FullName} ({student.StudentNumber}) is attached.";
+        var subject = $"ZynkEdu results - {student.FullName}";
+
+        if (request.SendEmail)
+        {
+            if (string.IsNullOrWhiteSpace(student.ParentEmail))
+            {
+                throw new InvalidOperationException("The selected student does not have a parent email on file.");
+            }
+
+            await _emailSender.SendAsync(
+                student.ParentEmail,
+                subject,
+                message,
+                slipPdf,
+                string.IsNullOrWhiteSpace(slipFileName) ? $"result-slip-{student.StudentNumber}.pdf" : slipFileName,
+                "application/pdf",
+                cancellationToken);
+            emailSent = true;
+        }
+
+        if (request.SendSms && !string.IsNullOrWhiteSpace(student.ParentPhone))
+        {
+            await _smsSender.SendAsync(
+                student.ParentPhone,
+                $"ZynkEdu results for {student.FullName} are ready. Please check your email or log in to view the slip.",
+                cancellationToken);
+            smsSent = true;
+        }
+
+        return new ResultSlipSendResponse(
+            student.Id,
+            student.FullName,
+            student.ParentEmail,
+            student.ParentPhone,
+            emailSent,
+            smsSent);
+    }
+
+    public async Task<ResultResponse> ApproveAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await UpdateApprovalStateAsync(id, "Approved", lockResult: true, cancellationToken);
+    }
+
+    public async Task<ResultResponse> RejectAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await UpdateApprovalStateAsync(id, "Rejected", lockResult: true, cancellationToken);
+    }
+
+    public async Task<ResultResponse> ReopenAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await UpdateApprovalStateAsync(id, "Pending", lockResult: false, cancellationToken);
+    }
+
+    public async Task<ResultResponse> LockAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await UpdateApprovalStateAsync(id, "Pending", lockResult: true, cancellationToken);
+    }
+
     private int RequireSchoolId()
     {
         if (_currentUserContext.SchoolId is not int schoolId)
@@ -263,6 +368,22 @@ public sealed class ResultService : IResultService
         return schoolId;
     }
 
+    private int? ResolveSchoolScope(int? requestedSchoolId)
+    {
+        if (_currentUserContext.Role == UserRole.PlatformAdmin)
+        {
+            return requestedSchoolId;
+        }
+
+        var schoolId = RequireSchoolId();
+        if (requestedSchoolId is not null && requestedSchoolId != schoolId)
+        {
+            throw new UnauthorizedAccessException("Not allowed.");
+        }
+
+        return schoolId;
+    }
+
     private static string GetGrade(decimal score)
     {
         if (score >= 80) return "A";
@@ -270,5 +391,46 @@ public sealed class ResultService : IResultService
         if (score >= 60) return "C";
         if (score >= 50) return "D";
         return "F";
+    }
+
+    private async Task<ResultResponse> UpdateApprovalStateAsync(int id, string approvalStatus, bool lockResult, CancellationToken cancellationToken)
+    {
+        if (_currentUserContext.Role is not (UserRole.Admin or UserRole.PlatformAdmin))
+        {
+            throw new UnauthorizedAccessException("Only school admins can manage result approvals.");
+        }
+
+        var schoolId = RequireSchoolId();
+        var result = await _dbContext.Results
+            .Include(x => x.Student)
+            .Include(x => x.Subject)
+            .Include(x => x.Teacher)
+            .FirstOrDefaultAsync(x => x.Id == id && x.SchoolId == schoolId, cancellationToken)
+            ?? throw new InvalidOperationException("Result was not found in this school.");
+
+        result.ApprovalStatus = approvalStatus;
+        result.IsLocked = lockResult;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(result.SchoolId, approvalStatus, "Result", result.Id.ToString(), $"Result {result.Id} for {result.Student.FullName} in {result.Subject.Name} is {approvalStatus.ToLowerInvariant()}.", cancellationToken);
+
+        return new ResultResponse(
+            result.Id,
+            result.SchoolId,
+            result.StudentId,
+            result.Student.FullName,
+            result.Student.StudentNumber,
+            result.Student.Class,
+            result.SubjectId,
+            result.Subject.Name,
+            result.TeacherId,
+            result.Teacher.DisplayName,
+            result.Score,
+            result.Grade,
+            result.Term,
+            result.Comment,
+            result.ApprovalStatus,
+            result.IsLocked,
+            result.CreatedAt,
+            result.CreatedAt.Year);
     }
 }

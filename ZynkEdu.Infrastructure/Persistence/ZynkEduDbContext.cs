@@ -17,6 +17,7 @@ public sealed class ZynkEduDbContext : DbContext
     }
 
     public DbSet<School> Schools => Set<School>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
     public DbSet<StaffAdmin> StaffAdmins => Set<StaffAdmin>();
@@ -24,6 +25,7 @@ public sealed class ZynkEduDbContext : DbContext
     public DbSet<Guardian> Guardians => Set<Guardian>();
     public DbSet<Student> Students => Set<Student>();
     public DbSet<Subject> Subjects => Set<Subject>();
+    public DbSet<PlatformSubjectCatalog> PlatformSubjectCatalogs => Set<PlatformSubjectCatalog>();
     public DbSet<TeacherAssignment> TeacherAssignments => Set<TeacherAssignment>();
     public DbSet<Result> Results => Set<Result>();
     public DbSet<StudentNumberCounter> StudentNumberCounters => Set<StudentNumberCounter>();
@@ -44,9 +46,11 @@ public sealed class ZynkEduDbContext : DbContext
 
         modelBuilder.Entity<School>(entity =>
         {
+            entity.Property(x => x.SchoolCode).HasMaxLength(20);
             entity.Property(x => x.Name).HasMaxLength(200);
             entity.Property(x => x.Address).HasMaxLength(500);
             entity.Property(x => x.AdminContactEmail).HasMaxLength(200);
+            entity.HasIndex(x => x.SchoolCode).IsUnique();
         });
 
         modelBuilder.Entity<AppUser>(entity =>
@@ -57,6 +61,17 @@ public sealed class ZynkEduDbContext : DbContext
             entity.Property(x => x.Role).HasConversion<int>();
             entity.HasIndex(x => x.Username).IsUnique();
             entity.HasIndex(x => new { x.SchoolId, x.Role });
+        });
+
+        modelBuilder.Entity<AuditLog>(entity =>
+        {
+            entity.Property(x => x.ActorRole).HasMaxLength(40);
+            entity.Property(x => x.ActorName).HasMaxLength(200);
+            entity.Property(x => x.Action).HasMaxLength(80);
+            entity.Property(x => x.EntityType).HasMaxLength(80);
+            entity.Property(x => x.EntityId).HasMaxLength(80);
+            entity.Property(x => x.Summary).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.SchoolId, x.CreatedAt });
         });
 
         modelBuilder.Entity<AdminUser>(entity =>
@@ -110,6 +125,7 @@ public sealed class ZynkEduDbContext : DbContext
             entity.Property(x => x.FullName).HasMaxLength(200);
             entity.Property(x => x.Class).HasMaxLength(100);
             entity.Property(x => x.Level).HasMaxLength(100);
+            entity.Property(x => x.Status).HasMaxLength(40);
             entity.Property(x => x.ParentEmail).HasMaxLength(200);
             entity.Property(x => x.ParentPhone).HasMaxLength(50);
             entity.Property(x => x.ParentPasswordHash).HasMaxLength(512);
@@ -134,8 +150,20 @@ public sealed class ZynkEduDbContext : DbContext
 
         modelBuilder.Entity<Subject>(entity =>
         {
+            entity.Property(x => x.Code).HasMaxLength(20);
             entity.Property(x => x.Name).HasMaxLength(200);
-            entity.HasIndex(x => new { x.SchoolId, x.Name }).IsUnique();
+            entity.Property(x => x.GradeLevel).HasMaxLength(100);
+            entity.HasIndex(x => new { x.SchoolId, x.GradeLevel, x.Code }).IsUnique();
+            entity.HasIndex(x => new { x.SchoolId, x.GradeLevel, x.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<PlatformSubjectCatalog>(entity =>
+        {
+            entity.Property(x => x.Code).HasMaxLength(20);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.GradeLevel).HasMaxLength(100);
+            entity.HasIndex(x => new { x.GradeLevel, x.Code }).IsUnique();
+            entity.HasIndex(x => new { x.GradeLevel, x.Name }).IsUnique();
         });
 
         modelBuilder.Entity<TeacherAssignment>(entity =>
@@ -149,6 +177,7 @@ public sealed class ZynkEduDbContext : DbContext
             entity.Property(x => x.Grade).HasMaxLength(20);
             entity.Property(x => x.Term).HasMaxLength(50);
             entity.Property(x => x.Comment).HasMaxLength(1000);
+            entity.Property(x => x.ApprovalStatus).HasMaxLength(40);
             entity.HasIndex(x => new { x.SchoolId, x.StudentId, x.SubjectId, x.Term });
         });
 

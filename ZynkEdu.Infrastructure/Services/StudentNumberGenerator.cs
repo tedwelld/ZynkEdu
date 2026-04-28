@@ -7,10 +7,12 @@ namespace ZynkEdu.Infrastructure.Services;
 public sealed class StudentNumberGenerator : IStudentNumberGenerator
 {
     private readonly ZynkEduDbContext _dbContext;
+    private readonly ISchoolCodeGenerator _schoolCodeGenerator;
 
-    public StudentNumberGenerator(ZynkEduDbContext dbContext)
+    public StudentNumberGenerator(ZynkEduDbContext dbContext, ISchoolCodeGenerator schoolCodeGenerator)
     {
         _dbContext = dbContext;
+        _schoolCodeGenerator = schoolCodeGenerator;
     }
 
     public async Task<string> GenerateAsync(int schoolId, CancellationToken cancellationToken = default)
@@ -49,6 +51,7 @@ public sealed class StudentNumberGenerator : IStudentNumberGenerator
 
         counter.LastNumber++;
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return $"SCH{schoolId:D3}-{counter.LastNumber:D4}";
+        var schoolCode = await _schoolCodeGenerator.GetOrCreateAsync(schoolId, cancellationToken);
+        return $"{schoolCode}-{counter.LastNumber:D4}";
     }
 }

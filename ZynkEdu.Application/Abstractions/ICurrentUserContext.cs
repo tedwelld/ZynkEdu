@@ -6,6 +6,7 @@ public interface ICurrentUserContext
 {
     bool IsAuthenticated { get; }
     bool HasSchoolScope { get; }
+    bool IsPlatformAdmin { get; }
     int? UserId { get; }
     int? SchoolId { get; }
     string? UserName { get; }

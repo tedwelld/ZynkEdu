@@ -14,12 +14,18 @@ public sealed class UserManagementService : IUserManagementService
     private readonly ZynkEduDbContext _dbContext;
     private readonly ICurrentUserContext _currentUserContext;
     private readonly IPasswordHasher<AppUser> _passwordHasher;
+    private readonly ITeacherAssignmentService _teacherAssignmentService;
 
-    public UserManagementService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext, IPasswordHasher<AppUser> passwordHasher)
+    public UserManagementService(
+        ZynkEduDbContext dbContext,
+        ICurrentUserContext currentUserContext,
+        IPasswordHasher<AppUser> passwordHasher,
+        ITeacherAssignmentService teacherAssignmentService)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
         _passwordHasher = passwordHasher;
+        _teacherAssignmentService = teacherAssignmentService;
     }
 
     public Task<UserResponse> CreateTeacherAsync(CreateSchoolUserRequest request, int? schoolId = null, CancellationToken cancellationToken = default)
@@ -38,12 +44,6 @@ public sealed class UserManagementService : IUserManagementService
             if (await _dbContext.Users.AnyAsync(x => x.Username == username, cancellationToken))
             {
                 throw new InvalidOperationException("Username already exists.");
-            }
-
-            var subject = await _dbContext.Subjects.FirstOrDefaultAsync(x => x.Id == request.SubjectId && x.SchoolId == resolvedSchoolId, cancellationToken);
-            if (subject is null)
-            {
-                throw new InvalidOperationException("Subject was not found in this school.");
             }
 
             var user = new AppUser
@@ -70,15 +70,10 @@ public sealed class UserManagementService : IUserManagementService
             });
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            _dbContext.TeacherAssignments.Add(new TeacherAssignment
-            {
-                SchoolId = resolvedSchoolId,
-                TeacherId = user.Id,
-                SubjectId = subject.Id,
-                Class = request.Class.Trim()
-            });
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await _teacherAssignmentService.CreateBatchAsync(
+                new CreateTeacherAssignmentsBatchRequest(user.Id, request.SubjectIds, request.Classes),
+                resolvedSchoolId,
+                cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
             return new UserResponse(user.Id, user.Username, user.DisplayName, user.Role.ToString(), user.SchoolId, user.CreatedAt, user.IsActive);

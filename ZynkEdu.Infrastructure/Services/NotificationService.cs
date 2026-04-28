@@ -20,11 +20,26 @@ public sealed class NotificationService : INotificationService
 
     public async Task<NotificationResponse> SendAsync(SendNotificationRequest request, CancellationToken cancellationToken = default)
     {
-        var schoolId = RequireSchoolId();
+        var schoolId = ResolveSchoolId(request.SchoolId);
         var createdBy = _currentUserContext.UserId ?? throw new UnauthorizedAccessException("Creator is missing.");
-        var targetStudents = request.StudentIds?.Count > 0
-            ? await _dbContext.Students.Where(x => x.SchoolId == schoolId && request.StudentIds.Contains(x.Id)).ToListAsync(cancellationToken)
-            : await _dbContext.Students.Where(x => x.SchoolId == schoolId).ToListAsync(cancellationToken);
+        var audience = request.Audience;
+        if (audience == NotificationAudience.All && request.StudentIds is { Count: > 0 } && string.IsNullOrWhiteSpace(request.ClassName))
+        {
+            audience = NotificationAudience.Individual;
+        }
+
+        var targetStudents = audience switch
+        {
+            NotificationAudience.Individual => await ResolveStudentsByIdAsync(schoolId, request.StudentIds, cancellationToken),
+            NotificationAudience.Class => await ResolveStudentsByClassAsync(schoolId, request.ClassName, cancellationToken),
+            NotificationAudience.All => await _dbContext.Students.Where(x => x.SchoolId == schoolId).ToListAsync(cancellationToken),
+            _ => throw new InvalidOperationException("Choose a notification audience.")
+        };
+
+        if (targetStudents.Count == 0)
+        {
+            throw new InvalidOperationException("No matching students were found.");
+        }
 
         var notification = new Notification
         {
@@ -70,7 +85,7 @@ public sealed class NotificationService : INotificationService
     {
         var query = _currentUserContext.Role == UserRole.PlatformAdmin
             ? _dbContext.Notifications.AsNoTracking()
-            : _dbContext.Notifications.AsNoTracking().Where(x => x.SchoolId == RequireSchoolId());
+            : _dbContext.Notifications.AsNoTracking().Where(x => x.SchoolId == RequireCurrentSchoolId());
 
         var notifications = await query
             .Include(x => x.Recipients)
@@ -95,18 +110,78 @@ public sealed class NotificationService : INotificationService
                 x.LastError)).ToList())).ToList();
     }
 
-    private int RequireSchoolId()
+    private int ResolveSchoolId(int? requestedSchoolId)
+    {
+        if (_currentUserContext.Role == UserRole.PlatformAdmin)
+        {
+            return requestedSchoolId ?? throw new InvalidOperationException("Choose a school before sending this notification.");
+        }
+
+        if (_currentUserContext.SchoolId is not int schoolId)
+        {
+            throw new UnauthorizedAccessException("A school-scoped user is required.");
+        }
+
+        if (_currentUserContext.Role is not (UserRole.Admin or UserRole.Teacher))
+        {
+            throw new UnauthorizedAccessException("Not allowed.");
+        }
+
+        if (requestedSchoolId is not null && requestedSchoolId != schoolId)
+        {
+            throw new UnauthorizedAccessException("Not allowed.");
+        }
+
+        return schoolId;
+    }
+
+    private int RequireCurrentSchoolId()
     {
         if (_currentUserContext.SchoolId is not int schoolId)
         {
             throw new UnauthorizedAccessException("A school-scoped user is required.");
         }
 
-        if (_currentUserContext.Role is not (UserRole.Admin or UserRole.Teacher or UserRole.PlatformAdmin))
+        return schoolId;
+    }
+
+    private async Task<List<Student>> ResolveStudentsByIdAsync(int schoolId, IReadOnlyList<int>? studentIds, CancellationToken cancellationToken)
+    {
+        var requestedIds = studentIds?.Where(id => id > 0).Distinct().ToArray() ?? Array.Empty<int>();
+        if (requestedIds.Length == 0)
         {
-            throw new UnauthorizedAccessException("Not allowed.");
+            throw new InvalidOperationException("Choose at least one student.");
         }
 
-        return schoolId;
+        var students = await _dbContext.Students
+            .Where(x => x.SchoolId == schoolId && requestedIds.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+
+        if (students.Count != requestedIds.Length)
+        {
+            throw new InvalidOperationException("One or more selected students were not found in this school.");
+        }
+
+        return students;
+    }
+
+    private async Task<List<Student>> ResolveStudentsByClassAsync(int schoolId, string? className, CancellationToken cancellationToken)
+    {
+        var trimmedClass = className?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedClass))
+        {
+            throw new InvalidOperationException("Choose a class.");
+        }
+
+        var students = await _dbContext.Students
+            .Where(x => x.SchoolId == schoolId && x.Class == trimmedClass)
+            .ToListAsync(cancellationToken);
+
+        if (students.Count == 0)
+        {
+            throw new InvalidOperationException("No students were found for the selected class.");
+        }
+
+        return students;
     }
 }

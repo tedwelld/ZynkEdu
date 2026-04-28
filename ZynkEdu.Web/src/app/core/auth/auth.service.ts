@@ -66,6 +66,17 @@ export class AuthService {
         void this.router.navigate(['/auth/login']);
     }
 
+    updateDisplayName(displayName: string): void {
+        const session = this.sessionState();
+        if (!session) {
+            return;
+        }
+
+        const nextSession = { ...session, displayName };
+        this.sessionState.set(nextSession);
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextSession));
+    }
+
     navigateAfterLogin(role: WorkspaceRole): Promise<boolean> {
         const target = role === 'Parent' ? '/parent/dashboard' : role === 'Teacher' ? '/teacher/dashboard' : role === 'PlatformAdmin' ? '/platform/dashboard' : '/admin/dashboard';
         return this.router.navigateByUrl(target);

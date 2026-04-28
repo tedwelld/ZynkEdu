@@ -61,6 +61,7 @@ public sealed class AttendanceService : IAttendanceService
                 className,
                 classAssignments.Select(x => x.Teacher.DisplayName).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x).ToList(),
                 classAssignments.Select(x => x.Subject.Name).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x).ToList(),
+                SchoolLevelCatalog.TryGetClassLevel(className, out var level) ? level : string.Empty,
                 studentCounts.TryGetValue(className, out var count) ? count : 0);
         }).ToList();
     }
@@ -146,13 +147,32 @@ public sealed class AttendanceService : IAttendanceService
 
     public async Task<IReadOnlyList<AttendanceDailySummaryResponse>> GetDailySummariesAsync(DateTime attendanceDate, int? schoolId = null, CancellationToken cancellationToken = default)
     {
+        if (_currentUserContext.Role == UserRole.PlatformAdmin && schoolId is null)
+        {
+            await EnsureDefaultTermsForAllSchoolsAsync(cancellationToken);
+
+            var schoolNames = await _dbContext.Schools.AsNoTracking()
+                .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
+
+            var registers = await _dbContext.AttendanceRegisters.AsNoTracking()
+                .Include(x => x.Teacher)
+                .Include(x => x.AcademicTerm)
+                .Include(x => x.Entries)
+                .Where(x => x.AttendanceDate == attendanceDate.Date)
+                .OrderBy(x => x.SchoolId)
+                .ThenBy(x => x.Class)
+                .ToListAsync(cancellationToken);
+
+            return registers.Select(register => BuildDailySummary(register, schoolNames.TryGetValue(register.SchoolId, out var schoolName) ? schoolName : $"School {register.SchoolId}")).ToList();
+        }
+
         var resolvedSchoolId = ResolveSchoolId(schoolId);
         await EnsureDefaultTermsAsync(resolvedSchoolId, cancellationToken);
 
         var school = await _dbContext.Schools.AsNoTracking()
             .FirstAsync(x => x.Id == resolvedSchoolId, cancellationToken);
 
-        var registers = await _dbContext.AttendanceRegisters.AsNoTracking()
+        var schoolRegisters = await _dbContext.AttendanceRegisters.AsNoTracking()
             .Include(x => x.Teacher)
             .Include(x => x.AcademicTerm)
             .Include(x => x.Entries)
@@ -160,32 +180,7 @@ public sealed class AttendanceService : IAttendanceService
             .OrderBy(x => x.Class)
             .ToListAsync(cancellationToken);
 
-        return registers.Select(register =>
-        {
-            var (present, absent, late, excused) = CountStatuses(register.Entries.Select(entry => new AttendanceStudentRegisterResponse(
-                entry.StudentId,
-                string.Empty,
-                string.Empty,
-                string.Empty,
-                entry.Status.ToString(),
-                entry.Note)).ToList());
-
-            return new AttendanceDailySummaryResponse(
-                register.Id,
-                resolvedSchoolId,
-                school.Name,
-                register.Class,
-                register.Teacher.DisplayName,
-                register.AcademicTerm.Name,
-                register.AttendanceDate.Date,
-                register.Entries.Count,
-                present,
-                absent,
-                late,
-                excused,
-                register.DispatchedAt is not null,
-                register.DispatchedAt);
-        }).ToList();
+        return schoolRegisters.Select(register => BuildDailySummary(register, school.Name)).ToList();
     }
 
     public async Task<AttendanceRegisterResponse> SaveAsync(SaveAttendanceRegisterRequest request, int? schoolId = null, CancellationToken cancellationToken = default)
@@ -398,6 +393,45 @@ public sealed class AttendanceService : IAttendanceService
             _dbContext.AcademicTerms.AddRange(missingTerms);
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private async Task EnsureDefaultTermsForAllSchoolsAsync(CancellationToken cancellationToken)
+    {
+        var schoolIds = await _dbContext.Schools.AsNoTracking()
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var schoolId in schoolIds)
+        {
+            await EnsureDefaultTermsAsync(schoolId, cancellationToken);
+        }
+    }
+
+    private static AttendanceDailySummaryResponse BuildDailySummary(AttendanceRegister register, string schoolName)
+    {
+        var (present, absent, late, excused) = CountStatuses(register.Entries.Select(entry => new AttendanceStudentRegisterResponse(
+            entry.StudentId,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            entry.Status.ToString(),
+            entry.Note)).ToList());
+
+        return new AttendanceDailySummaryResponse(
+            register.Id,
+            register.SchoolId,
+            schoolName,
+            register.Class,
+            register.Teacher.DisplayName,
+            register.AcademicTerm.Name,
+            register.AttendanceDate.Date,
+            register.Entries.Count,
+            present,
+            absent,
+            late,
+            excused,
+            register.DispatchedAt is not null,
+            register.DispatchedAt);
     }
 
     private int ResolveSchoolId(int? schoolId)

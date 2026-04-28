@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { AppLayout } from './app/layout/component/app.layout';
+import { authGuard } from './app/core/auth/auth.guard';
 import { Notfound } from './app/pages/notfound/notfound';
 import { workspaceGuard } from './app/core/auth/role.guard';
 
@@ -33,6 +34,17 @@ export const appRoutes: Routes = [
         canActivate: [workspaceGuard],
         data: { roles: ['Parent', 'PlatformAdmin'] },
         loadChildren: () => import('./app/pages/parent/parent.routes').then((m) => m.parentRoutes)
+    },
+    {
+        path: 'account',
+        component: AppLayout,
+        canActivate: [authGuard],
+        children: [
+            {
+                path: 'settings',
+                loadComponent: () => import('./app/pages/teacher/profile').then((m) => m.TeacherProfile)
+            }
+        ]
     },
     {
         path: 'legacy',

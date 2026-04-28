@@ -1,18 +1,22 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
-import { MessageService } from 'primeng/api';
 import { DatePickerModule } from 'primeng/datepicker';
 import { InputTextModule } from 'primeng/inputtext';
+import { MessageService } from 'primeng/api';
 import { SkeletonModule } from 'primeng/skeleton';
-import { TagModule } from 'primeng/tag';
 import { TableModule } from 'primeng/table';
+import { TagModule } from 'primeng/tag';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { ApiService } from '../../core/api/api.service';
 import { AttendanceClassOptionResponse, AttendanceRegisterResponse, AttendanceStatus, SchoolResponse } from '../../core/api/api.models';
 import { AuthService } from '../../core/auth/auth.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
+
+type AttendanceStatusTone = 'success' | 'secondary' | 'warning' | 'danger';
 
 @Component({
     standalone: true,
@@ -24,17 +28,21 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Teaching</p>
                     <h1 class="text-3xl font-display font-bold m-0">Attendance register</h1>
-                    <p class="text-muted-color mt-2 max-w-2xl">Pick the class, mark the daily register, and save it before the end-of-day dispatch.</p>
+                    <p class="text-muted-color mt-2 max-w-2xl">
+                        Pick the class, mark the register with one click, and let autosave keep the work safe while you move through the row.
+                    </p>
                 </div>
-                <div class="flex gap-3">
+                <div class="flex flex-wrap gap-3">
+                    <button pButton type="button" label="Mark all present" icon="pi pi-check" severity="success" [disabled]="!register || register.isLocked" (click)="markAllPresent()"></button>
+                    <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="secondary" (click)="exportPdf()"></button>
                     <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
-                    <button *ngIf="canSave" pButton type="button" label="Save register" icon="pi pi-check" (click)="saveRegister()"></button>
+                    <button *ngIf="canSave" pButton type="button" label="Save register" icon="pi pi-save" (click)="saveRegister(false)"></button>
                 </div>
             </header>
 
             <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <app-metric-card label="Students" [value]="studentCount" delta="Selected class" hint="Roster size" icon="pi pi-users" tone="blue"></app-metric-card>
-                <app-metric-card label="Present" [value]="presentCount" delta="Current register" hint="Marked present" icon="pi pi-check-circle" tone="green"></app-metric-card>
+                <app-metric-card label="Present" [value]="presentCount" delta="Current register" hint="Marked present" icon="pi pi-check-circle" tone="green" routerLink="/teacher/classes"></app-metric-card>
                 <app-metric-card label="Absent" [value]="absentCount" delta="Current register" hint="Marked absent" icon="pi pi-times-circle" tone="orange" direction="down"></app-metric-card>
                 <app-metric-card label="Late" [value]="lateCount" delta="Current register" hint="Marked late" icon="pi pi-clock" tone="purple"></app-metric-card>
             </section>
@@ -43,7 +51,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 <div class="grid gap-4 lg:grid-cols-3">
                     <div *ngIf="isPlatformAdmin">
                         <label class="block text-sm font-semibold mb-2">School</label>
-                        <app-dropdown [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
+                        <app-dropdown [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (opened)="loadData()" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Attendance date</label>
@@ -51,7 +59,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Class</label>
-                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClassName" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes" (ngModelChange)="onClassChange($event)"></app-dropdown>
+                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClassName" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes" (opened)="loadData()" (ngModelChange)="onClassChange($event)"></app-dropdown>
                     </div>
                 </div>
 
@@ -60,6 +68,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                     <span *ngIf="selectedClassOption">Teachers: <strong class="text-color">{{ selectedClassOption.teacherNames.join(', ') || 'Unassigned' }}</strong></span>
                     <span *ngIf="selectedClassOption">Subjects: <strong class="text-color">{{ selectedClassOption.subjectNames.join(', ') || 'None' }}</strong></span>
                     <span *ngIf="register?.isLocked" class="text-rose-500 font-semibold">Dispatched at {{ register?.dispatchedAt | date: 'shortTime' }}</span>
+                    <span *ngIf="saveFeedback" class="font-semibold text-emerald-600">{{ saveFeedback }}</span>
                 </div>
             </article>
 
@@ -67,7 +76,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 <div class="flex items-center justify-between mb-4">
                     <div>
                         <h2 class="text-xl font-display font-bold mb-1">Daily register</h2>
-                        <p class="text-sm text-muted-color">Mark each student, then save the register for dispatch at 13:00.</p>
+                        <p class="text-sm text-muted-color">Tap the status buttons for each student. Any change schedules an autosave.</p>
                     </div>
                     <p-tag [value]="register?.isLocked ? 'Dispatched' : 'Editable'" [severity]="register?.isLocked ? 'danger' : 'success'"></p-tag>
                 </div>
@@ -86,17 +95,22 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         </tr>
                     </ng-template>
                     <ng-template pTemplate="body" let-student>
-                        <tr>
+                        <tr [ngClass]="rowTone(student.status)">
                             <td>
                                 <div class="font-semibold">{{ student.studentName }}</div>
                                 <div class="text-xs text-muted-color">{{ student.studentNumber }}</div>
                             </td>
                             <td class="text-sm text-muted-color">{{ student.level }}</td>
-                            <td class="min-w-56">
-                                <app-dropdown [options]="statusOptions" [(ngModel)]="student.status" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [disabled]="!!register?.isLocked"></app-dropdown>
+                            <td class="min-w-72">
+                                <div class="flex flex-wrap gap-2">
+                                    <button pButton type="button" label="Present" class="p-button-sm" [severity]="statusButtonSeverity(student.status, 'Present')" [outlined]="student.status !== 'Present'" [disabled]="!!register?.isLocked" (click)="setStatus(student, 'Present')"></button>
+                                    <button pButton type="button" label="Absent" class="p-button-sm" [severity]="statusButtonSeverity(student.status, 'Absent')" [outlined]="student.status !== 'Absent'" [disabled]="!!register?.isLocked" (click)="setStatus(student, 'Absent')"></button>
+                                    <button pButton type="button" label="Late" class="p-button-sm" [severity]="statusButtonSeverity(student.status, 'Late')" [outlined]="student.status !== 'Late'" [disabled]="!!register?.isLocked" (click)="setStatus(student, 'Late')"></button>
+                                    <button pButton type="button" label="Excused" class="p-button-sm" [severity]="statusButtonSeverity(student.status, 'Excused')" [outlined]="student.status !== 'Excused'" [disabled]="!!register?.isLocked" (click)="setStatus(student, 'Excused')"></button>
+                                </div>
                             </td>
                             <td class="min-w-72">
-                                <input pInputText [(ngModel)]="student.note" class="w-full" [disabled]="!!register?.isLocked" placeholder="Optional note" />
+                                <input pInputText [(ngModel)]="student.note" class="w-full" [disabled]="!!register?.isLocked" placeholder="Optional note" (ngModelChange)="scheduleAutosave()" />
                             </td>
                         </tr>
                     </ng-template>
@@ -109,7 +123,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
         </section>
     `
 })
-export class TeacherAttendance implements OnInit {
+export class TeacherAttendance implements OnInit, OnDestroy {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
     private readonly messages = inject(MessageService);
@@ -122,6 +136,8 @@ export class TeacherAttendance implements OnInit {
     selectedClassName = '';
     attendanceDate = new Date();
     skeletonRows = Array.from({ length: 5 });
+    private autosaveHandle: ReturnType<typeof window.setTimeout> | null = null;
+    saveFeedback = '';
 
     statusOptions = [
         { label: 'Present', value: 'Present' as AttendanceStatus },
@@ -145,6 +161,12 @@ export class TeacherAttendance implements OnInit {
         }
 
         this.loadClasses();
+    }
+
+    ngOnDestroy(): void {
+        if (this.autosaveHandle) {
+            window.clearTimeout(this.autosaveHandle);
+        }
     }
 
     get isPlatformAdmin(): boolean {
@@ -213,7 +235,41 @@ export class TeacherAttendance implements OnInit {
         this.loadRegister();
     }
 
-    saveRegister(): void {
+    setStatus(student: AttendanceRegisterResponse['students'][number], status: AttendanceStatus): void {
+        if (this.register?.isLocked) {
+            return;
+        }
+
+        student.status = status;
+        this.scheduleAutosave();
+    }
+
+    markAllPresent(): void {
+        if (!this.register || this.register.isLocked) {
+            return;
+        }
+
+        this.register.students.forEach((student) => {
+            student.status = 'Present';
+        });
+
+        this.saveFeedback = 'All students marked present';
+        this.scheduleAutosave();
+    }
+
+    scheduleAutosave(): void {
+        if (!this.register || this.register.isLocked) {
+            return;
+        }
+
+        if (this.autosaveHandle) {
+            window.clearTimeout(this.autosaveHandle);
+        }
+
+        this.autosaveHandle = window.setTimeout(() => this.saveRegister(true), 900);
+    }
+
+    saveRegister(silent = false): void {
         if (!this.register || this.register.isLocked) {
             return;
         }
@@ -236,13 +292,79 @@ export class TeacherAttendance implements OnInit {
         }, this.isPlatformAdmin ? this.selectedSchoolId : null).subscribe({
             next: (response) => {
                 this.register = this.normalizeRegister(response);
-                this.messages.add({ severity: 'success', summary: 'Register saved', detail: 'The attendance register is ready for dispatch.' });
+                this.saveFeedback = silent ? 'Autosaved just now' : 'Register saved';
+                if (!silent) {
+                    this.messages.add({ severity: 'success', summary: 'Register saved', detail: 'The attendance register is ready for dispatch.' });
+                }
                 this.loadRegister();
             },
             error: (error) => {
                 this.messages.add({ severity: 'error', summary: 'Save failed', detail: this.readErrorMessage(error, 'The register could not be saved.') });
             }
         });
+    }
+
+    exportPdf(): void {
+        if (!this.register || !this.selectedClassName) {
+            return;
+        }
+
+        const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        doc.text(`Attendance register - ${this.selectedClassName}`, 40, 42);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`Date: ${this.serializeDate(this.attendanceDate)}`, 40, 60);
+        doc.text(`School: ${this.selectedSchoolLabel || this.register.schoolName}`, 40, 74);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 40, 88);
+
+        autoTable(doc, {
+            startY: 106,
+            head: [['Student', 'Number', 'Level', 'Status', 'Note']],
+            body: this.register.students.map((student) => [
+                student.studentName,
+                student.studentNumber,
+                student.level,
+                student.status,
+                student.note || ''
+            ]),
+            theme: 'striped',
+            styles: { fontSize: 8.5, cellPadding: 5 },
+            headStyles: { fillColor: [37, 99, 235] }
+        });
+
+        doc.save(`attendance-${this.selectedClassName}-${this.serializeDate(this.attendanceDate)}.pdf`);
+    }
+
+    statusButtonSeverity(current: AttendanceStatus, target: AttendanceStatus): 'success' | 'secondary' | 'info' | 'danger' {
+        if (current === target) {
+            return this.statusSeverity(target);
+        }
+
+        return 'secondary';
+    }
+
+    rowTone(status: AttendanceStatus): string {
+        return {
+            Present: 'bg-emerald-50/50 dark:bg-emerald-950/20',
+            Absent: 'bg-rose-50/50 dark:bg-rose-950/20',
+            Late: 'bg-amber-50/50 dark:bg-amber-950/20',
+            Excused: 'bg-sky-50/50 dark:bg-sky-950/20'
+        }[status];
+    }
+
+    private statusSeverity(status: AttendanceStatus): 'success' | 'info' | 'danger' | 'secondary' {
+        switch (status) {
+            case 'Present':
+                return 'success';
+            case 'Late':
+                return 'info';
+            case 'Absent':
+                return 'danger';
+            default:
+                return 'secondary';
+        }
     }
 
     private loadClasses(): void {
@@ -298,14 +420,21 @@ export class TeacherAttendance implements OnInit {
     }
 
     private serializeDate(date: Date): string {
-        const year = date.getFullYear();
-        const month = `${date.getMonth() + 1}`.padStart(2, '0');
-        const day = `${date.getDate()}`.padStart(2, '0');
-        return `${year}-${month}-${day}T00:00:00`;
+        return date.toISOString().slice(0, 10);
     }
 
     private readErrorMessage(error: unknown, fallback: string): string {
-        const problem = error as { error?: { detail?: string; title?: string; message?: string }; message?: string };
-        return problem?.error?.detail ?? problem?.error?.title ?? problem?.error?.message ?? problem?.message ?? fallback;
+        if (typeof error === 'object' && error !== null && 'error' in error) {
+            const payload = (error as { error?: { detail?: string; title?: string } }).error;
+            if (payload?.detail) {
+                return payload.detail;
+            }
+
+            if (payload?.title) {
+                return payload.title;
+            }
+        }
+
+        return fallback;
     }
 }

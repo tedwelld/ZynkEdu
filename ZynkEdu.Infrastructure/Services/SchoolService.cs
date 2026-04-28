@@ -13,13 +13,17 @@ public sealed class SchoolService : ISchoolService
 {
     private readonly ZynkEduDbContext _dbContext;
     private readonly ICurrentUserContext _currentUserContext;
+    private readonly ISchoolCodeGenerator _schoolCodeGenerator;
     private readonly IPasswordHasher<AppUser> _passwordHasher;
+    private readonly IAuditLogService _auditLogService;
 
-    public SchoolService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext, IPasswordHasher<AppUser> passwordHasher)
+    public SchoolService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext, ISchoolCodeGenerator schoolCodeGenerator, IPasswordHasher<AppUser> passwordHasher, IAuditLogService auditLogService)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
+        _schoolCodeGenerator = schoolCodeGenerator;
         _passwordHasher = passwordHasher;
+        _auditLogService = auditLogService;
     }
 
     public async Task<SchoolResponse> CreateAsync(SchoolCreateRequest request, CancellationToken cancellationToken = default)
@@ -31,6 +35,7 @@ public sealed class SchoolService : ISchoolService
 
         var school = new School
         {
+            SchoolCode = await _schoolCodeGenerator.GenerateAsync(request.Name, cancellationToken: cancellationToken),
             Name = request.Name.Trim(),
             Address = request.Address.Trim(),
             AdminContactEmail = NormalizeEmail(request.AdminContactEmail),
@@ -39,8 +44,9 @@ public sealed class SchoolService : ISchoolService
 
         _dbContext.Schools.Add(school);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(school.Id, "Created", "School", school.Id.ToString(), $"Created school {school.Name} ({school.SchoolCode}).", cancellationToken);
 
-        return new SchoolResponse(school.Id, school.Name, school.Address, school.AdminContactEmail, school.CreatedAt);
+        return new SchoolResponse(school.Id, school.SchoolCode, school.Name, school.Address, school.AdminContactEmail, school.CreatedAt);
     }
 
     public async Task<SchoolResponse> CreateWithAdminAsync(SchoolCreateWithAdminRequest request, CancellationToken cancellationToken = default)
@@ -57,6 +63,7 @@ public sealed class SchoolService : ISchoolService
 
             var school = new School
             {
+                SchoolCode = await _schoolCodeGenerator.GenerateAsync(request.Name, cancellationToken: cancellationToken),
                 Name = request.Name.Trim(),
                 Address = request.Address.Trim(),
                 AdminContactEmail = NormalizeEmail(request.AdminContactEmail),
@@ -96,9 +103,10 @@ public sealed class SchoolService : ISchoolService
             });
 
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await _auditLogService.LogAsync(school.Id, "Created", "School", school.Id.ToString(), $"Created school {school.Name} with admin {admin.DisplayName}.", cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            return new SchoolResponse(school.Id, school.Name, school.Address, school.AdminContactEmail, school.CreatedAt);
+            return new SchoolResponse(school.Id, school.SchoolCode, school.Name, school.Address, school.AdminContactEmail, school.CreatedAt);
         });
     }
 
@@ -110,7 +118,7 @@ public sealed class SchoolService : ISchoolService
 
         return await query
             .OrderBy(x => x.Name)
-            .Select(x => new SchoolResponse(x.Id, x.Name, x.Address, x.AdminContactEmail, x.CreatedAt))
+            .Select(x => new SchoolResponse(x.Id, x.SchoolCode ?? string.Empty, x.Name, x.Address, x.AdminContactEmail, x.CreatedAt))
             .ToListAsync(cancellationToken);
     }
 
@@ -129,7 +137,8 @@ public sealed class SchoolService : ISchoolService
         school.AdminContactEmail = NormalizeEmail(request.AdminContactEmail);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return new SchoolResponse(school.Id, school.Name, school.Address, school.AdminContactEmail, school.CreatedAt);
+        await _auditLogService.LogAsync(school.Id, "Updated", "School", school.Id.ToString(), $"Updated school {school.Name}.", cancellationToken);
+        return new SchoolResponse(school.Id, school.SchoolCode, school.Name, school.Address, school.AdminContactEmail, school.CreatedAt);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -144,6 +153,7 @@ public sealed class SchoolService : ISchoolService
 
         _dbContext.Schools.Remove(school);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(school.Id, "Deleted", "School", school.Id.ToString(), $"Deleted school {school.Name}.", cancellationToken);
     }
 
     private static string? NormalizeEmail(string email)

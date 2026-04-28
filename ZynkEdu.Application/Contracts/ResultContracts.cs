@@ -9,12 +9,25 @@ public sealed record CreateResultRequest(
     [Required, MinLength(1)] string Term,
     string? Comment);
 
+public sealed record SendResultSlipRequest(
+    bool SendEmail = true,
+    bool SendSms = true);
+
+public sealed record ResultSlipSendResponse(
+    int StudentId,
+    string StudentName,
+    string ParentEmail,
+    string ParentPhone,
+    bool EmailSent,
+    bool SmsSent);
+
 public sealed record ResultResponse(
     int Id,
     int SchoolId,
     int StudentId,
     string StudentName,
     string StudentNumber,
+    string StudentClass,
     int SubjectId,
     string SubjectName,
     int TeacherId,
@@ -23,4 +36,7 @@ public sealed record ResultResponse(
     string Grade,
     string Term,
     string? Comment,
-    DateTime CreatedAt);
+    string ApprovalStatus,
+    bool IsLocked,
+    DateTime CreatedAt,
+    int ResultYear);

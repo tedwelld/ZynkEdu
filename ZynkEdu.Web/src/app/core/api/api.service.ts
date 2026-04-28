@@ -2,6 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import {
     AcademicTermResponse,
+    AuditLogResponse,
+    BulkStudentSubjectEnrollmentResponse,
     AttendanceClassOptionResponse,
     AttendanceDailySummaryResponse,
     AttendanceRegisterResponse,
@@ -14,6 +16,7 @@ import {
     CreateTeacherWithAssignmentRequest,
     CreateStudentRequest,
     CreateTeacherAssignmentRequest,
+    CreateTeacherAssignmentsBatchRequest,
     DashboardResponse,
     LoginRequest,
     LoginResponse,
@@ -22,21 +25,28 @@ import {
     ParentOtpResponse,
     ParentPreviewReportResponse,
     ResultResponse,
+    ResultSlipSendResponse,
     TimetableResponse,
     SchoolResponse,
     SchoolCalendarEventResponse,
     SearchHit,
     SendNotificationRequest,
+    SendResultSlipRequest,
     SaveAttendanceRegisterRequest,
     StudentCommentResponse,
     StudentResponse,
     CreateSubjectRequest,
+    ImportSchoolSubjectsRequest,
+    ImportSubjectsResultResponse,
     SubjectResponse,
+    PlatformSubjectCatalogResponse,
     TeacherAssignmentResponse,
+    TeacherAssignmentBatchResponse,
     UpdateSchoolRequest,
     UpdateSchoolUserRequest,
     UpdateSubjectRequest,
     UpdateStudentRequest,
+    UpdateStudentStatusRequest,
     UpdateTeacherAssignmentRequest,
     UpsertAcademicTermRequest,
     UserResponse,
@@ -119,6 +129,16 @@ export class ApiService {
         return this.http.get<DashboardResponse>(`${API_BASE_URL}/admin/dashboard${query}`);
     }
 
+    getAuditLogs(schoolId?: number | null, take = 10): Observable<AuditLogResponse[]> {
+        const params = new URLSearchParams();
+        if (schoolId) {
+            params.set('schoolId', String(schoolId));
+        }
+        params.set('take', String(take));
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return this.http.get<AuditLogResponse[]>(`${API_BASE_URL}/admin/audit-logs${query}`);
+    }
+
     getStudents(classFilter?: string, schoolId?: number | null): Observable<StudentResponse[]> {
         const params = new URLSearchParams();
         if (classFilter) {
@@ -144,13 +164,26 @@ export class ApiService {
         return this.http.put<StudentResponse>(`${API_BASE_URL}/students/${id}`, request);
     }
 
+    updateStudentStatus(id: number, request: UpdateStudentStatusRequest): Observable<StudentResponse> {
+        return this.http.put<StudentResponse>(`${API_BASE_URL}/students/${id}/status`, request);
+    }
+
     deleteStudent(id: number): Observable<void> {
         return this.http.delete<void>(`${API_BASE_URL}/students/${id}`);
+    }
+
+    enrollAllStudentsInAllSubjects(schoolId?: number | null): Observable<BulkStudentSubjectEnrollmentResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<BulkStudentSubjectEnrollmentResponse>(`${API_BASE_URL}/students/enroll-all-subjects${query}`, {});
     }
 
     getSubjects(schoolId?: number | null): Observable<SubjectResponse[]> {
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.get<SubjectResponse[]>(`${API_BASE_URL}/subjects${query}`);
+    }
+
+    getPlatformSubjectCatalog(): Observable<PlatformSubjectCatalogResponse[]> {
+        return this.http.get<PlatformSubjectCatalogResponse[]>(`${API_BASE_URL}/platform/subjects/catalog`);
     }
 
     createSubject(request: CreateSubjectRequest, schoolId?: number | null): Observable<SubjectResponse> {
@@ -166,6 +199,30 @@ export class ApiService {
     deleteSubject(id: number, schoolId?: number | null): Observable<void> {
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.delete<void>(`${API_BASE_URL}/subjects/${id}${query}`);
+    }
+
+    createPlatformSubjectCatalog(request: CreateSubjectRequest): Observable<PlatformSubjectCatalogResponse> {
+        return this.http.post<PlatformSubjectCatalogResponse>(`${API_BASE_URL}/platform/subjects/catalog`, request);
+    }
+
+    updatePlatformSubjectCatalog(id: number, request: UpdateSubjectRequest): Observable<PlatformSubjectCatalogResponse> {
+        return this.http.put<PlatformSubjectCatalogResponse>(`${API_BASE_URL}/platform/subjects/catalog/${id}`, request);
+    }
+
+    deletePlatformSubjectCatalog(id: number): Observable<void> {
+        return this.http.delete<void>(`${API_BASE_URL}/platform/subjects/catalog/${id}`);
+    }
+
+    importSchoolSubjectsToCatalog(request: ImportSchoolSubjectsRequest): Observable<ImportSubjectsResultResponse> {
+        return this.http.post<ImportSubjectsResultResponse>(`${API_BASE_URL}/platform/subjects/import/from-school-to-catalog`, request);
+    }
+
+    importSchoolSubjectsToSchool(targetSchoolId: number, request: ImportSchoolSubjectsRequest): Observable<ImportSubjectsResultResponse> {
+        return this.http.post<ImportSubjectsResultResponse>(`${API_BASE_URL}/platform/subjects/import/from-school-to-school/${targetSchoolId}`, request);
+    }
+
+    publishAllCatalogSubjectsToSchool(targetSchoolId: number): Observable<ImportSubjectsResultResponse> {
+        return this.http.post<ImportSubjectsResultResponse>(`${API_BASE_URL}/platform/subjects/publish-all/${targetSchoolId}`, {});
     }
 
     getTeachers(schoolId?: number | null): Observable<UserResponse[]> {
@@ -223,6 +280,11 @@ export class ApiService {
         return this.http.post<TeacherAssignmentResponse>(`${API_BASE_URL}/teacher-assignments${query}`, request);
     }
 
+    createAssignmentsBatch(request: CreateTeacherAssignmentsBatchRequest, schoolId?: number | null): Observable<TeacherAssignmentBatchResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<TeacherAssignmentBatchResponse>(`${API_BASE_URL}/teacher-assignments/batch${query}`, request);
+    }
+
     updateAssignment(id: number, request: UpdateTeacherAssignmentRequest, schoolId?: number | null): Observable<TeacherAssignmentResponse> {
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.put<TeacherAssignmentResponse>(`${API_BASE_URL}/teacher-assignments/${id}${query}`, request);
@@ -247,6 +309,22 @@ export class ApiService {
 
     createResult(request: CreateResultRequest): Observable<ResultResponse> {
         return this.http.post<ResultResponse>(`${API_BASE_URL}/results`, request);
+    }
+
+    approveResult(id: number): Observable<ResultResponse> {
+        return this.http.post<ResultResponse>(`${API_BASE_URL}/results/${id}/approve`, {});
+    }
+
+    rejectResult(id: number): Observable<ResultResponse> {
+        return this.http.post<ResultResponse>(`${API_BASE_URL}/results/${id}/reject`, {});
+    }
+
+    reopenResult(id: number): Observable<ResultResponse> {
+        return this.http.post<ResultResponse>(`${API_BASE_URL}/results/${id}/reopen`, {});
+    }
+
+    lockResult(id: number): Observable<ResultResponse> {
+        return this.http.post<ResultResponse>(`${API_BASE_URL}/results/${id}/lock`, {});
     }
 
     getNotifications(): Observable<NotificationResponse[]> {
@@ -288,6 +366,15 @@ export class ApiService {
         return this.http.post<NotificationResponse>(`${API_BASE_URL}/notifications/send`, request);
     }
 
+    sendResultSlip(studentId: number, request: SendResultSlipRequest, slipPdf: Blob, schoolId?: number | null): Observable<ResultSlipSendResponse> {
+        const formData = new FormData();
+        formData.append('sendEmail', String(request.sendEmail));
+        formData.append('sendSms', String(request.sendSms));
+        formData.append('slipPdf', slipPdf, `result-slip-${studentId}.pdf`);
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<ResultSlipSendResponse>(`${API_BASE_URL}/results/${studentId}/send-slip${query}`, formData);
+    }
+
     getParentResults(): Observable<StudentCommentResponse[]> {
         return this.http.get<StudentCommentResponse[]>(`${API_BASE_URL}/parent/results`);
     }
@@ -322,7 +409,7 @@ export class ApiService {
             label: student.fullName,
             type: 'Student',
             description: `${student.studentNumber} · ${student.class}`,
-            route: `/admin/students?focus=${student.id}`
+            route: `/admin/students?schoolId=${student.schoolId}&focus=${student.id}`
         };
     }
 
@@ -352,7 +439,7 @@ export class ApiService {
             label: teacher.displayName,
             type: 'Teacher',
             description: `${teacher.username} · ${teacher.role}`,
-            route: `/admin/teachers?focus=${teacher.id}`
+            route: `/admin/teachers?schoolId=${teacher.schoolId}&focus=${teacher.id}`
         };
     }
 
@@ -361,8 +448,8 @@ export class ApiService {
             id: `subject-${subject.id}`,
             label: subject.name,
             type: 'Subject',
-            description: `School ${subject.schoolId}`,
-            route: `/admin/subjects?focus=${subject.id}`
+            description: `${subject.gradeLevel} · School ${subject.schoolId}`,
+            route: `/admin/subjects?schoolId=${subject.schoolId}&focus=${subject.id}`
         };
     }
 
@@ -371,8 +458,8 @@ export class ApiService {
             id: `assignment-${assignment.id}`,
             label: `${assignment.teacherName} · ${assignment.subjectName}`,
             type: 'Assignment',
-            description: assignment.class,
-            route: `/admin/assignments?focus=${assignment.id}`
+            description: `${assignment.class} · ${assignment.gradeLevel}`,
+            route: `/admin/assignments?schoolId=${assignment.schoolId}&focus=${assignment.id}`
         };
     }
 

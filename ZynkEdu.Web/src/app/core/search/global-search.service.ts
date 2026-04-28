@@ -82,7 +82,12 @@ export class GlobalSearchService {
                                                                     ...subjects.map((subject) => this.api.toSearchHitSubject(subject)),
                                                                     ...assignments.map((assignment) => this.api.toSearchHitAssignment(assignment)),
                                                                     ...notifications.map((notification) => this.api.toSearchHitNotification(notification))
-                                                                ])
+                                                                ].map((hit) => ({
+                                                                    ...hit,
+                                                                    route: hit.route.startsWith('/admin/')
+                                                                        ? hit.route.replace('/admin/', '/platform/')
+                                                                        : hit.route
+                                                                })))
                                                             )
                                                         )
                                                     )

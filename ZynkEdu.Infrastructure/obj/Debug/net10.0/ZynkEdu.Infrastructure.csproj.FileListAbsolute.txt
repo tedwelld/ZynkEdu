@@ -36,3 +36,4 @@ C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Infrastructure\obj\Debug\net10.0
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Infrastructure\obj\Debug\net10.0\ZynkEdu.Infrastructure.pdb
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Infrastructure\obj\Debug\net10.0\ZynkEdu.Infrastructure.genruntimeconfig.cache
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Infrastructure\obj\Debug\net10.0\ref\ZynkEdu.Infrastructure.dll
+C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Infrastructure\obj\Debug\net10.0\ZynkEdu.Infrastructure.sourcelink.json

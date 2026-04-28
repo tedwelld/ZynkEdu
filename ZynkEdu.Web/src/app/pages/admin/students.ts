@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ChartData, ChartOptions } from 'chart.js';
+import { ActivatedRoute } from '@angular/router';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ChartModule } from 'primeng/chart';
@@ -18,12 +19,14 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ApiService } from '../../core/api/api.service';
 import { extractApiErrorMessage } from '../../core/api/api-error';
 import {
+    BulkStudentSubjectEnrollmentResponse,
     CreateStudentRequest,
     DashboardResponse,
     ResultResponse,
     SchoolResponse,
     StudentResponse,
     SubjectResponse,
+    UpdateStudentStatusRequest,
     UpdateStudentRequest
 } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
@@ -49,6 +52,13 @@ const PERFORMANCE_OPTIONS = [
     { label: 'Excellent', value: 'Excellent' },
     { label: 'Stable', value: 'Stable' },
     { label: 'At risk', value: 'At risk' }
+];
+
+const STATUS_OPTIONS = [
+    { label: 'All statuses', value: 'All' },
+    { label: 'Active', value: 'Active' },
+    { label: 'Suspended', value: 'Suspended' },
+    { label: 'Archived', value: 'Archived' }
 ];
 
 const ALL_CLASS_LEVELS = [...new Set(Object.values(LEVEL_CLASS_MAP).flat())];
@@ -77,7 +87,14 @@ interface StudentDraft {
                     <p class="text-muted-color mt-2 max-w-2xl">Instant search, class filters, performance tags, and a profile drawer with results trend and parent contact details.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <app-dropdown *ngIf="isPlatformAdmin" [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-64" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
+                    <app-dropdown *ngIf="isPlatformAdmin" [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-64" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (opened)="loadData()" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
+                    <ng-container *ngIf="isPlatformAdmin; else schoolBulkAction">
+                        <button pButton type="button" label="Enroll selected school" icon="pi pi-users" severity="secondary" [disabled]="!selectedSchoolId || bulkEnrollmentLoading" (click)="confirmEnrollAllSubjects(false)"></button>
+                        <button pButton type="button" label="Enroll all schools" icon="pi pi-globe" severity="secondary" [disabled]="bulkEnrollmentLoading" (click)="confirmEnrollAllSubjects(true)"></button>
+                    </ng-container>
+                    <ng-template #schoolBulkAction>
+                        <button pButton type="button" label="Enroll all students" icon="pi pi-users" severity="secondary" [disabled]="bulkEnrollmentLoading" (click)="confirmEnrollAllSubjects(false)"></button>
+                    </ng-template>
                     <button pButton type="button" label="Add Student" icon="pi pi-user-plus" (click)="openCreateDrawer()"></button>
                     <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
                 </div>
@@ -98,11 +115,15 @@ interface StudentDraft {
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Class</label>
-                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClass" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes"></app-dropdown>
+                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClass" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes" (opened)="loadData()"></app-dropdown>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Performance</label>
-                        <app-dropdown [options]="performanceOptions" [(ngModel)]="selectedPerformance" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search performance"></app-dropdown>
+                        <app-dropdown [options]="performanceOptions" [(ngModel)]="selectedPerformance" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search performance" (opened)="loadData()"></app-dropdown>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Status</label>
+                        <app-dropdown [options]="statusOptions" [(ngModel)]="selectedStatus" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()"></app-dropdown>
                     </div>
                 </div>
             </div>
@@ -126,6 +147,7 @@ interface StudentDraft {
                             <th>Student</th>
                             <th>Class</th>
                             <th>Level</th>
+                            <th>Status</th>
                             <th>Subjects</th>
                             <th>Performance</th>
                             <th>Parent contact</th>
@@ -140,6 +162,9 @@ interface StudentDraft {
                             </td>
                             <td>{{ student.class }}</td>
                             <td>{{ student.level }}</td>
+                            <td>
+                                <p-tag [value]="student.status" [severity]="statusSeverity(student.status)"></p-tag>
+                            </td>
                             <td class="text-sm text-muted-color">{{ student.subjects?.length ? student.subjects.join(', ') : '-' }}</td>
                             <td>
                                 <p-tag [value]="bandFor(student.id)" [severity]="bandSeverity(bandFor(student.id))"></p-tag>
@@ -157,7 +182,7 @@ interface StudentDraft {
                     </ng-template>
                     <ng-template pTemplate="emptymessage">
                         <tr>
-                            <td colspan="7">
+                            <td colspan="8">
                                 <div class="py-8 text-center text-muted-color">No results yet. Teachers will add soon.</div>
                             </td>
                         </tr>
@@ -256,6 +281,7 @@ interface StudentDraft {
                                 </div>
                                 <div class="flex gap-2">
                                     <button pButton type="button" icon="pi pi-pencil" label="Edit" class="p-button-sm" (click)="openEditDrawer(selectedStudent)"></button>
+                                    <button pButton type="button" icon="pi pi-arrow-up-right" label="Promote" class="p-button-sm p-button-secondary" (click)="promoteSelectedStudent()"></button>
                                     <button pButton type="button" icon="pi pi-times" class="p-button-rounded p-button-text" (click)="drawerVisible = false"></button>
                                 </div>
                             </div>
@@ -268,6 +294,10 @@ interface StudentDraft {
                                 <div class="rounded-2xl bg-surface-0/70 dark:bg-surface-950/40 p-3">
                                     <div class="text-muted-color">Level</div>
                                     <div class="font-semibold">{{ selectedStudent.level }}</div>
+                                </div>
+                                <div class="rounded-2xl bg-surface-0/70 dark:bg-surface-950/40 p-3">
+                                    <div class="text-muted-color">Status</div>
+                                    <div class="font-semibold">{{ selectedStudent.status }}</div>
                                 </div>
                                 <div class="rounded-2xl bg-surface-0/70 dark:bg-surface-950/40 p-3">
                                     <div class="text-muted-color">Enrollment year</div>
@@ -310,6 +340,21 @@ interface StudentDraft {
                                 </div>
                             </div>
                         </div>
+
+                        <div class="workspace-card">
+                            <div class="flex items-center justify-between gap-3 mb-4">
+                                <div>
+                                    <h3 class="font-display font-bold mb-1">Lifecycle</h3>
+                                    <p class="text-sm text-muted-color">Suspend, archive, or reactivate from the admin desk.</p>
+                                </div>
+                                <p-tag [value]="selectedStudent.status" [severity]="statusSeverity(selectedStudent.status)"></p-tag>
+                            </div>
+                            <div class="grid gap-3 md:grid-cols-3">
+                                <button pButton type="button" label="Reactivate" icon="pi pi-play" severity="success" [disabled]="selectedStudent.status === 'Active'" (click)="setSelectedStudentStatus('Active')"></button>
+                                <button pButton type="button" label="Suspend" icon="pi pi-pause" severity="secondary" [disabled]="selectedStudent.status === 'Suspended'" (click)="setSelectedStudentStatus('Suspended')"></button>
+                                <button pButton type="button" label="Archive" icon="pi pi-box" severity="danger" [disabled]="selectedStudent.status === 'Archived'" (click)="setSelectedStudentStatus('Archived')"></button>
+                            </div>
+                        </div>
                     </div>
                     <ng-template #emptyDrawer>
                         <div class="h-full flex items-center justify-center text-muted-color">Pick a student to view the detailed drawer.</div>
@@ -322,6 +367,7 @@ interface StudentDraft {
 export class AdminStudents implements OnInit {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
+    private readonly route = inject(ActivatedRoute);
     private readonly confirmation = inject(ConfirmationService);
     private readonly messages = inject(MessageService);
 
@@ -334,14 +380,17 @@ export class AdminStudents implements OnInit {
     searchTerm = '';
     selectedClass = 'All';
     selectedPerformance = 'All';
+    selectedStatus = 'All';
     drawerVisible = false;
     drawerMode: StudentDrawerMode = 'view';
     selectedStudent: StudentResponse | null = null;
     editStudentId: number | null = null;
+    pendingFocusStudentId: number | null = null;
     studentResults: ResultResponse[] = [];
     studentChartData!: ChartData<'line'>;
     studentChartOptions!: ChartOptions<'line'>;
     skeletonRows = Array.from({ length: 5 });
+    bulkEnrollmentLoading = false;
     draft: StudentDraft = this.createEmptyDraft();
 
     get isPlatformAdmin(): boolean {
@@ -377,6 +426,10 @@ export class AdminStudents implements OnInit {
 
     get performanceOptions(): { label: string; value: string }[] {
         return PERFORMANCE_OPTIONS;
+    }
+
+    get statusOptions(): { label: string; value: string }[] {
+        return STATUS_OPTIONS;
     }
 
     get classOptions(): { label: string; value: string }[] {
@@ -422,7 +475,8 @@ export class AdminStudents implements OnInit {
             const matchesClass = this.selectedClass === 'All' || student.class === this.selectedClass;
             const performance = this.bandFor(student.id);
             const matchesPerformance = this.selectedPerformance === 'All' || performance === this.selectedPerformance;
-            return matchesSearch && matchesClass && matchesPerformance;
+            const matchesStatus = this.selectedStatus === 'All' || student.status === this.selectedStatus;
+            return matchesSearch && matchesClass && matchesPerformance && matchesStatus;
         });
     }
 
@@ -443,7 +497,22 @@ export class AdminStudents implements OnInit {
     }
 
     ngOnInit(): void {
+        this.applyQueryScope();
         this.loadData();
+    }
+
+    private applyQueryScope(): void {
+        const schoolIdText = this.route.snapshot.queryParamMap.get('schoolId');
+        const schoolId = schoolIdText ? Number(schoolIdText) : null;
+        if (Number.isFinite(schoolId)) {
+            this.selectedSchoolId = schoolId;
+        }
+
+        const focusText = this.route.snapshot.queryParamMap.get('focus');
+        const focusId = focusText ? Number(focusText) : null;
+        if (Number.isFinite(focusId)) {
+            this.pendingFocusStudentId = focusId;
+        }
     }
 
     loadData(): void {
@@ -485,12 +554,25 @@ export class AdminStudents implements OnInit {
                 if (!this.isPlatformAdmin && this.authSchoolId && !this.draft.schoolId) {
                     this.draft.schoolId = this.authSchoolId;
                 }
+                this.openPendingStudentFocus();
                 this.loading = false;
             },
             error: () => {
                 this.loading = false;
             }
         });
+    }
+
+    private openPendingStudentFocus(): void {
+        if (!this.pendingFocusStudentId) {
+            return;
+        }
+
+        const student = this.students.find((entry) => entry.id === this.pendingFocusStudentId);
+        this.pendingFocusStudentId = null;
+        if (student) {
+            this.openStudent(student);
+        }
     }
 
     bandFor(studentId: number): PerformanceBand {
@@ -622,8 +704,117 @@ export class AdminStudents implements OnInit {
         });
     }
 
+    confirmEnrollAllSubjects(enrollAllSchools: boolean): void {
+        const targetSchoolId = this.isPlatformAdmin
+            ? enrollAllSchools
+                ? null
+                : this.selectedSchoolId
+            : this.authSchoolId;
+
+        if (!this.isPlatformAdmin && targetSchoolId == null) {
+            this.messages.add({ severity: 'warn', summary: 'School required', detail: 'A school scope is required before bulk enrolling subjects.' });
+            return;
+        }
+
+        if (this.isPlatformAdmin && !enrollAllSchools && targetSchoolId == null) {
+            this.messages.add({ severity: 'warn', summary: 'School required', detail: 'Choose a school before bulk enrolling subjects.' });
+            return;
+        }
+
+        const message = enrollAllSchools
+            ? 'Enrol every student in every school into that school\'s registered subjects?'
+            : 'Enrol every student in this school into all registered subjects?';
+
+        this.confirmation.confirm({
+            message,
+            header: 'Bulk subject enrollment',
+            icon: 'pi pi-users',
+            acceptButtonStyleClass: 'p-button-primary',
+            accept: () => this.runEnrollAllSubjects(targetSchoolId)
+        });
+    }
+
+    private runEnrollAllSubjects(schoolId: number | null): void {
+        this.bulkEnrollmentLoading = true;
+        this.api.enrollAllStudentsInAllSubjects(schoolId).subscribe({
+            next: (result: BulkStudentSubjectEnrollmentResponse) => {
+                this.bulkEnrollmentLoading = false;
+                this.messages.add({
+                    severity: 'success',
+                    summary: 'Subjects enrolled',
+                    detail: `${result.studentCount} student(s) were enrolled in ${result.subjectCount} subject(s) across ${result.schoolCount} school(s).`
+                });
+                this.loadData();
+            },
+            error: (error) => {
+                this.bulkEnrollmentLoading = false;
+                this.messages.add({
+                    severity: 'error',
+                    summary: 'Enrollment failed',
+                    detail: this.readErrorMessage(error, 'The students could not be enrolled in all subjects.')
+                });
+            }
+        });
+    }
+
+    promoteSelectedStudent(): void {
+        if (!this.selectedStudent) {
+            return;
+        }
+
+        const next = this.promoteStudent(this.selectedStudent);
+        if (!next) {
+            this.messages.add({ severity: 'warn', summary: 'Cannot promote', detail: 'This student is already on the highest available class path.' });
+            return;
+        }
+
+        this.api.updateStudent(this.selectedStudent.id, next).subscribe({
+            next: () => {
+                this.messages.add({ severity: 'success', summary: 'Promoted', detail: `${this.selectedStudent?.fullName} moved to the next class.` });
+                this.loadData();
+            },
+            error: (error) => {
+                this.messages.add({ severity: 'error', summary: 'Promotion failed', detail: this.readErrorMessage(error, 'The student could not be promoted.') });
+            }
+        });
+    }
+
+    setSelectedStudentStatus(status: string): void {
+        if (!this.selectedStudent) {
+            return;
+        }
+
+        const request: UpdateStudentStatusRequest = { status };
+        this.api.updateStudentStatus(this.selectedStudent.id, request).subscribe({
+            next: (updated) => {
+                this.selectedStudent = updated;
+                this.students = this.students.map((student) => (student.id === updated.id ? updated : student));
+                this.messages.add({ severity: 'success', summary: 'Status updated', detail: `${updated.fullName} is now ${updated.status}.` });
+            },
+            error: (error) => {
+                this.messages.add({ severity: 'error', summary: 'Status update failed', detail: this.readErrorMessage(error, 'The student status could not be updated.') });
+            }
+        });
+    }
+
     schoolNameFor(schoolId: number): string {
         return this.schools.find((school) => school.id === schoolId)?.name ?? `School ${schoolId}`;
+    }
+
+    statusSeverity(status: string): 'success' | 'warning' | 'danger' | 'secondary' {
+        if (status === 'Active') {
+            return 'success';
+        }
+
+        if (status === 'Suspended') {
+            return 'warning';
+        }
+
+        if (status === 'Archived') {
+            return 'danger';
+        }
+
+        return 'secondary';
     }
 
     private createEmptyDraft(schoolId: number | null = null): StudentDraft {
@@ -761,6 +952,35 @@ export class AdminStudents implements OnInit {
                     }
                 }
             }
+        };
+    }
+
+    private promoteStudent(student: StudentResponse): UpdateStudentRequest | null {
+        const classSequence = [
+            'Form 1A', 'Form 1B', 'Form 1C', 'Form 2A', 'Form 2B', 'Form 2C',
+            'Form 3A Sciences', 'Form 3B Commercials', 'Form 3C Arts', 'Form 4A Sciences', 'Form 4B Commercials', 'Form 4C Arts',
+            'Form 5 Arts', 'Form 5 Commercials', 'Form 5 Sciences', 'Form 6 Arts', 'Form 6 Commercials', 'Form 6 Sciences'
+        ];
+        const index = classSequence.findIndex((value) => value === student.class);
+        if (index < 0 || index === classSequence.length - 1) {
+            return null;
+        }
+
+        const nextClass = classSequence[index + 1];
+        const level = nextClass.startsWith('Form 1') || nextClass.startsWith('Form 2')
+            ? 'ZGC Level'
+            : nextClass.startsWith('Form 3') || nextClass.startsWith('Form 4')
+                ? "O'Level"
+                : "A'Level";
+
+        return {
+            fullName: student.fullName,
+            class: nextClass,
+            level,
+            enrollmentYear: student.enrollmentYear,
+            subjectIds: [...student.subjectIds],
+            parentEmail: student.parentEmail,
+            parentPhone: student.parentPhone
         };
     }
 }

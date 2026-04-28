@@ -28,6 +28,13 @@ public sealed class TeacherAssignmentsController : ControllerBase
         return Ok(await _assignmentService.CreateAsync(request, schoolId, cancellationToken));
     }
 
+    [HttpPost("batch")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    public async Task<ActionResult<TeacherAssignmentBatchResponse>> CreateBatch([FromBody] CreateTeacherAssignmentsBatchRequest request, [FromQuery] int? schoolId, CancellationToken cancellationToken)
+    {
+        return Ok(await _assignmentService.CreateBatchAsync(request, schoolId, cancellationToken));
+    }
+
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<TeacherAssignmentResponse>>> GetAll([FromQuery] int? schoolId, CancellationToken cancellationToken)
     {

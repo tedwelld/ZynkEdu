@@ -1,15 +1,17 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { DatePickerModule } from 'primeng/datepicker';
 import { MessageService } from 'primeng/api';
+import { InputTextModule } from 'primeng/inputtext';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ApiService } from '../../core/api/api.service';
-import { AttendanceDailySummaryResponse, AttendanceRegisterResponse, SchoolResponse } from '../../core/api/api.models';
+import { AttendanceDailySummaryResponse, AttendanceRegisterResponse, AttendanceStatus, SchoolResponse, SaveAttendanceRegisterRequest } from '../../core/api/api.models';
 import { AuthService } from '../../core/auth/auth.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
@@ -17,7 +19,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 @Component({
     standalone: true,
     selector: 'app-admin-attendance',
-    imports: [CommonModule, FormsModule, ButtonModule, DatePickerModule, DialogModule, MetricCardComponent, AppDropdownComponent, SkeletonModule, TableModule, TagModule],
+    imports: [CommonModule, FormsModule, ButtonModule, DatePickerModule, DialogModule, InputTextModule, MetricCardComponent, AppDropdownComponent, SkeletonModule, TableModule, TagModule],
     template: `
         <section class="space-y-6">
             <header class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -40,11 +42,19 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 <div class="grid gap-4 lg:grid-cols-2">
                     <div *ngIf="isPlatformAdmin">
                         <label class="block text-sm font-semibold mb-2">School</label>
-                        <app-dropdown [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
+                        <app-dropdown [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (opened)="loadData()" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Attendance date</label>
                         <p-datepicker [(ngModel)]="attendanceDate" [showIcon]="true" [showButtonBar]="true" appendTo="body" class="w-full" (ngModelChange)="onDateChange($event)"></p-datepicker>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Class filter</label>
+                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClassFilter" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes" (opened)="loadData()"></app-dropdown>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Teacher filter</label>
+                        <app-dropdown [options]="teacherOptions" [(ngModel)]="selectedTeacherFilter" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search teachers" (opened)="loadData()"></app-dropdown>
                     </div>
                 </div>
                 <div class="text-sm text-muted-color" *ngIf="selectedSchoolLabel">
@@ -65,7 +75,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                     <p-skeleton *ngFor="let _ of skeletonRows" height="3.5rem" borderRadius="1rem"></p-skeleton>
                 </div>
 
-                <p-table *ngIf="!loading" [value]="summaries" [rows]="8" [paginator]="true" styleClass="p-datatable-sm">
+                <p-table *ngIf="!loading" [value]="filteredSummaries" [rows]="8" [paginator]="true" styleClass="p-datatable-sm">
                     <ng-template pTemplate="header">
                         <tr>
                             <th>Class</th>
@@ -92,7 +102,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                     </ng-template>
                 </p-table>
 
-                <div *ngIf="!loading && summaries.length === 0" class="rounded-3xl border border-dashed border-surface-300 dark:border-surface-700 p-6 text-center text-muted-color">
+                <div *ngIf="!loading && filteredSummaries.length === 0" class="rounded-3xl border border-dashed border-surface-300 dark:border-surface-700 p-6 text-center text-muted-color">
                     No attendance has been captured for the selected date yet.
                 </div>
             </article>
@@ -114,7 +124,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                             <div class="text-right">
                                 <div class="text-sm text-muted-color">Date</div>
                                 <div class="text-lg font-semibold">{{ selectedRegister.attendanceDate | date: 'fullDate' }}</div>
-                                <p-tag class="mt-2" [value]="selectedRegister.isLocked ? 'Dispatched' : 'Pending'" [severity]="selectedRegister.isLocked ? 'success' : 'warning'"></p-tag>
+                                <p-tag class="mt-2" [value]="selectedRegister.isLocked ? 'Locked' : 'Pending'" [severity]="selectedRegister.isLocked ? 'success' : 'warning'"></p-tag>
                             </div>
                         </div>
                     </div>
@@ -155,12 +165,30 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                                 </td>
                                 <td class="text-sm text-muted-color">{{ student.level }}</td>
                                 <td>
-                                    <p-tag [value]="student.status"></p-tag>
+                                    <ng-container *ngIf="!editMode; else statusEditor">
+                                        <p-tag [value]="student.status" [severity]="statusSeverity(student.status)"></p-tag>
+                                    </ng-container>
+                                    <ng-template #statusEditor>
+                                        <app-dropdown [options]="statusOptions" [(ngModel)]="student.status" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()"></app-dropdown>
+                                    </ng-template>
                                 </td>
-                                <td class="text-sm text-muted-color">{{ student.note || 'No note' }}</td>
+                                <td>
+                                    <ng-container *ngIf="!editMode; else noteEditor">
+                                        <span class="text-sm text-muted-color">{{ student.note || 'No note' }}</span>
+                                    </ng-container>
+                                    <ng-template #noteEditor>
+                                        <input pInputText [(ngModel)]="student.note" class="w-full" />
+                                    </ng-template>
+                                </td>
                             </tr>
                         </ng-template>
                     </p-table>
+
+                    <div class="flex flex-wrap justify-end gap-3">
+                        <button pButton type="button" label="Edit register" icon="pi pi-pencil" severity="secondary" *ngIf="!editMode" (click)="editMode = true"></button>
+                        <button pButton type="button" label="Cancel edits" icon="pi pi-times" severity="secondary" *ngIf="editMode" (click)="cancelEdits()"></button>
+                        <button pButton type="button" label="Save override" icon="pi pi-save" *ngIf="editMode" (click)="saveOverride()"></button>
+                    </div>
                 </div>
             </p-dialog>
         </section>
@@ -169,6 +197,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 export class AdminAttendance implements OnInit {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
+    private readonly route = inject(ActivatedRoute);
     private readonly messages = inject(MessageService);
 
     loading = true;
@@ -176,12 +205,43 @@ export class AdminAttendance implements OnInit {
     summaries: AttendanceDailySummaryResponse[] = [];
     selectedRegister: AttendanceRegisterResponse | null = null;
     detailVisible = false;
+    editMode = false;
     skeletonRows = Array.from({ length: 4 });
     schools: SchoolResponse[] = [];
     selectedSchoolId: number | null = this.auth.schoolId();
     attendanceDate = new Date();
+    selectedClassFilter = 'All';
+    selectedTeacherFilter = 'All';
+
+    get classOptions(): { label: string; value: string }[] {
+        const classes = Array.from(new Set(this.summaries.map((summary) => summary.className))).sort();
+        return [{ label: 'All classes', value: 'All' }, ...classes.map((value) => ({ label: value, value }))];
+    }
+
+    get teacherOptions(): { label: string; value: string }[] {
+        const teachers = Array.from(new Set(this.summaries.map((summary) => summary.teacherName))).sort();
+        return [{ label: 'All teachers', value: 'All' }, ...teachers.map((value) => ({ label: value, value }))];
+    }
+
+    get statusOptions(): { label: string; value: AttendanceStatus }[] {
+        return [
+            { label: 'Present', value: 'Present' },
+            { label: 'Absent', value: 'Absent' },
+            { label: 'Late', value: 'Late' },
+            { label: 'Excused', value: 'Excused' }
+        ];
+    }
+
+    get filteredSummaries(): AttendanceDailySummaryResponse[] {
+        return this.summaries.filter((summary) => {
+            const matchesClass = this.selectedClassFilter === 'All' || summary.className === this.selectedClassFilter;
+            const matchesTeacher = this.selectedTeacherFilter === 'All' || summary.teacherName === this.selectedTeacherFilter;
+            return matchesClass && matchesTeacher;
+        });
+    }
 
     ngOnInit(): void {
+        this.applySchoolScopeFromQuery();
         if (this.isPlatformAdmin) {
             this.auth.loadSchools().subscribe({
                 next: (schools) => {
@@ -196,6 +256,14 @@ export class AdminAttendance implements OnInit {
         }
 
         this.loadData();
+    }
+
+    private applySchoolScopeFromQuery(): void {
+        const schoolIdText = this.route.snapshot.queryParamMap.get('schoolId');
+        const schoolId = schoolIdText ? Number(schoolIdText) : null;
+        if (Number.isFinite(schoolId)) {
+            this.selectedSchoolId = schoolId;
+        }
     }
 
     get isPlatformAdmin(): boolean {
@@ -269,6 +337,7 @@ export class AdminAttendance implements OnInit {
 
         this.detailLoading = true;
         this.detailVisible = true;
+        this.editMode = false;
         this.api.getAttendanceRegister(summary.className, this.serializeDate(new Date(summary.attendanceDate)), schoolId).subscribe({
             next: (register) => {
                 this.selectedRegister = this.normalizeRegister(register);
@@ -289,6 +358,58 @@ export class AdminAttendance implements OnInit {
                 note: student.note ?? ''
             }))
         };
+    }
+
+    saveOverride(): void {
+        if (!this.selectedRegister) {
+            return;
+        }
+
+        const schoolId = this.isPlatformAdmin ? this.selectedSchoolId : null;
+        const payload: SaveAttendanceRegisterRequest = {
+            attendanceDate: this.serializeDate(new Date(this.selectedRegister.attendanceDate)),
+            className: this.selectedRegister.className,
+            students: this.selectedRegister.students.map((student) => ({
+                studentId: student.studentId,
+                status: student.status,
+                note: student.note || null
+            }))
+        };
+
+        this.api.saveAttendanceRegister(payload, schoolId).subscribe({
+            next: (register) => {
+                this.selectedRegister = this.normalizeRegister(register);
+                this.editMode = false;
+                this.messages.add({ severity: 'success', summary: 'Saved', detail: 'Attendance override saved.' });
+                this.loadData();
+            },
+            error: (error) => {
+                this.messages.add({ severity: 'error', summary: 'Save failed', detail: this.readErrorMessage(error, 'The register could not be saved.') });
+            }
+        });
+    }
+
+    cancelEdits(): void {
+        this.editMode = false;
+        if (this.selectedRegister) {
+            this.selectedRegister = { ...this.selectedRegister, students: this.selectedRegister.students.map((student) => ({ ...student })) };
+        }
+    }
+
+    statusSeverity(status: string): 'success' | 'warning' | 'danger' | 'secondary' {
+        if (status === 'Present') {
+            return 'success';
+        }
+
+        if (status === 'Late') {
+            return 'warning';
+        }
+
+        if (status === 'Absent') {
+            return 'danger';
+        }
+
+        return 'secondary';
     }
 
     private serializeDate(date: Date): string {

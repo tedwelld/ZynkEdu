@@ -151,7 +151,7 @@ public sealed class AuthService : IAuthService
     {
         return await _dbContext.Schools.AsNoTracking()
             .OrderBy(x => x.Name)
-            .Select(x => new SchoolResponse(x.Id, x.Name, x.Address, x.AdminContactEmail, x.CreatedAt))
+            .Select(x => new SchoolResponse(x.Id, x.SchoolCode ?? string.Empty, x.Name, x.Address, x.AdminContactEmail, x.CreatedAt))
             .ToListAsync(cancellationToken);
     }
 

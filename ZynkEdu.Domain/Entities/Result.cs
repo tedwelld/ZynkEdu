@@ -15,5 +15,7 @@ public sealed class Result : EntityBase, ISchoolScoped
     public string Grade { get; set; } = string.Empty;
     public string Term { get; set; } = string.Empty;
     public string? Comment { get; set; }
+    public string ApprovalStatus { get; set; } = "Pending";
+    public bool IsLocked { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

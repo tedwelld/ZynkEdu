@@ -2,123 +2,164 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
-import { DatePickerModule } from 'primeng/datepicker';
+import { MessageService } from 'primeng/api';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
-import {
-    AcademicTermResponse,
-    DashboardResponse,
-    NotificationResponse,
-    ResultResponse,
-    SubjectPerformanceDto
-} from '../../core/api/api.models';
+import { AuthService } from '../../core/auth/auth.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
-
-type ReportKind = 'school-summary' | 'school-comparison' | 'student-performance' | 'teacher-performance' | 'academic-summary' | 'notifications';
-type PeriodKind = 'term' | 'date-range' | 'month' | 'week' | 'day';
-
-interface ReportOption {
-    label: string;
-    value: ReportKind;
-    description: string;
-}
-
-interface PeriodOption {
-    label: string;
-    value: PeriodKind;
-}
+import { ResultResponse, SchoolResponse, UserResponse } from '../../core/api/api.models';
 
 interface PreviewRow {
+    year: number;
+    className: string;
     studentName: string;
     subjectName: string;
+    teacherName: string;
     score: string;
+    grade: string;
     term: string;
-    date: string;
-}
-
-interface NotificationPreviewRow {
-    title: string;
-    type: string;
-    message: string;
     date: string;
 }
 
 @Component({
     standalone: true,
     selector: 'app-admin-reports',
-    imports: [CommonModule, FormsModule, ButtonModule, DatePickerModule, MetricCardComponent, AppDropdownComponent, SkeletonModule, TableModule, TagModule],
+    imports: [CommonModule, FormsModule, ButtonModule, MetricCardComponent, AppDropdownComponent, SkeletonModule, TableModule, TagModule],
     template: `
         <section class="space-y-6">
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Reports</p>
-                    <h1 class="text-3xl font-display font-bold m-0">Report generator</h1>
-                    <p class="text-muted-color mt-2 max-w-2xl">Choose a report type, pick a term or date window, and export a clean PDF from the current system data.</p>
+                    <h1 class="text-3xl font-display font-bold m-0">Filter-first reports</h1>
+                    <p class="text-muted-color mt-2 max-w-2xl">Generate exports by year, class, student name, and teacher name from the current live results data. Class-grouped PDFs and parent-specific slips keep the report flow safe and readable.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
-                    <button pButton type="button" label="Generate PDF" icon="pi pi-file-pdf" (click)="generateReport()" [disabled]="loading || !hasAnyData"></button>
+                    <button pButton type="button" label="Generate PDF" icon="pi pi-file-pdf" (click)="generateReport()" [disabled]="loading || filteredResults.length === 0"></button>
+                    <button pButton type="button" label="Send parent slip" icon="pi pi-send" severity="info" (click)="sendParentSlip()" [disabled]="loading || !canSendParentSlip"></button>
+                    <button pButton type="button" label="Export Excel" icon="pi pi-file-excel" severity="success" (click)="exportExcel()" [disabled]="loading || filteredResults.length === 0"></button>
                 </div>
             </div>
 
             <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <app-metric-card label="Report types" [value]="reportOptions.length.toString()" delta="Templates" hint="PDF exports" icon="pi pi-file-pdf" tone="blue" direction="up"></app-metric-card>
-                <app-metric-card label="Results in scope" [value]="filteredResults.length.toString()" delta="Filtered view" hint="Matching rows" icon="pi pi-chart-line" tone="green" direction="up"></app-metric-card>
-                <app-metric-card label="Notifications" [value]="filteredNotifications.length.toString()" delta="Filtered view" hint="Message rows" icon="pi pi-bell" tone="purple" direction="up"></app-metric-card>
-                <app-metric-card label="Terms" [value]="terms.length.toString()" delta="School calendar" hint="Selectable periods" icon="pi pi-calendar" tone="orange" direction="up"></app-metric-card>
+                <app-metric-card label="Results in scope" [value]="filteredResults.length.toString()" delta="Live rows" hint="Current filters" icon="pi pi-chart-line" tone="blue" direction="up"></app-metric-card>
+                <app-metric-card label="Students" [value]="studentCount.toString()" delta="Distinct students" hint="Filtered names" icon="pi pi-users" tone="green" direction="up"></app-metric-card>
+                <app-metric-card label="Teachers" [value]="teacherCount.toString()" delta="Distinct teachers" hint="Assigned staff" icon="pi pi-id-card" tone="purple" direction="up"></app-metric-card>
+                <app-metric-card label="Average score" [value]="averageScoreLabel" delta="Filtered average" hint="Current report" icon="pi pi-chart-bar" tone="orange" direction="up"></app-metric-card>
             </section>
 
             <article class="workspace-card">
                 <div class="flex items-center justify-between gap-4 mb-4">
                     <div>
                         <h2 class="text-xl font-display font-bold mb-1">Report filters</h2>
-                        <p class="text-sm text-muted-color">Pick the report and the time window to include in the export.</p>
+                        <p class="text-sm text-muted-color">Each selection is validated against the latest data when opened.</p>
                     </div>
-                    <p-tag [value]="selectedPeriodLabel"></p-tag>
+                    <p-tag [value]="selectedScopeLabel"></p-tag>
                 </div>
 
-                <div class="grid gap-4 xl:grid-cols-4">
-                    <div>
-                        <label class="block text-sm font-semibold mb-2">Report type</label>
-                        <app-dropdown [options]="reportOptions" [(ngModel)]="selectedReport" optionLabel="label" optionValue="value" class="w-full" appendTo="body"></app-dropdown>
+                <div class="grid gap-4 xl:grid-cols-5">
+                    <div *ngIf="isPlatformAdmin">
+                        <label class="block text-sm font-semibold mb-2">School</label>
+                        <app-dropdown
+                            [options]="schoolOptions"
+                            [(ngModel)]="selectedSchoolId"
+                            optionLabel="label"
+                            optionValue="value"
+                            class="w-full"
+                            appendTo="body"
+                            [filter]="true"
+                            filterBy="label"
+                            filterPlaceholder="Search schools"
+                            [showClear]="true"
+                            (opened)="loadData()"
+                            (ngModelChange)="onSchoolChange($event)"
+                        ></app-dropdown>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-semibold mb-2">Period</label>
-                        <app-dropdown [options]="periodOptions" [(ngModel)]="selectedPeriodKind" optionLabel="label" optionValue="value" class="w-full" appendTo="body"></app-dropdown>
+                        <label class="block text-sm font-semibold mb-2">Year</label>
+                        <app-dropdown
+                            [options]="yearOptions"
+                            [(ngModel)]="selectedYear"
+                            optionLabel="label"
+                            optionValue="value"
+                            class="w-full"
+                            appendTo="body"
+                            [filter]="true"
+                            filterBy="label"
+                            filterPlaceholder="Search years"
+                            [showClear]="true"
+                            (opened)="loadData()"
+                            (ngModelChange)="onFilterChange()"
+                        ></app-dropdown>
                     </div>
 
-                    <div *ngIf="selectedPeriodKind === 'term'">
-                        <label class="block text-sm font-semibold mb-2">Term</label>
-                        <app-dropdown [options]="termOptions" [(ngModel)]="selectedTermId" optionLabel="label" optionValue="value" class="w-full" appendTo="body"></app-dropdown>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Class</label>
+                        <app-dropdown
+                            [options]="classOptions"
+                            [(ngModel)]="selectedClass"
+                            optionLabel="label"
+                            optionValue="value"
+                            class="w-full"
+                            appendTo="body"
+                            [filter]="true"
+                            filterBy="label"
+                            filterPlaceholder="Search classes"
+                            [showClear]="true"
+                            (opened)="loadData()"
+                            (ngModelChange)="onFilterChange()"
+                        ></app-dropdown>
                     </div>
 
-                    <div *ngIf="selectedPeriodKind === 'date-range'" class="grid gap-4 md:grid-cols-2 xl:col-span-2">
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Start date</label>
-                            <p-datepicker [(ngModel)]="dateRangeStart" [showIcon]="true" [showButtonBar]="true" appendTo="body" class="w-full"></p-datepicker>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">End date</label>
-                            <p-datepicker [(ngModel)]="dateRangeEnd" [showIcon]="true" [showButtonBar]="true" appendTo="body" class="w-full"></p-datepicker>
-                        </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Student name</label>
+                        <app-dropdown
+                            [options]="studentOptions"
+                            [(ngModel)]="selectedStudentId"
+                            optionLabel="label"
+                            optionValue="value"
+                            class="w-full"
+                            appendTo="body"
+                            [filter]="true"
+                            filterBy="label"
+                            filterPlaceholder="Search students"
+                            [showClear]="true"
+                            (opened)="loadData()"
+                            (ngModelChange)="onFilterChange()"
+                        ></app-dropdown>
                     </div>
 
-                    <div *ngIf="selectedPeriodKind === 'month' || selectedPeriodKind === 'week' || selectedPeriodKind === 'day'">
-                        <label class="block text-sm font-semibold mb-2">Anchor date</label>
-                        <p-datepicker [(ngModel)]="anchorDate" [showIcon]="true" [showButtonBar]="true" appendTo="body" class="w-full"></p-datepicker>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Teacher name</label>
+                        <app-dropdown
+                            [options]="teacherOptions"
+                            [(ngModel)]="selectedTeacherId"
+                            optionLabel="label"
+                            optionValue="value"
+                            class="w-full"
+                            appendTo="body"
+                            [filter]="true"
+                            filterBy="label"
+                            filterPlaceholder="Search teachers"
+                            [showClear]="true"
+                            (opened)="loadData()"
+                            (ngModelChange)="onFilterChange()"
+                        ></app-dropdown>
                     </div>
                 </div>
 
                 <div class="flex flex-wrap gap-3 pt-4">
-                    <button pButton type="button" label="Generate PDF" icon="pi pi-download" (click)="generateReport()" [disabled]="loading || !hasAnyData"></button>
-                    <button pButton type="button" label="Reset filters" severity="secondary" (click)="resetFilters()"></button>
+                    <button pButton type="button" label="Generate PDF" icon="pi pi-download" (click)="generateReport()" [disabled]="loading || filteredResults.length === 0"></button>
+                    <button pButton type="button" label="Export Excel" icon="pi pi-file-excel" severity="success" (click)="exportExcel()" [disabled]="loading || filteredResults.length === 0"></button>
+                    <button pButton type="button" label="Clear filters" severity="secondary" (click)="resetFilters()"></button>
                 </div>
             </article>
 
@@ -127,9 +168,9 @@ interface NotificationPreviewRow {
                     <div class="flex items-center justify-between gap-3 mb-4">
                         <div>
                             <h2 class="text-xl font-display font-bold mb-1">Preview</h2>
-                            <p class="text-sm text-muted-color">This is the data that will go into the PDF.</p>
+                            <p class="text-sm text-muted-color">The first rows of the filtered dataset.</p>
                         </div>
-                        <span class="text-sm text-muted-color">{{ previewCountLabel }}</span>
+                        <span class="text-sm text-muted-color">{{ previewResults.length }} row(s)</span>
                     </div>
 
                     <div *ngIf="loading" class="space-y-3">
@@ -138,85 +179,56 @@ interface NotificationPreviewRow {
                     </div>
 
                     <ng-container *ngIf="!loading">
-                        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
-                                <div class="text-xs uppercase tracking-[0.18em] text-muted-color font-semibold">Report</div>
-                                <div class="text-lg font-display font-bold mt-1">{{ selectedReportLabel }}</div>
-                            </div>
-                            <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
-                                <div class="text-xs uppercase tracking-[0.18em] text-muted-color font-semibold">Period</div>
-                                <div class="text-lg font-display font-bold mt-1">{{ selectedPeriodLabel }}</div>
-                            </div>
-                            <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
-                                <div class="text-xs uppercase tracking-[0.18em] text-muted-color font-semibold">Results</div>
-                                <div class="text-lg font-display font-bold mt-1">{{ filteredResults.length }}</div>
-                            </div>
-                            <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
-                                <div class="text-xs uppercase tracking-[0.18em] text-muted-color font-semibold">Messages</div>
-                                <div class="text-lg font-display font-bold mt-1">{{ filteredNotifications.length }}</div>
-                            </div>
-                        </div>
-
-                        <div class="mt-5">
-                            <p-table *ngIf="selectedReport !== 'notifications'" [value]="previewResults" styleClass="p-datatable-sm">
-                                <ng-template pTemplate="header">
-                                    <tr>
-                                        <th>Student</th>
-                                        <th>Subject</th>
-                                        <th>Score</th>
-                                        <th>Term</th>
-                                        <th>Date</th>
-                                    </tr>
-                                </ng-template>
-                                <ng-template pTemplate="body" let-row>
-                                    <tr>
-                                        <td class="font-semibold">{{ row.studentName }}</td>
-                                        <td>{{ row.subjectName }}</td>
-                                        <td>{{ row.score }}</td>
-                                        <td>{{ row.term }}</td>
-                                        <td class="text-sm text-muted-color">{{ row.date }}</td>
-                                    </tr>
-                                </ng-template>
-                            </p-table>
-
-                            <p-table *ngIf="selectedReport === 'notifications'" [value]="previewNotifications" styleClass="p-datatable-sm">
-                                <ng-template pTemplate="header">
-                                    <tr>
-                                        <th>Title</th>
-                                        <th>Type</th>
-                                        <th>Message</th>
-                                        <th>Date</th>
-                                    </tr>
-                                </ng-template>
-                                <ng-template pTemplate="body" let-row>
-                                    <tr>
-                                        <td class="font-semibold">{{ row.title }}</td>
-                                        <td>{{ row.type }}</td>
-                                        <td>{{ row.message }}</td>
-                                        <td class="text-sm text-muted-color">{{ row.date }}</td>
-                                    </tr>
-                                </ng-template>
-                            </p-table>
-                        </div>
+                        <p-table [value]="previewResults" styleClass="p-datatable-sm">
+                            <ng-template pTemplate="header">
+                                <tr>
+                                    <th>Year</th>
+                                    <th>Class</th>
+                                    <th>Student</th>
+                                    <th>Subject</th>
+                                    <th>Teacher</th>
+                                    <th>Score</th>
+                                    <th>Term</th>
+                                </tr>
+                            </ng-template>
+                            <ng-template pTemplate="body" let-row>
+                                <tr>
+                                    <td>{{ row.year }}</td>
+                                    <td class="font-semibold">{{ row.className }}</td>
+                                    <td>{{ row.studentName }}</td>
+                                    <td>{{ row.subjectName }}</td>
+                                    <td>{{ row.teacherName }}</td>
+                                    <td>{{ row.score }}</td>
+                                    <td>{{ row.term }}</td>
+                                </tr>
+                            </ng-template>
+                        </p-table>
                     </ng-container>
                 </article>
 
                 <article class="workspace-card">
                     <div class="flex items-center justify-between gap-3 mb-4">
                         <div>
-                            <h2 class="text-xl font-display font-bold mb-1">Report notes</h2>
-                            <p class="text-sm text-muted-color">What each report includes.</p>
+                            <h2 class="text-xl font-display font-bold mb-1">Filter summary</h2>
+                            <p class="text-sm text-muted-color">Report criteria and a quick view of the dataset.</p>
                         </div>
                     </div>
 
                     <div class="space-y-3">
-                        <div *ngFor="let report of reportOptions" class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4" [ngClass]="selectedReport === report.value ? 'bg-surface-50 dark:bg-surface-900/50' : ''">
-                            <div class="flex items-center justify-between gap-3">
-                                <div>
-                                    <div class="font-semibold">{{ report.label }}</div>
-                                    <div class="text-sm text-muted-color mt-1">{{ report.description }}</div>
-                                </div>
-                                <p-tag [value]="selectedReport === report.value ? 'Selected' : 'Ready'" [severity]="selectedReport === report.value ? 'success' : 'secondary'"></p-tag>
+                        <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
+                            <div class="text-xs uppercase tracking-[0.18em] text-muted-color font-semibold">Scope</div>
+                            <div class="text-lg font-display font-bold mt-1">{{ selectedScopeLabel }}</div>
+                        </div>
+                        <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
+                            <div class="text-xs uppercase tracking-[0.18em] text-muted-color font-semibold">Year</div>
+                            <div class="text-lg font-display font-bold mt-1">{{ selectedYear ?? 'All years' }}</div>
+                        </div>
+                        <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
+                            <div class="text-xs uppercase tracking-[0.18em] text-muted-color font-semibold">Class / Student / Teacher</div>
+                            <div class="text-sm text-muted-color mt-1">
+                                {{ selectedClass || 'All classes' }}<br />
+                                {{ selectedStudentLabel }}<br />
+                                {{ selectedTeacherLabel }}
                             </div>
                         </div>
                     </div>
@@ -227,81 +239,154 @@ interface NotificationPreviewRow {
 })
 export class AdminReports implements OnInit {
     private readonly api = inject(ApiService);
+    private readonly auth = inject(AuthService);
+    private readonly messages = inject(MessageService);
 
     loading = true;
-    dashboard: DashboardResponse | null = null;
+    schools: SchoolResponse[] = [];
     results: ResultResponse[] = [];
-    notifications: NotificationResponse[] = [];
-    terms: AcademicTermResponse[] = [];
-
-    selectedReport: ReportKind = 'school-summary';
-    selectedPeriodKind: PeriodKind = 'term';
-    selectedTermId: number | null = null;
-    dateRangeStart: Date | null = null;
-    dateRangeEnd: Date | null = null;
-    anchorDate: Date = new Date();
-
-    reportOptions: ReportOption[] = [
-        {
-            label: 'School summary',
-            value: 'school-summary',
-            description: 'Overview of the current school snapshot.'
-        },
-        {
-            label: 'School comparison',
-            value: 'school-comparison',
-            description: 'Ranks schools by average score and pass rate.'
-        },
-        {
-            label: 'Student performance',
-            value: 'student-performance',
-            description: 'Highlights the strongest and weakest students.'
-        },
-        {
-            label: 'Teacher performance',
-            value: 'teacher-performance',
-            description: 'Shows the average score for each teacher.'
-        },
-        {
-            label: 'Academic summary',
-            value: 'academic-summary',
-            description: 'Breaks results down by subject and class.'
-        },
-        {
-            label: 'Notifications',
-            value: 'notifications',
-            description: 'Exports message activity for the selected period.'
-        }
-    ];
-
-    periodOptions: PeriodOption[] = [
-        { label: 'Term', value: 'term' },
-        { label: 'Date range', value: 'date-range' },
-        { label: 'Month', value: 'month' },
-        { label: 'Week', value: 'week' },
-        { label: 'Day', value: 'day' }
-    ];
+    selectedSchoolId: number | null = null;
+    selectedYear: number | null = null;
+    selectedClass = '';
+    selectedStudentId: number | null = null;
+    selectedTeacherId: number | null = null;
 
     ngOnInit(): void {
+        this.selectedSchoolId = this.auth.role() === 'PlatformAdmin' ? null : this.auth.schoolId();
         this.loadData();
+    }
+
+    get isPlatformAdmin(): boolean {
+        return this.auth.role() === 'PlatformAdmin';
+    }
+
+    get schoolOptions(): { label: string; value: number | null }[] {
+        return [{ label: 'All schools', value: null }, ...this.schools.map((school) => ({ label: school.name, value: school.id }))];
+    }
+
+    get baseResults(): ResultResponse[] {
+        return this.results.filter((result) => !this.selectedSchoolId || result.schoolId === this.selectedSchoolId);
+    }
+
+    get yearOptions(): { label: string; value: number | null }[] {
+        const values = Array.from(new Set(this.baseResults.map((result) => result.resultYear))).sort((a, b) => b - a);
+        return [{ label: 'All years', value: null }, ...values.map((value) => ({ label: value.toString(), value }))];
+    }
+
+    get classOptions(): { label: string; value: string }[] {
+        const values = Array.from(new Set(this.baseResults.map((result) => result.studentClass).filter((value) => value.trim().length > 0))).sort((a, b) => a.localeCompare(b));
+        return [{ label: 'All classes', value: '' }, ...values.map((value) => ({ label: value, value }))];
+    }
+
+    get studentOptions(): { label: string; value: number | null }[] {
+        const values = this.uniqueStudents(this.baseResults)
+            .sort((a, b) => a.label.localeCompare(b.label));
+        return [{ label: 'All students', value: null }, ...values];
+    }
+
+    get teacherOptions(): { label: string; value: number | null }[] {
+        const values = this.uniqueTeachers(this.baseResults)
+            .sort((a, b) => a.label.localeCompare(b.label));
+        return [{ label: 'All teachers', value: null }, ...values];
+    }
+
+    get filteredResults(): ResultResponse[] {
+        return this.baseResults.filter((result) => {
+            const matchesYear = this.selectedYear == null || result.resultYear === this.selectedYear;
+            const matchesClass = !this.selectedClass || result.studentClass === this.selectedClass;
+            const matchesStudent = this.selectedStudentId == null || result.studentId === this.selectedStudentId;
+            const matchesTeacher = this.selectedTeacherId == null || result.teacherId === this.selectedTeacherId;
+            return matchesYear && matchesClass && matchesStudent && matchesTeacher;
+        });
+    }
+
+    get previewResults(): PreviewRow[] {
+        return this.filteredResults.slice(0, 12).map((result) => ({
+            year: result.resultYear,
+            className: result.studentClass,
+            studentName: `${result.studentName} (${result.studentNumber})`,
+            subjectName: result.subjectName,
+            teacherName: result.teacherName,
+            score: `${result.score.toFixed(1)}%`,
+            grade: result.grade,
+            term: result.term,
+            date: this.formatDate(result.createdAt)
+        }));
+    }
+
+    get studentCount(): number {
+        return new Set(this.filteredResults.map((result) => result.studentId)).size;
+    }
+
+    get teacherCount(): number {
+        return new Set(this.filteredResults.map((result) => result.teacherId)).size;
+    }
+
+    get averageScoreLabel(): string {
+        if (this.filteredResults.length === 0) {
+            return '0%';
+        }
+
+        const average = this.filteredResults.reduce((sum, result) => sum + Number(result.score), 0) / this.filteredResults.length;
+        return `${average.toFixed(1)}%`;
+    }
+
+    get selectedScopeLabel(): string {
+        if (!this.isPlatformAdmin) {
+            return this.schools.find((school) => school.id === this.selectedSchoolId)?.name ?? 'Current school';
+        }
+
+        if (!this.selectedSchoolId) {
+            return 'All schools';
+        }
+
+        return this.schools.find((school) => school.id === this.selectedSchoolId)?.name ?? `School ${this.selectedSchoolId}`;
+    }
+
+    get selectedStudentLabel(): string {
+        if (this.selectedStudentId == null) {
+            return 'All students';
+        }
+
+        return this.baseResults.find((result) => result.studentId === this.selectedStudentId)?.studentName ?? 'Selected student';
+    }
+
+    get selectedTeacherLabel(): string {
+        if (this.selectedTeacherId == null) {
+            return 'All teachers';
+        }
+
+        return this.baseResults.find((result) => result.teacherId === this.selectedTeacherId)?.teacherName ?? 'Selected teacher';
+    }
+
+    get canSendParentSlip(): boolean {
+        return this.selectedStudentId != null && this.selectedStudentResults.length > 0;
+    }
+
+    get selectedStudentResults(): ResultResponse[] {
+        if (this.selectedStudentId == null) {
+            return [];
+        }
+
+        return this.filteredResults.filter((result) => result.studentId === this.selectedStudentId);
     }
 
     loadData(): void {
         this.loading = true;
         forkJoin({
-            dashboard: this.api.getAdminDashboard(),
-            results: this.api.getResults(),
-            notifications: this.api.getNotifications(),
-            terms: this.api.getAcademicTerms()
+            schools: this.isPlatformAdmin ? this.api.getPlatformSchools() : this.api.getSchools(),
+            results: this.api.getResults()
         }).subscribe({
-            next: ({ dashboard, results, notifications, terms }) => {
-                this.dashboard = dashboard;
+            next: ({ schools, results }) => {
+                this.schools = schools;
                 this.results = results;
-                this.notifications = notifications;
-                this.terms = terms;
-                if (this.selectedTermId === null && terms.length > 0) {
-                    this.selectedTermId = terms[0].id;
+                if (this.isPlatformAdmin && this.selectedSchoolId != null && !this.schools.some((school) => school.id === this.selectedSchoolId)) {
+                    this.selectedSchoolId = null;
                 }
+                if (!this.isPlatformAdmin) {
+                    this.selectedSchoolId = this.auth.schoolId();
+                }
+                this.syncFilters();
                 this.loading = false;
             },
             error: () => {
@@ -310,461 +395,298 @@ export class AdminReports implements OnInit {
         });
     }
 
+    onSchoolChange(schoolId: number | null): void {
+        this.selectedSchoolId = schoolId;
+        this.syncFilters();
+    }
+
+    onFilterChange(): void {
+        this.syncFilters();
+    }
+
     resetFilters(): void {
-        this.selectedReport = 'school-summary';
-        this.selectedPeriodKind = 'term';
-        this.selectedTermId = this.terms[0]?.id ?? null;
-        this.dateRangeStart = null;
-        this.dateRangeEnd = null;
-        this.anchorDate = new Date();
+        this.selectedYear = null;
+        this.selectedClass = '';
+        this.selectedStudentId = null;
+        this.selectedTeacherId = null;
     }
 
     generateReport(): void {
-        if (!this.dashboard) {
+        if (this.filteredResults.length === 0) {
+            this.messages.add({ severity: 'warn', summary: 'No data', detail: 'There are no results to include in the PDF report.' });
             return;
         }
 
+        try {
+            const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+            const margin = 40;
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const title = 'Results report';
+            const description = 'Filtered by year, class, student name, and teacher name. Grouped by school and class for easy review.';
+            const scope = this.selectedScopeLabel;
+            const filters = this.selectedFilterSummary();
+
+            doc.setTextColor(17, 24, 39);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(20);
+            doc.text(title, margin, 46);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(75, 85, 99);
+            doc.text(description, margin, 64, { maxWidth: pageWidth - margin * 2 });
+            doc.text(`Scope: ${scope}`, margin, 82);
+            doc.text(`Filters: ${filters}`, margin, 96);
+            doc.text(`Generated: ${this.formatDate(new Date())}`, margin, 110);
+
+            let currentY = 126;
+            for (const schoolGroup of this.groupedResultsBySchoolAndClass()) {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(13);
+                doc.setTextColor(17, 24, 39);
+                doc.text(schoolGroup.schoolName, margin, currentY);
+                currentY += 14;
+
+                for (const classGroup of schoolGroup.classes) {
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(11);
+                    doc.setTextColor(37, 99, 235);
+                    doc.text(`${classGroup.className} (${classGroup.rows.length} row(s))`, margin, currentY);
+                    currentY += 10;
+
+                    autoTable(doc, {
+                        startY: currentY,
+                        head: [['Year', 'Student', 'Subject', 'Teacher', 'Score', 'Grade', 'Term', 'Date']],
+                        body: classGroup.rows.map((result) => [
+                            result.resultYear.toString(),
+                            `${result.studentName} (${result.studentNumber})`,
+                            result.subjectName,
+                            result.teacherName,
+                            `${result.score.toFixed(1)}%`,
+                            result.grade,
+                            result.term,
+                            this.formatDate(result.createdAt)
+                        ]),
+                        theme: 'striped',
+                        styles: {
+                            fontSize: 8,
+                            cellPadding: 4
+                        },
+                        headStyles: {
+                            fillColor: [37, 99, 235]
+                        },
+                        margin: {
+                            left: margin,
+                            right: margin
+                        }
+                    });
+
+                    currentY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 18 : currentY + 110;
+                    if (currentY > doc.internal.pageSize.getHeight() - 120) {
+                        doc.addPage();
+                        currentY = 40;
+                    }
+                }
+            }
+
+            doc.save(this.fileNameForReport());
+            this.messages.add({ severity: 'success', summary: 'PDF ready', detail: 'The filtered report was generated successfully.' });
+        } catch {
+            this.messages.add({ severity: 'error', summary: 'PDF failed', detail: 'The PDF report could not be generated.' });
+        }
+    }
+
+    sendParentSlip(): void {
+        if (this.selectedStudentId == null || this.selectedStudentResults.length === 0) {
+            this.messages.add({ severity: 'warn', summary: 'Select a student', detail: 'Choose a student before sending a parent slip.' });
+            return;
+        }
+
+        try {
+            const pdf = this.buildStudentSlipPdf(this.selectedStudentResults);
+            const blob = pdf.output('blob');
+            this.api.sendResultSlip(
+                this.selectedStudentId,
+                { sendEmail: true, sendSms: true },
+                blob,
+                this.selectedSchoolId
+            ).subscribe({
+                next: () => {
+                    this.messages.add({ severity: 'success', summary: 'Slip sent', detail: 'The selected student slip was sent to the registered parent contact.' });
+                },
+                error: () => {
+                    this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The parent slip could not be sent.' });
+                }
+            });
+        } catch {
+            this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The parent slip could not be prepared.' });
+        }
+    }
+
+    exportExcel(): void {
+        try {
+            const workbook = XLSX.utils.book_new();
+            const summarySheet = XLSX.utils.aoa_to_sheet([
+                ['Scope', this.selectedScopeLabel],
+                ['Filters', this.selectedFilterSummary()],
+                ['Results in scope', this.filteredResults.length.toString()],
+                ['Students', this.studentCount.toString()],
+                ['Teachers', this.teacherCount.toString()],
+                ['Average score', this.averageScoreLabel]
+            ]);
+
+            const previewRows = this.filteredResults.map((result) => [
+                result.resultYear,
+                result.studentClass,
+                result.studentName,
+                result.studentNumber,
+                result.subjectName,
+                result.teacherName,
+                Number(result.score),
+                result.grade,
+                result.term,
+                this.formatDate(result.createdAt)
+            ]);
+
+            XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+            XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['Year', 'Class', 'Student', 'Number', 'Subject', 'Teacher', 'Score', 'Grade', 'Term', 'Date'], ...previewRows]), 'Results');
+            XLSX.writeFile(workbook, this.fileNameForExcel());
+            this.messages.add({ severity: 'success', summary: 'Excel ready', detail: 'The filtered spreadsheet was exported successfully.' });
+        } catch {
+            this.messages.add({ severity: 'error', summary: 'Excel failed', detail: 'The Excel report could not be exported.' });
+        }
+    }
+
+    private syncFilters(): void {
+        this.selectedYear = this.yearOptions.some((option) => option.value === this.selectedYear) ? this.selectedYear : null;
+        this.selectedClass = this.classOptions.some((option) => option.value === this.selectedClass) ? this.selectedClass : '';
+        this.selectedStudentId = this.studentOptions.some((option) => option.value === this.selectedStudentId) ? this.selectedStudentId : null;
+        this.selectedTeacherId = this.teacherOptions.some((option) => option.value === this.selectedTeacherId) ? this.selectedTeacherId : null;
+    }
+
+    private groupedResultsBySchoolAndClass(): { schoolName: string; classes: { className: string; rows: ResultResponse[] }[] }[] {
+        const schoolGroups = new Map<string, Map<string, ResultResponse[]>>();
+
+        for (const result of this.filteredResults) {
+            const schoolName = this.schoolNameForResult(result);
+            const className = result.studentClass || 'Unassigned';
+            if (!schoolGroups.has(schoolName)) {
+                schoolGroups.set(schoolName, new Map<string, ResultResponse[]>());
+            }
+
+            const classes = schoolGroups.get(schoolName)!;
+            if (!classes.has(className)) {
+                classes.set(className, []);
+            }
+
+            classes.get(className)!.push(result);
+        }
+
+        return Array.from(schoolGroups.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([schoolName, classes]) => ({
+                schoolName,
+                classes: Array.from(classes.entries())
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([className, rows]) => ({
+                        className,
+                        rows: rows
+                            .slice()
+                            .sort((left, right) =>
+                                left.studentName.localeCompare(right.studentName) ||
+                                left.subjectName.localeCompare(right.subjectName) ||
+                                left.createdAt.localeCompare(right.createdAt))
+                    }))
+            }));
+    }
+
+    private buildStudentSlipPdf(results: ResultResponse[]): jsPDF {
+        const student = results[0];
         const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
         const margin = 40;
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const reportTitle = this.selectedReportLabel;
-        const reportDescription = this.reportOptions.find((report) => report.value === this.selectedReport)?.description ?? '';
-        const periodLabel = this.selectedPeriodLabel;
+        const schoolName = this.schoolNameForResult(student);
+        const subjectRows = results
+            .slice()
+            .sort((left, right) => left.subjectName.localeCompare(right.subjectName));
 
-        let y = this.writeHeader(doc, reportTitle, reportDescription, periodLabel, margin, pageWidth);
-        y = this.writeSummaryBlock(doc, margin, y);
-
-        switch (this.selectedReport) {
-            case 'school-summary':
-                this.writeTableSection(doc, 'Result snapshot', ['Metric', 'Value'], this.buildSchoolSummaryRows(), margin, y);
-                break;
-            case 'school-comparison':
-                this.writeTableSection(doc, 'School comparison', ['School', 'Average score', 'Pass rate', 'Results'], this.buildSchoolComparisonRows(), margin, y);
-                break;
-            case 'student-performance':
-                this.writeTableSection(doc, 'Student performance', ['Student', 'Average score', 'Results', 'Term'], this.buildStudentRows(), margin, y);
-                break;
-            case 'teacher-performance':
-                this.writeTableSection(doc, 'Teacher performance', ['Teacher', 'Subject', 'Class', 'Average score'], this.buildTeacherRows(), margin, y);
-                break;
-            case 'academic-summary':
-                this.writeTableSection(doc, 'Subject performance', ['Subject', 'Average score'], this.buildSubjectRows(), margin, y);
-                this.writeTableSection(doc, 'Class performance', ['Class', 'Average score', 'Pass rate'], this.buildClassRows(), margin, this.nextY(doc, y));
-                break;
-            case 'notifications':
-                this.writeTableSection(doc, 'Notifications', ['Title', 'Type', 'Message', 'Date'], this.buildNotificationRows(), margin, y);
-                break;
-        }
-
-        doc.save(this.fileNameForReport());
-    }
-
-    get hasAnyData(): boolean {
-        return this.results.length > 0 || this.notifications.length > 0;
-    }
-
-    get previewCountLabel(): string {
-        return `${this.selectedReport === 'notifications' ? this.filteredNotifications.length : this.previewResults.length} row(s)`;
-    }
-
-    get selectedReportLabel(): string {
-        return this.reportOptions.find((report) => report.value === this.selectedReport)?.label ?? 'Report';
-    }
-
-    get selectedPeriodLabel(): string {
-        const range = this.periodRange();
-        if (!range) {
-            return 'No period selected';
-        }
-
-        return range.label;
-    }
-
-    get termOptions(): { label: string; value: number }[] {
-        return this.terms.map((term) => ({ label: term.name || `Term ${term.termNumber}`, value: term.id }));
-    }
-
-    get filteredResults(): ResultResponse[] {
-        const range = this.periodRange();
-        if (!range) {
-            return [...this.results];
-        }
-
-        return this.results.filter((result) => {
-            const createdAt = new Date(result.createdAt);
-            return createdAt >= range.start && createdAt <= range.end && this.matchesTerm(result.term);
-        });
-    }
-
-    get filteredNotifications(): NotificationResponse[] {
-        const range = this.periodRange();
-        if (!range) {
-            return [...this.notifications];
-        }
-
-        return this.notifications.filter((notification) => {
-            const createdAt = new Date(notification.createdAt);
-            return createdAt >= range.start && createdAt <= range.end;
-        });
-    }
-
-    get previewResults(): PreviewRow[] {
-        return this.filteredResults.slice(0, 10).map((result) => ({
-            studentName: `${result.studentName} (${result.studentNumber})`,
-            subjectName: result.subjectName,
-            score: `${result.score.toFixed(1)}%`,
-            term: result.term,
-            date: this.formatDate(result.createdAt)
-        }));
-    }
-
-    get previewNotifications(): NotificationPreviewRow[] {
-        return this.filteredNotifications.slice(0, 10).map((notification) => ({
-            title: notification.title,
-            type: notification.type,
-            message: notification.message,
-            date: this.formatDate(notification.createdAt)
-        }));
-    }
-
-    private periodRange(): { start: Date; end: Date; label: string } | null {
-        if (this.selectedPeriodKind === 'term') {
-            const term = this.terms.find((item) => item.id === this.selectedTermId) ?? this.terms[0];
-            if (!term) {
-                return null;
-            }
-
-            const start = term.startDate ? this.startOfDay(new Date(term.startDate)) : new Date(0);
-            const end = term.endDate ? this.endOfDay(new Date(term.endDate)) : new Date();
-            return {
-                start,
-                end,
-                label: term.startDate && term.endDate ? `${term.name} - ${this.formatDateRange(start, end)}` : term.name || `Term ${term.termNumber}`
-            };
-        }
-
-        if (this.selectedPeriodKind === 'date-range') {
-            if (!this.dateRangeStart || !this.dateRangeEnd) {
-                return null;
-            }
-
-            const start = this.startOfDay(this.dateRangeStart);
-            const end = this.endOfDay(this.dateRangeEnd);
-            return {
-                start,
-                end,
-                label: `${this.formatDate(start)} to ${this.formatDate(end)}`
-            };
-        }
-
-        const anchor = this.anchorDate ? new Date(this.anchorDate) : new Date();
-        if (this.selectedPeriodKind === 'month') {
-            const start = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-            const end = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0, 23, 59, 59, 999);
-            return {
-                start,
-                end,
-                label: `${anchor.toLocaleString('en-GB', { month: 'long', year: 'numeric' })}`
-            };
-        }
-
-        if (this.selectedPeriodKind === 'week') {
-            const day = anchor.getDay();
-            const offsetToMonday = (day + 6) % 7;
-            const start = this.startOfDay(new Date(anchor));
-            start.setDate(anchor.getDate() - offsetToMonday);
-            const end = this.endOfDay(new Date(start));
-            end.setDate(start.getDate() + 6);
-            return {
-                start,
-                end,
-                label: `Week of ${this.formatDate(start)}`
-            };
-        }
-
-        const start = this.startOfDay(anchor);
-        const end = this.endOfDay(anchor);
-        return {
-            start,
-            end,
-            label: this.formatDate(anchor)
-        };
-    }
-
-    private matchesTerm(resultTerm: string): boolean {
-        if (this.selectedPeriodKind !== 'term') {
-            return true;
-        }
-
-        const term = this.terms.find((item) => item.id === this.selectedTermId) ?? this.terms[0];
-        if (!term) {
-            return true;
-        }
-
-        const termText = resultTerm.trim().toLowerCase();
-        const candidates = [term.name, `term ${term.termNumber}`, `${term.termNumber}`]
-            .filter((value): value is string => Boolean(value))
-            .map((value) => value.toLowerCase());
-
-        return candidates.some((candidate) => termText.includes(candidate));
-    }
-
-    private buildSchoolSummaryRows(): string[][] {
-        const rows = [
-            ['Period', this.selectedPeriodLabel],
-            ['Results in scope', this.filteredResults.length.toString()],
-            ['Notifications in scope', this.filteredNotifications.length.toString()]
-        ];
-
-        if (this.filteredResults.length === 0) {
-            rows.push(['Average score', 'No results available']);
-            rows.push(['Pass rate', 'No results available']);
-            return rows;
-        }
-
-        const average = this.filteredResults.reduce((sum, result) => sum + Number(result.score), 0) / this.filteredResults.length;
-        const passRate = (this.filteredResults.filter((result) => result.score >= 50).length * 100) / this.filteredResults.length;
-        const topStudent = this.groupByStudent(this.filteredResults)[0];
-
-        rows.push(['Average score', `${average.toFixed(1)}%`]);
-        rows.push(['Pass rate', `${passRate.toFixed(1)}%`]);
-        rows.push(['Top student', topStudent ? `${topStudent.studentName} (${topStudent.average.toFixed(1)}%)` : 'No data']);
-        return rows;
-    }
-
-    private buildSchoolComparisonRows(): string[][] {
-        const schoolRows = this.dashboard?.schoolPerformance ?? [];
-        if (schoolRows.length === 0) {
-            return [['No data', 'Nothing to compare', '0%', '0']];
-        }
-
-        return schoolRows.map((row) => [
-            row.schoolName,
-            `${row.averageScore.toFixed(1)}%`,
-            `${row.passRate.toFixed(1)}%`,
-            row.resultCount.toString()
-        ]);
-    }
-
-    private buildStudentRows(): string[][] {
-        return this.groupByStudent(this.filteredResults).slice(0, 12).map((row) => [
-            row.studentName,
-            `${row.average.toFixed(1)}%`,
-            row.count.toString(),
-            row.term
-        ]);
-    }
-
-    private buildTeacherRows(): string[][] {
-        const rows = this.groupByTeacher(this.filteredResults);
-        return rows.map((row) => [
-            row.teacherName,
-            row.subject,
-            row.className,
-            `${row.average.toFixed(1)}%`
-        ]);
-    }
-
-    private buildSubjectRows(): string[][] {
-        const rows = this.groupBySubject(this.filteredResults);
-        return rows.map((row) => [row.subject, `${row.averageScore.toFixed(1)}%`]);
-    }
-
-    private buildClassRows(): string[][] {
-        const rows = this.groupByClass(this.filteredResults);
-        return rows.map((row) => [row.className, `${row.average.toFixed(1)}%`, `${row.passRate.toFixed(1)}%`]);
-    }
-
-    private buildNotificationRows(): string[][] {
-        if (this.filteredNotifications.length === 0) {
-            return [['No notifications', 'No data', 'Nothing was sent in this period.', this.selectedPeriodLabel]];
-        }
-
-        return this.filteredNotifications.map((notification) => [
-            notification.title,
-            notification.type,
-            notification.message,
-            this.formatDate(notification.createdAt)
-        ]);
-    }
-
-    private groupByStudent(results: ResultResponse[]): { studentName: string; average: number; count: number; term: string }[] {
-        const map = new Map<string, { studentName: string; scores: number[]; term: string }>();
-
-        for (const result of results) {
-            const key = `${result.studentId}-${result.studentName}`;
-            const entry = map.get(key) ?? { studentName: `${result.studentName} (${result.studentNumber})`, scores: [], term: result.term };
-            entry.scores.push(Number(result.score));
-            entry.term = result.term;
-            map.set(key, entry);
-        }
-
-        return Array.from(map.values())
-            .map((entry) => ({
-                studentName: entry.studentName,
-                average: entry.scores.reduce((sum, score) => sum + score, 0) / entry.scores.length,
-                count: entry.scores.length,
-                term: entry.term
-            }))
-            .sort((a, b) => b.average - a.average);
-    }
-
-    private groupByTeacher(results: ResultResponse[]): { teacherName: string; subject: string; className: string; average: number }[] {
-        const map = new Map<string, { teacherName: string; subject: string; className: string; scores: number[] }>();
-
-        for (const result of results) {
-            const key = `${result.teacherId}-${result.subjectId}-${result.term}`;
-            const entry = map.get(key) ?? { teacherName: result.teacherName, subject: result.subjectName, className: this.classForResult(result), scores: [] };
-            entry.scores.push(Number(result.score));
-            map.set(key, entry);
-        }
-
-        return Array.from(map.values())
-            .map((entry) => ({
-                teacherName: entry.teacherName,
-                subject: entry.subject,
-                className: entry.className,
-                average: entry.scores.reduce((sum, score) => sum + score, 0) / entry.scores.length
-            }))
-            .sort((a, b) => b.average - a.average);
-    }
-
-    private groupBySubject(results: ResultResponse[]): SubjectPerformanceDto[] {
-        const map = new Map<string, number[]>();
-
-        for (const result of results) {
-            const scores = map.get(result.subjectName) ?? [];
-            scores.push(Number(result.score));
-            map.set(result.subjectName, scores);
-        }
-
-        return Array.from(map.entries())
-            .map(([subject, scores]) => ({
-                subject,
-                averageScore: scores.reduce((sum, score) => sum + score, 0) / scores.length
-            }))
-            .sort((a, b) => b.averageScore - a.averageScore);
-    }
-
-    private groupByClass(results: ResultResponse[]): { className: string; average: number; passRate: number }[] {
-        const map = new Map<string, number[]>();
-
-        for (const result of results) {
-            const className = this.classForResult(result);
-            const scores = map.get(className) ?? [];
-            scores.push(Number(result.score));
-            map.set(className, scores);
-        }
-
-        return Array.from(map.entries())
-            .map(([className, scores]) => ({
-                className,
-                average: scores.reduce((sum, score) => sum + score, 0) / scores.length,
-                passRate: (scores.filter((score) => score >= 50).length * 100) / scores.length
-            }))
-            .sort((a, b) => b.average - a.average);
-    }
-
-    private classForResult(result: ResultResponse): string {
-        const assignment = this.dashboard?.teacherPerformance.find((item) => item.teacherId === result.teacherId && item.subject === result.subjectName);
-        return assignment?.class ?? 'Unassigned';
-    }
-
-    private fileNameForReport(): string {
-        return `${this.selectedReport}-${this.selectedPeriodKind}.pdf`;
-    }
-
-    private writeHeader(doc: jsPDF, title: string, description: string, period: string, margin: number, pageWidth: number): number {
-        doc.setTextColor(17, 24, 39);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(20);
-        doc.text(title, margin, 46);
+        doc.setFontSize(18);
+        doc.text('Parent result slip', margin, 42);
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
-        doc.setTextColor(75, 85, 99);
-        doc.text(description, margin, 64, { maxWidth: pageWidth - margin * 2 });
-        doc.text(`Period: ${period}`, margin, 82);
-        doc.text(`Generated: ${this.formatDate(new Date())}`, margin, 96);
-        doc.setTextColor(17, 24, 39);
-        return 112;
-    }
-
-    private writeSummaryBlock(doc: jsPDF, margin: number, y: number): number {
-        autoTable(doc, {
-            startY: y,
-            head: [['Metric', 'Value']],
-            body: [
-                ['Results in scope', this.filteredResults.length.toString()],
-                ['Notifications in scope', this.filteredNotifications.length.toString()],
-                ['Term options', this.terms.length.toString()]
-            ],
-            theme: 'grid',
-            styles: {
-                fontSize: 9,
-                cellPadding: 6
-            },
-            headStyles: {
-                fillColor: [37, 99, 235]
-            }
-        });
-
-        return this.nextY(doc, y);
-    }
-
-    private writeTableSection(doc: jsPDF, title: string, headers: string[], rows: string[][], margin: number, y: number): void {
-        this.writeSectionTitle(doc, title, margin, y);
+        doc.text(`Student: ${student.studentName}`, margin, 60);
+        doc.text(`Student number: ${student.studentNumber}`, margin, 74);
+        doc.text(`School: ${schoolName}`, margin, 88);
+        doc.text(`Class: ${student.studentClass} | Year: ${student.resultYear}`, margin, 102);
+        const overallAverage = subjectRows.length === 0 ? 0 : subjectRows.reduce((sum, result) => sum + result.score, 0) / subjectRows.length;
+        doc.text(`Overall average: ${overallAverage.toFixed(1)}%`, margin, 116);
+        doc.text(`Generated: ${this.formatDate(new Date())}`, margin, 130);
 
         autoTable(doc, {
-            startY: y + 14,
-            head: [headers],
-            body: rows.length > 0 ? rows : [headers.map(() => 'No data')],
+            startY: 148,
+            head: [['Subject', 'Teacher', 'Score', 'Grade', 'Term', 'Comment', 'Date']],
+            body: subjectRows.map((result) => [
+                result.subjectName,
+                result.teacherName,
+                `${result.score.toFixed(1)}%`,
+                result.grade,
+                result.term,
+                result.comment || 'No teacher comment yet.',
+                this.formatDate(result.createdAt)
+            ]),
             theme: 'striped',
-            styles: {
-                fontSize: 8.5,
-                cellPadding: 5
-            },
-            headStyles: {
-                fillColor: [124, 58, 237]
-            },
-            margin: {
-                left: margin,
-                right: margin
-            }
+            styles: { fontSize: 8, cellPadding: 5, valign: 'top' },
+            headStyles: { fillColor: [37, 99, 235] },
+            margin: { left: margin, right: margin }
         });
+
+        return doc;
     }
 
-    private writeSectionTitle(doc: jsPDF, title: string, margin: number, y: number): void {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.setTextColor(17, 24, 39);
-        doc.text(title, margin, y);
+    private uniqueStudents(results: ResultResponse[]): { label: string; value: number }[] {
+        const map = new Map<number, string>();
+        for (const result of results) {
+            if (!map.has(result.studentId)) {
+                map.set(result.studentId, `${result.studentName} (${result.studentNumber})`);
+            }
+        }
+
+        return Array.from(map.entries()).map(([value, label]) => ({ label, value }));
     }
 
-    private nextY(doc: jsPDF, fallback: number): number {
-        const lastTable = (doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable;
-        return (lastTable?.finalY ?? fallback) + 14;
+    private schoolNameForResult(result: ResultResponse): string {
+        return this.schools.find((school) => school.id === result.schoolId)?.name ?? `School ${result.schoolId}`;
     }
 
-    private startOfDay(value: Date): Date {
-        const date = new Date(value);
-        date.setHours(0, 0, 0, 0);
-        return date;
+    private uniqueTeachers(results: ResultResponse[]): { label: string; value: number }[] {
+        const map = new Map<number, string>();
+        for (const result of results) {
+            if (!map.has(result.teacherId)) {
+                map.set(result.teacherId, result.teacherName);
+            }
+        }
+
+        return Array.from(map.entries()).map(([value, label]) => ({ label, value }));
     }
 
-    private endOfDay(value: Date): Date {
-        const date = new Date(value);
-        date.setHours(23, 59, 59, 999);
-        return date;
+    private selectedFilterSummary(): string {
+        return [
+            `Year: ${this.selectedYear ?? 'All'}`,
+            `Class: ${this.selectedClass || 'All'}`,
+            `Student: ${this.selectedStudentLabel}`,
+            `Teacher: ${this.selectedTeacherLabel}`
+        ].join(' | ');
+    }
+
+    private fileNameForReport(): string {
+        return `results-report-${this.selectedYear ?? 'all'}-${this.selectedClass || 'all'}.pdf`;
+    }
+
+    private fileNameForExcel(): string {
+        return `results-report-${this.selectedYear ?? 'all'}-${this.selectedClass || 'all'}.xlsx`;
     }
 
     private formatDate(value: string | Date): string {
-        return new Intl.DateTimeFormat('en-GB', {
-            dateStyle: 'medium'
-        }).format(new Date(value));
-    }
-
-    private formatDateRange(start: Date, end: Date): string {
-        return `${this.formatDate(start)} - ${this.formatDate(end)}`;
+        return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(new Date(value));
     }
 }

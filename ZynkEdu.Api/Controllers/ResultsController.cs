@@ -42,4 +42,47 @@ public sealed class ResultsController : ControllerBase
     {
         return Ok(await _resultService.GetClassResultsAsync(className, cancellationToken));
     }
+
+    [HttpPost("{id:int}/send-slip")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<ResultSlipSendResponse>> SendSlip(
+        int id,
+        [FromForm] SendResultSlipRequest request,
+        [FromForm] IFormFile slipPdf,
+        [FromQuery] int? schoolId,
+        CancellationToken cancellationToken)
+    {
+        await using var stream = new MemoryStream();
+        await slipPdf.CopyToAsync(stream, cancellationToken);
+        return Ok(await _resultService.SendSlipAsync(id, request, stream.ToArray(), slipPdf.FileName, schoolId, cancellationToken));
+    }
+
+    [HttpPost("{id:int}/approve")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    public async Task<ActionResult<ResultResponse>> Approve(int id, CancellationToken cancellationToken)
+    {
+        return Ok(await _resultService.ApproveAsync(id, cancellationToken));
+    }
+
+    [HttpPost("{id:int}/reject")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    public async Task<ActionResult<ResultResponse>> Reject(int id, CancellationToken cancellationToken)
+    {
+        return Ok(await _resultService.RejectAsync(id, cancellationToken));
+    }
+
+    [HttpPost("{id:int}/reopen")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    public async Task<ActionResult<ResultResponse>> Reopen(int id, CancellationToken cancellationToken)
+    {
+        return Ok(await _resultService.ReopenAsync(id, cancellationToken));
+    }
+
+    [HttpPost("{id:int}/lock")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    public async Task<ActionResult<ResultResponse>> Lock(int id, CancellationToken cancellationToken)
+    {
+        return Ok(await _resultService.LockAsync(id, cancellationToken));
+    }
 }

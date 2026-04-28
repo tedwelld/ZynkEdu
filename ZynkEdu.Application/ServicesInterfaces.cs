@@ -19,6 +19,23 @@ public interface ISchoolService
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
 }
 
+public interface ISchoolCodeGenerator
+{
+    Task<string> GenerateAsync(string schoolName, int? excludeSchoolId = null, CancellationToken cancellationToken = default);
+    Task<string> GetOrCreateAsync(int schoolId, CancellationToken cancellationToken = default);
+}
+
+public interface ISubjectCodeGenerator
+{
+    Task<string> GenerateAsync(string subjectName, int schoolId, string gradeLevel, int? excludeSubjectId = null, CancellationToken cancellationToken = default);
+}
+
+public interface IAuditLogService
+{
+    Task LogAsync(int? schoolId, string action, string entityType, string entityId, string summary, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AuditLogResponse>> GetRecentAsync(int? schoolId = null, int take = 10, CancellationToken cancellationToken = default);
+}
+
 public interface IAttendanceService
 {
     Task<IReadOnlyList<AttendanceClassOptionResponse>> GetClassOptionsAsync(int? schoolId = null, CancellationToken cancellationToken = default);
@@ -38,12 +55,15 @@ public interface IStudentService
     Task<IReadOnlyList<StudentResponse>> GetAllAsync(string? classFilter = null, int? schoolId = null, CancellationToken cancellationToken = default);
     Task<StudentResponse?> GetByIdAsync(int id, int? schoolId = null, CancellationToken cancellationToken = default);
     Task<StudentResponse> UpdateAsync(int id, UpdateStudentRequest request, CancellationToken cancellationToken = default);
+    Task<StudentResponse> UpdateStatusAsync(int id, UpdateStudentStatusRequest request, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
+    Task<BulkStudentSubjectEnrollmentResponse> EnrollAllSubjectsAsync(int? schoolId = null, CancellationToken cancellationToken = default);
 }
 
 public interface ITeacherAssignmentService
 {
     Task<TeacherAssignmentResponse> CreateAsync(CreateTeacherAssignmentRequest request, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<TeacherAssignmentBatchResponse> CreateBatchAsync(CreateTeacherAssignmentsBatchRequest request, int? schoolId = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TeacherAssignmentResponse>> GetByTeacherAsync(int teacherId, int? schoolId = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TeacherAssignmentResponse>> GetAllAsync(int? schoolId = null, CancellationToken cancellationToken = default);
     Task<TeacherAssignmentResponse> UpdateAsync(int id, UpdateTeacherAssignmentRequest request, int? schoolId = null, CancellationToken cancellationToken = default);
@@ -58,6 +78,11 @@ public interface IResultService
     Task<IReadOnlyList<ResultResponse>> GetClassResultsAsync(string className, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<StudentCommentResponse>> GetParentResultsAsync(string destination, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ParentPreviewReportResponse>> GetParentReportPreviewAsync(string destination, CancellationToken cancellationToken = default);
+    Task<ResultSlipSendResponse> SendSlipAsync(int studentId, SendResultSlipRequest request, byte[] slipPdf, string slipFileName, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<ResultResponse> ApproveAsync(int id, CancellationToken cancellationToken = default);
+    Task<ResultResponse> RejectAsync(int id, CancellationToken cancellationToken = default);
+    Task<ResultResponse> ReopenAsync(int id, CancellationToken cancellationToken = default);
+    Task<ResultResponse> LockAsync(int id, CancellationToken cancellationToken = default);
 }
 
 public interface INotificationService
