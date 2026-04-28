@@ -1,0 +1,7 @@
+# Build output
+**/bin/
+**/obj/
+
+# Keep the web app's own transient build output out of source control
+ZynkEdu.Web/dist/
+ZynkEdu.Web/.angular/cache/
