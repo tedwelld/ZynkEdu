@@ -32,6 +32,7 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddScoped<ICurrentUserContext, CurrentUserContext>();
+        services.AddScoped<IDatabaseInitializationService, DatabaseInitializationService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
         services.AddScoped<ISchoolCodeGenerator, SchoolCodeGenerator>();
         services.AddScoped<ISubjectCodeGenerator, SubjectCodeGenerator>();

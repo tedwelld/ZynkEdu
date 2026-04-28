@@ -69,18 +69,23 @@ if (app.Environment.IsDevelopment())
 
 app.MapControllers();
 
-await RunBootstrapStepAsync("database migration", () => EnsureDatabaseMigratedAsync(app.Services, app.Logger), app.Logger);
+var databaseMigrated = await RunBootstrapStepAsync("database initialization", () => InitializeDatabaseAsync(app.Services, app.Logger), app.Logger);
+if (!databaseMigrated)
+{
+    throw new InvalidOperationException("Database initialization could not be completed. Run .\\scripts\\Update-Database.ps1 and confirm that LocalDB is available before starting the API.");
+}
+
 await RunBootstrapStepAsync("platform admin", () => SeedPlatformAdminAsync(app.Services, app.Configuration, app.Logger), app.Logger);
 
 app.Run();
 
-static async Task RunBootstrapStepAsync(string stepName, Func<Task<bool>> step, ILogger logger, int maxAttempts = 5)
+static async Task<bool> RunBootstrapStepAsync(string stepName, Func<Task<bool>> step, ILogger logger, int maxAttempts = 5)
 {
     for (var attempt = 1; attempt <= maxAttempts; attempt++)
     {
         if (await step())
         {
-            return;
+            return true;
         }
 
         if (attempt < maxAttempts)
@@ -92,21 +97,21 @@ static async Task RunBootstrapStepAsync(string stepName, Func<Task<bool>> step, 
     }
 
     logger.LogWarning("Bootstrap step {StepName} could not be completed after {MaxAttempts} attempts.", stepName, maxAttempts);
+    return false;
 }
 
-static async Task<bool> EnsureDatabaseMigratedAsync(IServiceProvider services, ILogger logger)
+static async Task<bool> InitializeDatabaseAsync(IServiceProvider services, ILogger logger)
 {
     try
     {
         using var scope = services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ZynkEduDbContext>();
-
-        await dbContext.Database.MigrateAsync();
+        var databaseInitializationService = scope.ServiceProvider.GetRequiredService<IDatabaseInitializationService>();
+        await databaseInitializationService.InitializeAsync();
         return true;
     }
     catch (Exception ex)
     {
-        logger.LogWarning(ex, "Database migration was skipped because the SQL Server instance is not available yet.");
+        logger.LogWarning(ex, "Database initialization was skipped because the SQL Server instance is not available yet.");
         return false;
     }
 }

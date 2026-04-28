@@ -140,6 +140,30 @@ cd ZynkEdu.Web
 npm run build
 ```
 
+## Updating The Database
+
+The repository now includes a migration helper for collaborators who need to create or update their LocalDB database explicitly.
+
+From the repository root, run:
+
+```powershell
+.\scripts\Update-Database.ps1
+```
+
+You can also run the EF Core command directly:
+
+```bash
+dotnet ef database update --project ZynkEdu.Infrastructure
+```
+
+That command uses the same `appsettings.json` connection string as the running API, so collaborators do not need a separate startup project just to apply migrations.
+
+The API also initializes the database on startup:
+
+- if the database does not exist, EF Core migrations create it
+- if pending migrations exist, the latest migrations are applied automatically
+- if LocalDB is not reachable, the API fails fast instead of starting in a broken state
+
 ## Current Seeded Data
 
 The application no longer seeds the older demo school dataset. Startup now focuses on bootstrap only.
@@ -229,4 +253,3 @@ If you are deploying outside local development, move SMTP credentials and JWT si
 - [`ZynkEdu.Web/src/app/pages/platform/platform.routes.ts`](ZynkEdu.Web/src/app/pages/platform/platform.routes.ts)
 - [`ZynkEdu.Web/src/app/pages/admin/subjects.ts`](ZynkEdu.Web/src/app/pages/admin/subjects.ts)
 - [`ZynkEdu.Web/src/app/pages/admin/assignments.ts`](ZynkEdu.Web/src/app/pages/admin/assignments.ts)
-
