@@ -34,12 +34,14 @@ public sealed class SubjectServiceTests
         await using (queryContext)
         {
             var service = CreateService(queryContext, currentUser);
-            var response = await service.CreateAsync(new CreateSubjectRequest("Mathematics", null, "O'Level"));
+            var response = await service.CreateAsync(new CreateSubjectRequest("Mathematics", null, "O'Level", 1, true));
 
             Assert.Equal("O'Level", response.GradeLevel);
+            Assert.True(response.IsPractical);
 
             var stored = await queryContext.Subjects.AsNoTracking().SingleAsync(x => x.Id == response.Id);
             Assert.Equal("O'Level", stored.GradeLevel);
+            Assert.True(stored.IsPractical);
         }
     }
 

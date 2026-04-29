@@ -8,6 +8,7 @@ public sealed class PlatformSubjectCatalog : EntityBase
     public string Name { get; set; } = string.Empty;
     public string GradeLevel { get; set; } = string.Empty;
     public int WeeklyLoad { get; set; } = 1;
+    public bool IsPractical { get; set; }
     public int? SourceSchoolId { get; set; }
     public int? SourceSubjectId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

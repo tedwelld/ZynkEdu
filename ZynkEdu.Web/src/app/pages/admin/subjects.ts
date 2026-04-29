@@ -3,6 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
+import { CheckboxModule } from 'primeng/checkbox';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
@@ -31,7 +32,7 @@ type ImportTargetMode = 'catalog' | 'school';
 @Component({
     standalone: true,
     selector: 'app-admin-subjects',
-    imports: [CommonModule, FormsModule, ButtonModule, DialogModule, InputTextModule, MetricCardComponent, AppDropdownComponent, MultiSelectModule, SkeletonModule, TableModule, TagModule],
+    imports: [CommonModule, FormsModule, ButtonModule, CheckboxModule, DialogModule, InputTextModule, MetricCardComponent, AppDropdownComponent, MultiSelectModule, SkeletonModule, TableModule, TagModule],
     template: `
         <section class="space-y-6">
             <div class="workspace-card flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -158,6 +159,7 @@ type ImportTargetMode = 'catalog' | 'school';
                                 <th>Code</th>
                                 <th>Subject</th>
                                 <th>Grade level</th>
+                                <th>Type</th>
                                 <th>Weekly load</th>
                                 <th>Average</th>
                                 <th>Band</th>
@@ -169,6 +171,7 @@ type ImportTargetMode = 'catalog' | 'school';
                                 <td class="font-semibold">{{ subject.code }}</td>
                                 <td class="font-semibold">{{ subject.name }}</td>
                                 <td><p-tag [value]="levelLabelFor(subject.gradeLevel)" [severity]="severityForLevel(subject.gradeLevel)"></p-tag></td>
+                                <td><p-tag [value]="subject.isPractical ? 'Practical' : 'Academic'" [severity]="subject.isPractical ? 'warning' : 'secondary'"></p-tag></td>
                                 <td>{{ subject.weeklyLoad }}</td>
                                 <td>{{ averageFor(subject.name) }}%</td>
                                 <td>
@@ -190,6 +193,7 @@ type ImportTargetMode = 'catalog' | 'school';
                                 <th>Code</th>
                                 <th>Subject</th>
                                 <th>Grade level</th>
+                                <th>Type</th>
                                 <th>Weekly load</th>
                                 <th>Source school</th>
                                 <th class="text-right">Actions</th>
@@ -200,6 +204,7 @@ type ImportTargetMode = 'catalog' | 'school';
                                 <td class="font-semibold">{{ subject.code }}</td>
                                 <td class="font-semibold">{{ subject.name }}</td>
                                 <td><p-tag [value]="levelLabelFor(subject.gradeLevel)" [severity]="severityForLevel(subject.gradeLevel)"></p-tag></td>
+                                <td><p-tag [value]="subject.isPractical ? 'Practical' : 'Academic'" [severity]="subject.isPractical ? 'warning' : 'secondary'"></p-tag></td>
                                 <td>{{ subject.weeklyLoad }}</td>
                                 <td class="text-sm text-muted-color">
                                     {{ subject.sourceSchoolName ?? (subject.sourceSchoolId ? schoolNameFor(subject.sourceSchoolId) : 'Manual catalog entry') }}
@@ -235,6 +240,13 @@ type ImportTargetMode = 'catalog' | 'school';
                         <label class="block text-sm font-semibold mb-2">Weekly load</label>
                         <input pInputText type="number" min="1" max="9" [(ngModel)]="draft.weeklyLoad" class="w-full" />
                     </div>
+                    <label class="flex items-center gap-3 rounded-2xl border border-surface-200 dark:border-surface-700 px-4 py-3">
+                        <p-checkbox [(ngModel)]="draft.isPractical" binary inputId="subject-practical"></p-checkbox>
+                        <span class="text-sm">
+                            <span class="block font-semibold">Practical subject</span>
+                            <span class="block text-muted-color">Use synchronized timetable blocks for practical lessons.</span>
+                        </span>
+                    </label>
                     <div class="flex justify-end gap-3 pt-3">
                         <button pButton type="button" label="Cancel" severity="secondary" (click)="drawerVisible = false"></button>
                         <button pButton type="button" [label]="drawerMode === 'create' ? 'Save subject' : 'Update subject'" icon="pi pi-check" (click)="saveSchoolSubject()"></button>
@@ -263,6 +275,13 @@ type ImportTargetMode = 'catalog' | 'school';
                         <label class="block text-sm font-semibold mb-2">Weekly load</label>
                         <input pInputText type="number" min="1" max="9" [(ngModel)]="catalogDraft.weeklyLoad" class="w-full" />
                     </div>
+                    <label class="flex items-center gap-3 rounded-2xl border border-surface-200 dark:border-surface-700 px-4 py-3">
+                        <p-checkbox [(ngModel)]="catalogDraft.isPractical" binary inputId="catalog-subject-practical"></p-checkbox>
+                        <span class="text-sm">
+                            <span class="block font-semibold">Practical subject</span>
+                            <span class="block text-muted-color">Publish this as a practical subject template.</span>
+                        </span>
+                    </label>
                     <div class="flex justify-end gap-3 pt-3">
                         <button pButton type="button" label="Cancel" severity="secondary" (click)="catalogDrawerVisible = false"></button>
                         <button pButton type="button" [label]="catalogDrawerMode === 'create' ? 'Save catalog subject' : 'Update catalog subject'" icon="pi pi-check" (click)="saveCatalogSubject()"></button>
@@ -380,15 +399,16 @@ export class AdminSubjects implements OnInit {
     selectedSchoolId: number | null = null;
     pendingFocusSubjectId: number | null = null;
     pendingCreateSubject = false;
-    draft: { id?: number; schoolId: number | null; code: string; name: string; gradeLevel: string; weeklyLoad: number } = { schoolId: null, code: '', name: '', gradeLevel: 'General', weeklyLoad: 1 };
+    draft: { id?: number; schoolId: number | null; code: string; name: string; gradeLevel: string; weeklyLoad: number; isPractical: boolean } = { schoolId: null, code: '', name: '', gradeLevel: 'General', weeklyLoad: 1, isPractical: false };
 
     catalogDrawerVisible = false;
     catalogDrawerMode: CatalogDialogMode = 'create';
-    catalogDraft: { id?: number; code: string; name: string; gradeLevel: string; weeklyLoad: number; sourceSchoolId?: number | null } = {
+    catalogDraft: { id?: number; code: string; name: string; gradeLevel: string; weeklyLoad: number; isPractical: boolean; sourceSchoolId?: number | null } = {
         code: '',
         name: '',
         gradeLevel: 'General',
         weeklyLoad: 1,
+        isPractical: false,
         sourceSchoolId: null
     };
 
@@ -605,7 +625,7 @@ export class AdminSubjects implements OnInit {
 
     get importSourceSubjectOptions(): { label: string; value: number }[] {
         return this.importSourceSubjects.map((subject) => ({
-            label: `${subject.name} (${subject.code || 'auto'}) · ${normalizeSchoolLevel(subject.gradeLevel)}`,
+            label: `${subject.name} (${subject.code || 'auto'}) · ${normalizeSchoolLevel(subject.gradeLevel)} · ${subject.isPractical ? 'Practical' : 'Academic'}`,
             value: subject.id
         }));
     }
@@ -695,14 +715,15 @@ export class AdminSubjects implements OnInit {
             code: '',
             name: '',
             gradeLevel: '' as SchoolLevel,
-            weeklyLoad: 1
+            weeklyLoad: 1,
+            isPractical: false
         };
         this.drawerVisible = true;
     }
 
     openEditSchoolSubject(subject: SubjectResponse): void {
         this.drawerMode = 'edit';
-        this.draft = { id: subject.id, schoolId: subject.schoolId, code: subject.code, name: subject.name, gradeLevel: normalizeSchoolLevel(subject.gradeLevel), weeklyLoad: subject.weeklyLoad };
+        this.draft = { id: subject.id, schoolId: subject.schoolId, code: subject.code, name: subject.name, gradeLevel: normalizeSchoolLevel(subject.gradeLevel), weeklyLoad: subject.weeklyLoad, isPractical: subject.isPractical };
         this.drawerVisible = true;
     }
 
@@ -713,6 +734,7 @@ export class AdminSubjects implements OnInit {
             name: '',
             gradeLevel: '' as SchoolLevel,
             weeklyLoad: 1,
+            isPractical: false,
             sourceSchoolId: null
         };
         this.catalogDrawerVisible = true;
@@ -726,6 +748,7 @@ export class AdminSubjects implements OnInit {
             name: subject.name,
             gradeLevel: normalizeSchoolLevel(subject.gradeLevel),
             weeklyLoad: subject.weeklyLoad,
+            isPractical: subject.isPractical,
             sourceSchoolId: subject.sourceSchoolId ?? null
         };
         this.catalogDrawerVisible = true;
@@ -743,7 +766,7 @@ export class AdminSubjects implements OnInit {
                 return;
             }
 
-            this.api.createSubject({ name: this.draft.name, code: this.draft.code || null, gradeLevel: this.draft.gradeLevel || null, weeklyLoad: this.draft.weeklyLoad || 1 }, this.draft.schoolId).subscribe({
+            this.api.createSubject({ name: this.draft.name, code: this.draft.code || null, gradeLevel: this.draft.gradeLevel || null, weeklyLoad: this.draft.weeklyLoad || 1, isPractical: this.draft.isPractical }, this.draft.schoolId).subscribe({
                 next: () => {
                     this.messages.add({ severity: 'success', summary: 'Subject saved', detail: `${this.draft.name} added.` });
                     this.drawerVisible = false;
@@ -760,7 +783,7 @@ export class AdminSubjects implements OnInit {
             return;
         }
 
-        this.api.updateSubject(this.draft.id, { name: this.draft.name, code: this.draft.code || null, gradeLevel: this.draft.gradeLevel || null, weeklyLoad: this.draft.weeklyLoad || 1 }, this.draft.schoolId).subscribe({
+        this.api.updateSubject(this.draft.id, { name: this.draft.name, code: this.draft.code || null, gradeLevel: this.draft.gradeLevel || null, weeklyLoad: this.draft.weeklyLoad || 1, isPractical: this.draft.isPractical }, this.draft.schoolId).subscribe({
             next: () => {
                 this.messages.add({ severity: 'success', summary: 'Subject updated', detail: `${this.draft.name} saved.` });
                 this.drawerVisible = false;
@@ -779,7 +802,7 @@ export class AdminSubjects implements OnInit {
                 return;
             }
 
-            this.api.createPlatformSubjectCatalog({ name: this.catalogDraft.name, code: this.catalogDraft.code || null, gradeLevel: this.catalogDraft.gradeLevel || null, weeklyLoad: this.catalogDraft.weeklyLoad || 1 }).subscribe({
+            this.api.createPlatformSubjectCatalog({ name: this.catalogDraft.name, code: this.catalogDraft.code || null, gradeLevel: this.catalogDraft.gradeLevel || null, weeklyLoad: this.catalogDraft.weeklyLoad || 1, isPractical: this.catalogDraft.isPractical }).subscribe({
                 next: () => {
                     this.messages.add({ severity: 'success', summary: 'Catalog saved', detail: `${this.catalogDraft.name} added to the platform catalog.` });
                     this.catalogDrawerVisible = false;
@@ -796,7 +819,7 @@ export class AdminSubjects implements OnInit {
             return;
         }
 
-        this.api.updatePlatformSubjectCatalog(this.catalogDraft.id, { name: this.catalogDraft.name, code: this.catalogDraft.code || null, gradeLevel: this.catalogDraft.gradeLevel || null, weeklyLoad: this.catalogDraft.weeklyLoad || 1 }).subscribe({
+        this.api.updatePlatformSubjectCatalog(this.catalogDraft.id, { name: this.catalogDraft.name, code: this.catalogDraft.code || null, gradeLevel: this.catalogDraft.gradeLevel || null, weeklyLoad: this.catalogDraft.weeklyLoad || 1, isPractical: this.catalogDraft.isPractical }).subscribe({
             next: () => {
                 this.messages.add({ severity: 'success', summary: 'Catalog updated', detail: `${this.catalogDraft.name} saved.` });
                 this.catalogDrawerVisible = false;

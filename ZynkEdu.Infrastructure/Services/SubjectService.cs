@@ -36,13 +36,14 @@ public sealed class SubjectService : ISubjectService
             Code = code,
             Name = request.Name.Trim(),
             GradeLevel = gradeLevel,
-            WeeklyLoad = weeklyLoad
+            WeeklyLoad = weeklyLoad,
+            IsPractical = request.IsPractical
         };
 
         _dbContext.Subjects.Add(subject);
         await _dbContext.SaveChangesAsync(cancellationToken);
         await _auditLogService.LogAsync(resolvedSchoolId, "Created", "Subject", subject.Id.ToString(), $"Created subject {subject.Name} ({subject.Code}).", cancellationToken);
-        return new SubjectResponse(subject.Id, subject.SchoolId, subject.Code ?? string.Empty, subject.Name, subject.GradeLevel, subject.WeeklyLoad);
+        return new SubjectResponse(subject.Id, subject.SchoolId, subject.Code ?? string.Empty, subject.Name, subject.GradeLevel, subject.WeeklyLoad, subject.IsPractical);
     }
 
     public async Task<IReadOnlyList<SubjectResponse>> GetAllAsync(int? schoolId = null, CancellationToken cancellationToken = default)
@@ -57,7 +58,7 @@ public sealed class SubjectService : ISubjectService
 
         return await query
             .OrderBy(x => x.Name)
-            .Select(x => new SubjectResponse(x.Id, x.SchoolId, x.Code ?? string.Empty, x.Name, x.GradeLevel, x.WeeklyLoad))
+            .Select(x => new SubjectResponse(x.Id, x.SchoolId, x.Code ?? string.Empty, x.Name, x.GradeLevel, x.WeeklyLoad, x.IsPractical))
             .ToListAsync(cancellationToken);
     }
 
@@ -73,10 +74,11 @@ public sealed class SubjectService : ISubjectService
             : NormalizeCode(request.Code);
         subject.GradeLevel = NormalizeGradeLevel(request.GradeLevel);
         subject.WeeklyLoad = NormalizeWeeklyLoad(request.WeeklyLoad);
+        subject.IsPractical = request.IsPractical;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await _auditLogService.LogAsync(subject.SchoolId, "Updated", "Subject", subject.Id.ToString(), $"Updated subject {subject.Name} ({subject.Code}).", cancellationToken);
-        return new SubjectResponse(subject.Id, subject.SchoolId, subject.Code ?? string.Empty, subject.Name, subject.GradeLevel, subject.WeeklyLoad);
+        return new SubjectResponse(subject.Id, subject.SchoolId, subject.Code ?? string.Empty, subject.Name, subject.GradeLevel, subject.WeeklyLoad, subject.IsPractical);
     }
 
     public async Task DeleteAsync(int id, int? schoolId = null, CancellationToken cancellationToken = default)

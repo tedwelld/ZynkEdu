@@ -6,13 +6,15 @@ public sealed record CreateSubjectRequest(
     [Required, MinLength(2)] string Name,
     string? Code = null,
     string? GradeLevel = null,
-    [Range(1, 9)] int WeeklyLoad = 1);
+    [Range(1, 9)] int WeeklyLoad = 1,
+    bool IsPractical = false);
 
 public sealed record UpdateSubjectRequest(
     [Required, MinLength(2)] string Name,
     string? Code = null,
     string? GradeLevel = null,
-    [Range(1, 9)] int WeeklyLoad = 1);
+    [Range(1, 9)] int WeeklyLoad = 1,
+    bool IsPractical = false);
 
 public sealed record SubjectResponse(
     int Id,
@@ -20,4 +22,5 @@ public sealed record SubjectResponse(
     string Code,
     string Name,
     string GradeLevel,
-    int WeeklyLoad);
+    int WeeklyLoad,
+    bool IsPractical);

@@ -316,12 +316,19 @@ public sealed class TimetableService : ITimetableService
                 }
 
                 classAssignments.Add(new SubjectCoveragePlan(
+                    schoolClass.Name,
                     normalizedLevel,
                     assignment.TeacherId,
                     assignmentTeacher.DisplayName,
                     classSubject.SubjectId,
                     subject.Name,
-                    NormalizeWeeklyLoad(subject.WeeklyLoad)));
+                    NormalizeWeeklyLoad(subject.WeeklyLoad),
+                    subject.IsPractical));
+            }
+
+            if (classAssignments.Count(x => x.IsPractical) > 1)
+            {
+                throw new InvalidOperationException($"The class {schoolClass.Name} can only have one practical subject before generating the timetable.");
             }
 
             if (classAssignments.Count > 0)
@@ -338,12 +345,56 @@ public sealed class TimetableService : ITimetableService
         var teacherOccupancy = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var generated = new List<TimetableSlot>();
         var schoolDayCounts = new int[Weekdays.Length];
+        var classOccupancyByClass = plans.ToDictionary(x => x.ClassName, _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase);
+        var classDayCountsByClass = plans.ToDictionary(x => x.ClassName, _ => new int[Weekdays.Length], StringComparer.OrdinalIgnoreCase);
+        var practicalEntries = BuildPracticalEntries(plans);
+        var practicalOccurrenceCount = practicalEntries.Count == 0 ? 0 : practicalEntries.Max(x => x.WeeklyLoad);
+
+        for (var occurrence = 0; occurrence < practicalOccurrenceCount; occurrence++)
+        {
+            var participating = practicalEntries
+                .Where(x => x.WeeklyLoad > occurrence)
+                .ToList();
+
+            if (participating.Count == 0)
+            {
+                continue;
+            }
+
+            var slot = FindAvailablePracticalSlot(occurrence, participating, schoolDayCounts, classOccupancyByClass, teacherOccupancy);
+            if (slot is null)
+            {
+                throw new InvalidOperationException("Unable to place the practical timetable block without a clash. Check teacher coverage and practical subject loads.");
+            }
+
+            var dayIndex = Array.IndexOf(Weekdays, slot.DayOfWeek);
+            foreach (var subject in participating)
+            {
+                generated.Add(new TimetableSlot
+                {
+                    SchoolId = schoolId,
+                    TeacherId = subject.TeacherId,
+                    SubjectId = subject.SubjectId,
+                    Class = subject.ClassName,
+                    Term = term,
+                    DayOfWeek = slot.DayOfWeek,
+                    StartTime = slot.StartTime,
+                    EndTime = slot.EndTime
+                });
+
+                classOccupancyByClass[subject.ClassName].Add(BuildOccupancyKey(slot.DayOfWeek, slot.StartTime));
+                classDayCountsByClass[subject.ClassName][dayIndex]++;
+                teacherOccupancy.Add(BuildTeacherOccupancyKey(subject.TeacherId, slot.DayOfWeek, slot.StartTime));
+                schoolDayCounts[dayIndex]++;
+            }
+        }
 
         foreach (var plan in plans.OrderBy(x => GetLevelSortOrder(x.GradeLevel)).ThenBy(x => x.ClassName))
         {
-            var classOccupancy = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var classDayCounts = new int[Weekdays.Length];
+            var classOccupancy = classOccupancyByClass[plan.ClassName];
+            var classDayCounts = classDayCountsByClass[plan.ClassName];
             var subjectLoads = plan.Subjects
+                .Where(x => !x.IsPractical)
                 .OrderByDescending(x => x.WeeklyLoad)
                 .ThenBy(x => x.SubjectName)
                 .ToList();
@@ -426,6 +477,43 @@ public sealed class TimetableService : ITimetableService
         return null;
     }
 
+    private SlotTemplate? FindAvailablePracticalSlot(
+        int occurrence,
+        IReadOnlyList<PracticalSubjectPlan> practicalSubjects,
+        int[] schoolDayCounts,
+        IReadOnlyDictionary<string, HashSet<string>> classOccupancyByClass,
+        HashSet<string> teacherOccupancy)
+    {
+        var preferredDays = GetPreferredPracticalDayOrder(occurrence);
+        var sessionOrder = GetPreferredPracticalSessionOrder(occurrence);
+
+        foreach (var dayIndex in preferredDays
+                     .OrderBy(dayIndex => schoolDayCounts[dayIndex]))
+        {
+            foreach (var sessionIndex in sessionOrder)
+            {
+                var template = SessionTemplates[sessionIndex];
+                var dayName = Weekdays[dayIndex];
+
+                var hasConflict = practicalSubjects.Any(subject =>
+                {
+                    var classKey = BuildOccupancyKey(dayName, template.Start);
+                    var teacherKey = BuildTeacherOccupancyKey(subject.TeacherId, dayName, template.Start);
+                    return classOccupancyByClass[subject.ClassName].Contains(classKey) || teacherOccupancy.Contains(teacherKey);
+                });
+
+                if (hasConflict)
+                {
+                    continue;
+                }
+
+                return new SlotTemplate(dayName, template.Start, template.End);
+            }
+        }
+
+        return null;
+    }
+
     private async Task<IReadOnlyDictionary<string, string>> LoadClassLevelLookupAsync(int? schoolId, CancellationToken cancellationToken)
     {
         var query = _dbContext.SchoolClasses.AsNoTracking();
@@ -447,6 +535,35 @@ public sealed class TimetableService : ITimetableService
         return lookup;
     }
 
+    private static List<PracticalSubjectPlan> BuildPracticalEntries(IReadOnlyList<ClassTimetablePlan> plans)
+    {
+        var practicalEntries = plans
+            .SelectMany(plan => plan.Subjects
+                .Where(subject => subject.IsPractical)
+                .Select(subject => new PracticalSubjectPlan(
+                    plan.ClassName,
+                    subject.GradeLevel,
+                    subject.TeacherId,
+                    subject.TeacherName,
+                    subject.SubjectId,
+                    subject.SubjectName,
+                    subject.WeeklyLoad)))
+            .ToList();
+
+        var duplicateClassNames = practicalEntries
+            .GroupBy(entry => entry.ClassName, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToList();
+
+        if (duplicateClassNames.Count > 0)
+        {
+            throw new InvalidOperationException($"Each class can only have one practical subject before generating the timetable. Problem classes: {string.Join(", ", duplicateClassNames)}.");
+        }
+
+        return practicalEntries;
+    }
+
     private static string ResolveGradeLevel(int schoolId, string className, IReadOnlyDictionary<string, string> classLevels)
     {
         return classLevels.TryGetValue(BuildClassLookupKey(schoolId, className), out var gradeLevel)
@@ -465,6 +582,22 @@ public sealed class TimetableService : ITimetableService
     private static IReadOnlyList<int> GetPreferredSessionOrder(string className, string subjectName, int occurrence)
     {
         var seed = StableHash($"{className}|{subjectName}|{occurrence}");
+        return Enumerable.Range(0, SessionTemplates.Count)
+            .Select(index => (index + seed) % SessionTemplates.Count)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<int> GetPreferredPracticalDayOrder(int occurrence)
+    {
+        var seed = StableHash($"Practical|{occurrence}");
+        return Enumerable.Range(0, Weekdays.Length)
+            .Select(index => (index + seed) % Weekdays.Length)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<int> GetPreferredPracticalSessionOrder(int occurrence)
+    {
+        var seed = StableHash($"Practical|{occurrence}");
         return Enumerable.Range(0, SessionTemplates.Count)
             .Select(index => (index + seed) % SessionTemplates.Count)
             .ToArray();
@@ -765,8 +898,8 @@ public sealed class TimetableService : ITimetableService
         });
 
         return candidateTeachers
-            .OrderByDescending(x => x.SubjectAffinity)
-            .ThenBy(x => x.Load)
+            .OrderBy(x => x.Load)
+            .ThenByDescending(x => x.SubjectAffinity)
             .ThenBy(x => x.Teacher.DisplayName)
             .ThenBy(x => x.Teacher.Id)
             .Select(x => x.Teacher)
@@ -799,7 +932,9 @@ public sealed class TimetableService : ITimetableService
 
     private sealed record ClassTimetablePlan(string ClassName, string GradeLevel, IReadOnlyList<SubjectCoveragePlan> Subjects);
 
-    private sealed record SubjectCoveragePlan(string GradeLevel, int TeacherId, string TeacherName, int SubjectId, string SubjectName, int WeeklyLoad);
+    private sealed record SubjectCoveragePlan(string ClassName, string GradeLevel, int TeacherId, string TeacherName, int SubjectId, string SubjectName, int WeeklyLoad, bool IsPractical);
+
+    private sealed record PracticalSubjectPlan(string ClassName, string GradeLevel, int TeacherId, string TeacherName, int SubjectId, string SubjectName, int WeeklyLoad);
 
     private sealed record SlotTemplate(string DayOfWeek, TimeOnly StartTime, TimeOnly EndTime);
 

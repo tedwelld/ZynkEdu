@@ -158,6 +158,7 @@ public sealed class ZynkEduDbContext : DbContext
             entity.Property(x => x.Name).HasMaxLength(200);
             entity.Property(x => x.GradeLevel).HasMaxLength(100);
             entity.Property(x => x.WeeklyLoad).HasDefaultValue(1);
+            entity.Property(x => x.IsPractical).HasDefaultValue(false);
             entity.HasIndex(x => new { x.SchoolId, x.GradeLevel, x.Code }).IsUnique();
             entity.HasIndex(x => new { x.SchoolId, x.GradeLevel, x.Name }).IsUnique();
         });
@@ -189,6 +190,7 @@ public sealed class ZynkEduDbContext : DbContext
             entity.Property(x => x.Name).HasMaxLength(200);
             entity.Property(x => x.GradeLevel).HasMaxLength(100);
             entity.Property(x => x.WeeklyLoad).HasDefaultValue(1);
+            entity.Property(x => x.IsPractical).HasDefaultValue(false);
             entity.HasIndex(x => new { x.GradeLevel, x.Code }).IsUnique();
             entity.HasIndex(x => new { x.GradeLevel, x.Name }).IsUnique();
         });

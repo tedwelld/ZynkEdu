@@ -62,6 +62,8 @@ const DEFAULT_PREFERENCES: AccountNotificationPreferences = {
                     <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="secondary" routerLink="/teacher/attendance" *ngIf="isTeacher"></button>
                     <button pButton type="button" label="Results" icon="pi pi-table" routerLink="/teacher/results" *ngIf="isTeacher"></button>
                     <button pButton type="button" label="My classes" icon="pi pi-users" severity="secondary" routerLink="/teacher/classes" *ngIf="isTeacher"></button>
+                    <button pButton type="button" label="Timetable" icon="pi pi-calendar" severity="secondary" routerLink="/teacher/timetable" *ngIf="isTeacher"></button>
+                    <button pButton type="button" label="Subjects" icon="pi pi-book" severity="secondary" routerLink="/teacher/subjects" *ngIf="isTeacher"></button>
                 </div>
             </header>
 

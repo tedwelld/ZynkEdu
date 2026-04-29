@@ -37,6 +37,7 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
                 x.Name,
                 x.GradeLevel,
                 x.WeeklyLoad,
+                x.IsPractical,
                 x.SourceSchoolId,
                 x.SourceSchoolId is int schoolId && sources.TryGetValue(schoolId, out var sourceName) ? sourceName : null))
             .ToList();
@@ -58,7 +59,8 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
             Code = code,
             Name = name,
             GradeLevel = gradeLevel,
-            WeeklyLoad = weeklyLoad
+            WeeklyLoad = weeklyLoad,
+            IsPractical = request.IsPractical
         };
 
         _dbContext.PlatformSubjectCatalogs.Add(catalog);
@@ -85,6 +87,7 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
         catalog.GradeLevel = gradeLevel;
         catalog.Code = code;
         catalog.WeeklyLoad = weeklyLoad;
+        catalog.IsPractical = request.IsPractical;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await _auditLogService.LogAsync(null, "Updated", "PlatformSubjectCatalog", catalog.Id.ToString(), $"Updated catalog subject {catalog.Name} ({catalog.Code}).", cancellationToken);
@@ -149,6 +152,7 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
                 Name = candidateName,
                 GradeLevel = candidateLevel,
                 WeeklyLoad = NormalizeWeeklyLoad(subject.WeeklyLoad),
+                IsPractical = subject.IsPractical,
                 SourceSchoolId = sourceSchoolId,
                 SourceSubjectId = subject.Id
             };
@@ -211,7 +215,8 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
                 Code = code,
                 Name = candidateName,
                 GradeLevel = candidateLevel,
-                WeeklyLoad = NormalizeWeeklyLoad(subject.WeeklyLoad)
+                WeeklyLoad = NormalizeWeeklyLoad(subject.WeeklyLoad),
+                IsPractical = subject.IsPractical
             };
 
             _dbContext.Subjects.Add(targetSubject);
@@ -266,7 +271,8 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
                 Code = code,
                 Name = candidateName,
                 GradeLevel = candidateLevel,
-                WeeklyLoad = NormalizeWeeklyLoad(catalogSubject.WeeklyLoad)
+                WeeklyLoad = NormalizeWeeklyLoad(catalogSubject.WeeklyLoad),
+                IsPractical = catalogSubject.IsPractical
             };
 
             _dbContext.Subjects.Add(subject);
@@ -321,6 +327,7 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
             catalog.Name,
             catalog.GradeLevel,
             catalog.WeeklyLoad,
+            catalog.IsPractical,
             catalog.SourceSchoolId,
             sourceSchoolName);
     }

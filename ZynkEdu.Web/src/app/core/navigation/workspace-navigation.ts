@@ -49,7 +49,9 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuSec
                     { label: 'Dashboard', icon: 'pi pi-fw pi-home', routerLink: ['/teacher/dashboard'] },
                     { label: 'Attendance', icon: 'pi pi-fw pi-check-square', routerLink: ['/teacher/attendance'] },
                     { label: 'Results Entry', icon: 'pi pi-fw pi-table', routerLink: ['/teacher/results'] },
-                    { label: 'My Classes', icon: 'pi pi-fw pi-users', routerLink: ['/teacher/classes'] }
+                    { label: 'My Classes', icon: 'pi pi-fw pi-users', routerLink: ['/teacher/classes'] },
+                    { label: 'Timetable', icon: 'pi pi-fw pi-calendar', routerLink: ['/teacher/timetable'] },
+                    { label: 'Subjects', icon: 'pi pi-fw pi-book', routerLink: ['/teacher/subjects'] }
                 ]
             },
             {

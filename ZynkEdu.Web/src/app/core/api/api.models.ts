@@ -251,6 +251,7 @@ export interface SubjectResponse {
     name: string;
     gradeLevel: string;
     weeklyLoad: number;
+    isPractical: boolean;
 }
 
 export interface SchoolClassResponse {
@@ -271,6 +272,7 @@ export interface PlatformSubjectCatalogResponse {
     name: string;
     gradeLevel: string;
     weeklyLoad: number;
+    isPractical: boolean;
     sourceSchoolId?: number | null;
     sourceSchoolName?: string | null;
 }
@@ -368,6 +370,7 @@ export interface CreateSubjectRequest {
     code?: string | null;
     gradeLevel?: string | null;
     weeklyLoad?: number;
+    isPractical?: boolean;
 }
 
 export interface UpdateSubjectRequest {
@@ -375,6 +378,7 @@ export interface UpdateSubjectRequest {
     code?: string | null;
     gradeLevel?: string | null;
     weeklyLoad?: number;
+    isPractical?: boolean;
 }
 
 export interface CreateSchoolClassRequest {
