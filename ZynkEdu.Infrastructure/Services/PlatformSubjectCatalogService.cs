@@ -36,6 +36,7 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
                 x.Code ?? string.Empty,
                 x.Name,
                 x.GradeLevel,
+                x.WeeklyLoad,
                 x.SourceSchoolId,
                 x.SourceSchoolId is int schoolId && sources.TryGetValue(schoolId, out var sourceName) ? sourceName : null))
             .ToList();
@@ -45,6 +46,7 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
     {
         var name = NormalizeName(request.Name);
         var gradeLevel = NormalizeGradeLevel(request.GradeLevel);
+        var weeklyLoad = NormalizeWeeklyLoad(request.WeeklyLoad);
         var code = string.IsNullOrWhiteSpace(request.Code)
             ? await GenerateCodeAsync(name, gradeLevel, null, cancellationToken)
             : NormalizeCode(request.Code);
@@ -55,7 +57,8 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
         {
             Code = code,
             Name = name,
-            GradeLevel = gradeLevel
+            GradeLevel = gradeLevel,
+            WeeklyLoad = weeklyLoad
         };
 
         _dbContext.PlatformSubjectCatalogs.Add(catalog);
@@ -71,6 +74,7 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
 
         var name = NormalizeName(request.Name);
         var gradeLevel = NormalizeGradeLevel(request.GradeLevel);
+        var weeklyLoad = NormalizeWeeklyLoad(request.WeeklyLoad);
         var code = string.IsNullOrWhiteSpace(request.Code)
             ? await GenerateCodeAsync(name, gradeLevel, catalog.Id, cancellationToken)
             : NormalizeCode(request.Code);
@@ -80,6 +84,7 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
         catalog.Name = name;
         catalog.GradeLevel = gradeLevel;
         catalog.Code = code;
+        catalog.WeeklyLoad = weeklyLoad;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await _auditLogService.LogAsync(null, "Updated", "PlatformSubjectCatalog", catalog.Id.ToString(), $"Updated catalog subject {catalog.Name} ({catalog.Code}).", cancellationToken);
@@ -143,6 +148,7 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
                 Code = code,
                 Name = candidateName,
                 GradeLevel = candidateLevel,
+                WeeklyLoad = NormalizeWeeklyLoad(subject.WeeklyLoad),
                 SourceSchoolId = sourceSchoolId,
                 SourceSubjectId = subject.Id
             };
@@ -204,7 +210,8 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
                 SchoolId = targetSchoolId,
                 Code = code,
                 Name = candidateName,
-                GradeLevel = candidateLevel
+                GradeLevel = candidateLevel,
+                WeeklyLoad = NormalizeWeeklyLoad(subject.WeeklyLoad)
             };
 
             _dbContext.Subjects.Add(targetSubject);
@@ -226,6 +233,13 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
             .OrderBy(x => x.Name)
             .ToListAsync(cancellationToken);
 
+        var result = await PublishCatalogToSchoolAsync(targetSchoolId, catalogSubjects, cancellationToken);
+        await _auditLogService.LogAsync(targetSchoolId, "Published", "Subject", targetSchoolId.ToString(), $"Published {result.ImportedCount} catalog subject(s) into school {targetSchoolId}. Skipped {result.SkippedCount}.", cancellationToken);
+        return result;
+    }
+
+    private async Task<ImportSubjectsResultResponse> PublishCatalogToSchoolAsync(int targetSchoolId, IReadOnlyList<PlatformSubjectCatalog> catalogSubjects, CancellationToken cancellationToken)
+    {
         var existingNameKeys = await LoadSchoolNameKeysAsync(targetSchoolId, cancellationToken);
         var existingCodeKeys = await LoadSchoolCodeKeysAsync(targetSchoolId, cancellationToken);
         var created = 0;
@@ -251,7 +265,8 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
                 SchoolId = targetSchoolId,
                 Code = code,
                 Name = candidateName,
-                GradeLevel = candidateLevel
+                GradeLevel = candidateLevel,
+                WeeklyLoad = NormalizeWeeklyLoad(catalogSubject.WeeklyLoad)
             };
 
             _dbContext.Subjects.Add(subject);
@@ -261,7 +276,31 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        await _auditLogService.LogAsync(targetSchoolId, "Published", "Subject", targetSchoolId.ToString(), $"Published {created} catalog subject(s) into school {targetSchoolId}. Skipped {skipped}.", cancellationToken);
+        return new ImportSubjectsResultResponse(created, skipped);
+    }
+
+    public async Task<ImportSubjectsResultResponse> PublishAllCatalogToAllSchoolsAsync(CancellationToken cancellationToken = default)
+    {
+        var schools = await _dbContext.Schools.AsNoTracking()
+            .OrderBy(x => x.Name)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        var catalogSubjects = await _dbContext.PlatformSubjectCatalogs.AsNoTracking()
+            .OrderBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+
+        var created = 0;
+        var skipped = 0;
+
+        foreach (var schoolId in schools)
+        {
+            var schoolResult = await PublishCatalogToSchoolAsync(schoolId, catalogSubjects, cancellationToken);
+            created += schoolResult.ImportedCount;
+            skipped += schoolResult.SkippedCount;
+        }
+
+        await _auditLogService.LogAsync(null, "Published", "Subject", "all-schools", $"Published {created} catalog subject(s) into all schools. Skipped {skipped}.", cancellationToken);
         return new ImportSubjectsResultResponse(created, skipped);
     }
 
@@ -281,6 +320,7 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
             catalog.Code ?? string.Empty,
             catalog.Name,
             catalog.GradeLevel,
+            catalog.WeeklyLoad,
             catalog.SourceSchoolId,
             sourceSchoolName);
     }
@@ -442,6 +482,16 @@ public sealed class PlatformSubjectCatalogService : IPlatformSubjectCatalogServi
     }
 
     private static string NormalizeGradeLevel(string? gradeLevel) => SchoolLevelCatalog.NormalizeLevel(gradeLevel);
+
+    private static int NormalizeWeeklyLoad(int weeklyLoad)
+    {
+        if (weeklyLoad < 1 || weeklyLoad > 9)
+        {
+            throw new InvalidOperationException("The subject weekly load must be between 1 and 9.");
+        }
+
+        return weeklyLoad;
+    }
 
     private static string BuildBaseCode(string value)
     {

@@ -60,4 +60,10 @@ public sealed class PlatformSubjectsController : ControllerBase
     {
         return Ok(await _platformSubjectCatalogService.PublishAllCatalogToSchoolAsync(targetSchoolId, cancellationToken));
     }
+
+    [HttpPost("publish-all-schools")]
+    public async Task<ActionResult<ImportSubjectsResultResponse>> PublishAllToAllSchools(CancellationToken cancellationToken)
+    {
+        return Ok(await _platformSubjectCatalogService.PublishAllCatalogToAllSchoolsAsync(cancellationToken));
+    }
 }

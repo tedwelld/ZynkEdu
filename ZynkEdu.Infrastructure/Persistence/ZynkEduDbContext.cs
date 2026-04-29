@@ -39,6 +39,8 @@ public sealed class ZynkEduDbContext : DbContext
     public DbSet<NotificationRecipient> NotificationRecipients => Set<NotificationRecipient>();
     public DbSet<ParentOtpChallenge> ParentOtpChallenges => Set<ParentOtpChallenge>();
     public DbSet<TimetableSlot> TimetableSlots => Set<TimetableSlot>();
+    public DbSet<TimetablePublication> TimetablePublications => Set<TimetablePublication>();
+    public DbSet<TimetableDispatchLog> TimetableDispatchLogs => Set<TimetableDispatchLog>();
     public DbSet<AcademicTerm> AcademicTerms => Set<AcademicTerm>();
     public DbSet<SchoolCalendarEvent> SchoolCalendarEvents => Set<SchoolCalendarEvent>();
 
@@ -155,6 +157,7 @@ public sealed class ZynkEduDbContext : DbContext
             entity.Property(x => x.Code).HasMaxLength(20);
             entity.Property(x => x.Name).HasMaxLength(200);
             entity.Property(x => x.GradeLevel).HasMaxLength(100);
+            entity.Property(x => x.WeeklyLoad).HasDefaultValue(1);
             entity.HasIndex(x => new { x.SchoolId, x.GradeLevel, x.Code }).IsUnique();
             entity.HasIndex(x => new { x.SchoolId, x.GradeLevel, x.Name }).IsUnique();
         });
@@ -185,6 +188,7 @@ public sealed class ZynkEduDbContext : DbContext
             entity.Property(x => x.Code).HasMaxLength(20);
             entity.Property(x => x.Name).HasMaxLength(200);
             entity.Property(x => x.GradeLevel).HasMaxLength(100);
+            entity.Property(x => x.WeeklyLoad).HasDefaultValue(1);
             entity.HasIndex(x => new { x.GradeLevel, x.Code }).IsUnique();
             entity.HasIndex(x => new { x.GradeLevel, x.Name }).IsUnique();
         });
@@ -289,6 +293,19 @@ public sealed class ZynkEduDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<TimetablePublication>(entity =>
+        {
+            entity.Property(x => x.Term).HasMaxLength(50);
+            entity.HasIndex(x => new { x.SchoolId, x.Term }).IsUnique();
+        });
+
+        modelBuilder.Entity<TimetableDispatchLog>(entity =>
+        {
+            entity.Property(x => x.Term).HasMaxLength(50);
+            entity.Property(x => x.LastError).HasMaxLength(1000);
+            entity.HasIndex(x => new { x.SchoolId, x.TeacherId, x.Term }).IsUnique();
+        });
+
         modelBuilder.Entity<AcademicTerm>(entity =>
         {
             entity.Property(x => x.Name).HasMaxLength(100);
@@ -323,6 +340,8 @@ public sealed class ZynkEduDbContext : DbContext
         ApplySchoolFilter<StudentNumberCounter>(modelBuilder);
         ApplySchoolFilter<Notification>(modelBuilder);
         ApplySchoolFilter<TimetableSlot>(modelBuilder);
+        ApplySchoolFilter<TimetablePublication>(modelBuilder);
+        ApplySchoolFilter<TimetableDispatchLog>(modelBuilder);
         ApplySchoolFilter<AcademicTerm>(modelBuilder);
         ApplySchoolFilter<SchoolCalendarEvent>(modelBuilder);
     }

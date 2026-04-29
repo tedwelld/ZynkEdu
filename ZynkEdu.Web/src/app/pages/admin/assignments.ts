@@ -1,15 +1,18 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
-import { MessageService } from 'primeng/api';
+import { ActivatedRoute, Router } from '@angular/router';
+import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { DrawerModule } from 'primeng/drawer';
 import { InputTextModule } from 'primeng/inputtext';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { SkeletonModule } from 'primeng/skeleton';
+import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import {
@@ -23,7 +26,7 @@ import {
     UserResponse
 } from '../../core/api/api.models';
 import { AuthService } from '../../core/auth/auth.service';
-import { normalizeSchoolLevel, SchoolLevel } from '../../core/school-levels';
+import { normalizeSchoolLevel } from '../../core/school-levels';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 
@@ -34,10 +37,15 @@ interface AssignmentDraft {
     classes: string[];
 }
 
+interface MissingCoverageEntry {
+    className: string;
+    subjectName: string;
+}
+
 @Component({
     standalone: true,
     selector: 'app-admin-assignments',
-    imports: [CommonModule, FormsModule, ButtonModule, DrawerModule, InputTextModule, AppDropdownComponent, MultiSelectModule, SkeletonModule, TagModule, TooltipModule, MetricCardComponent],
+    imports: [CommonModule, FormsModule, ButtonModule, DrawerModule, InputTextModule, AppDropdownComponent, MultiSelectModule, SkeletonModule, TableModule, TagModule, TooltipModule, MetricCardComponent],
     template: `
         <section class="space-y-6">
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -54,11 +62,43 @@ interface AssignmentDraft {
                 </div>
             </div>
 
+            <div *ngIf="pendingCoverage.length > 0" class="workspace-card border border-amber-200/80 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-800">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <p class="text-sm uppercase tracking-[0.2em] text-amber-700 dark:text-amber-300 font-semibold">Timetable coverage needed</p>
+                        <h2 class="text-xl font-display font-bold mb-2">Prefilled from timetable gaps</h2>
+                        <p class="text-sm text-muted-color max-w-3xl">
+                            These class-subject pairs must be assigned to teachers before the timetable can be generated. Choose a teacher, then save the assignment.
+                        </p>
+                    </div>
+                    <button pButton type="button" label="Clear prefill" severity="secondary" icon="pi pi-times" (click)="clearPendingCoverage()"></button>
+                </div>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <p-tag *ngFor="let item of pendingCoverage" [value]="coverageLabelFor(item)" severity="warning"></p-tag>
+                </div>
+            </div>
+
             <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <app-metric-card label="Teachers" [value]="visibleTeachers.length.toString()" delta="Available roster" hint="Selected school" icon="pi pi-id-card" tone="blue"></app-metric-card>
-                <app-metric-card label="Subjects" [value]="visibleSubjects.length.toString()" delta="Available roster" hint="Selected school" icon="pi pi-book" tone="green"></app-metric-card>
+                <div class="xl:col-span-2">
+                    <app-metric-card label="Subjects" [value]="visibleSubjects.length.toString()" delta="Available roster" hint="Selected school" icon="pi pi-book" tone="green"></app-metric-card>
+                </div>
                 <app-metric-card label="Classes" [value]="visibleClasses.length.toString()" delta="Class registry" hint="Teaching ready" icon="pi pi-sitemap" tone="purple"></app-metric-card>
-                <app-metric-card label="Assignments" [value]="visibleAssignments.length.toString()" delta="Live links" hint="Current mappings" icon="pi pi-link" tone="orange"></app-metric-card>
+                <article class="workspace-card metric-gradient h-full flex flex-col justify-between gap-3">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <span class="block text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Current assignments</span>
+                            <h3 class="text-3xl font-bold mt-2 mb-0 font-display">{{ visibleAssignments.length.toString() }}</h3>
+                            <p class="mt-2 text-sm text-muted-color">View and export the active teacher links.</p>
+                        </div>
+                        <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-white soft-shadow bg-gradient-to-br from-orange-500 to-amber-500">
+                            <i class="pi pi-link text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="grid gap-2">
+                        <button pButton type="button" label="View current assignments" icon="pi pi-table" severity="secondary" class="w-full" (click)="assignmentsDrawerVisible = true"></button>
+                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="help" class="w-full" (click)="exportAssignmentsPdf()"></button>
+                    </div>
+                </article>
             </section>
 
             <article class="workspace-card">
@@ -79,17 +119,14 @@ interface AssignmentDraft {
                         <app-dropdown [options]="teacherOptions" [(ngModel)]="draft.teacherId" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search teachers" (opened)="refreshLookups()" (ngModelChange)="onTeacherChange($event)"></app-dropdown>
                     </div>
                     <div>
+                        <label class="block text-sm font-semibold mb-2">Classes</label>
+                        <p-multiSelect [options]="classOptions" [(ngModel)]="draft.classes" optionLabel="label" optionValue="value" display="chip" class="w-full" [filter]="true" filterPlaceholder="Search classes" appendTo="body" [disabled]="classOptions.length === 0" placeholder="Select classes" (onClick)="refreshLookups()" (ngModelChange)="onClassesChange($event)"></p-multiSelect>
+                    </div>
+                    <div>
                         <label class="block text-sm font-semibold mb-2">Subjects</label>
                         <p-multiSelect [options]="subjectOptions" [(ngModel)]="draft.subjectIds" optionLabel="label" optionValue="value" display="chip" class="w-full" [filter]="true" filterPlaceholder="Search subjects" appendTo="body" [disabled]="subjectOptions.length === 0" placeholder="Select subjects" (onClick)="refreshLookups()"></p-multiSelect>
                         <div *ngIf="draft.classes.length > 0 && subjectOptions.length === 0" class="mt-2 text-sm text-red-500">
-                            The selected class has no shared subjects yet.
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold mb-2">Classes</label>
-                        <p-multiSelect [options]="classOptions" [(ngModel)]="draft.classes" optionLabel="label" optionValue="value" display="chip" class="w-full" [filter]="true" filterPlaceholder="Search classes" appendTo="body" [disabled]="classOptions.length === 0" placeholder="Select classes" (onClick)="refreshLookups()" (ngModelChange)="onClassesChange($event)"></p-multiSelect>
-                        <div *ngIf="draft.classes.length > 0 && !selectedClassLevel" class="mt-2 text-sm text-red-500">
-                            Choose classes from the same level before saving.
+                            The selected classes have no available subjects yet.
                         </div>
                     </div>
                     <div class="flex items-end">
@@ -98,70 +135,87 @@ interface AssignmentDraft {
                 </div>
             </article>
 
-            <div class="grid gap-6 xl:grid-cols-[0.72fr_0.72fr]">
-                <article class="workspace-card">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h2 class="text-xl font-display font-bold mb-1">Teachers</h2>
-                            <p class="text-sm text-muted-color">Available teachers in the selected school.</p>
-                        </div>
-                        <span class="text-xs uppercase tracking-[0.2em] text-muted-color">{{ visibleTeachers.length }}</span>
-                    </div>
-                    <div *ngIf="loading" class="space-y-3">
-                        <p-skeleton *ngFor="let _ of skeletonRows" height="3.5rem" borderRadius="1rem"></p-skeleton>
-                    </div>
-                    <div *ngIf="!loading" class="space-y-3">
-                        <div *ngFor="let teacher of visibleTeachers" class="rounded-2xl border border-surface-200 dark:border-surface-700 p-3">
-                            <div class="font-semibold">{{ teacher.displayName }}</div>
-                            <div class="text-xs text-muted-color">{{ teacher.username }}</div>
-                        </div>
-                    </div>
-                </article>
-
-                <article class="workspace-card">
-                    <div class="flex items-center justify-between mb-4">
-                        <div>
-                            <h2 class="text-xl font-display font-bold mb-1">Subjects</h2>
-                            <p class="text-sm text-muted-color">Available subjects in the selected school.</p>
-                        </div>
-                        <span class="text-xs uppercase tracking-[0.2em] text-muted-color">{{ visibleSubjects.length }}</span>
-                    </div>
-                    <div *ngIf="loading" class="space-y-3">
-                        <p-skeleton *ngFor="let _ of skeletonRows" height="3.5rem" borderRadius="1rem"></p-skeleton>
-                    </div>
-                    <div *ngIf="!loading" class="space-y-3">
-                        <div *ngFor="let subject of visibleSubjects" class="rounded-2xl border border-surface-200 dark:border-surface-700 p-3">
-                            <div class="font-semibold">{{ subject.name }}</div>
-                            <div class="mt-1 text-xs text-muted-color">Subject ID {{ subject.id }}</div>
-                            <p-tag class="mt-2 inline-flex" [value]="levelLabelFor(subject.gradeLevel)" [severity]="severityForLevel(subject.gradeLevel)"></p-tag>
-                        </div>
-                    </div>
-                </article>
-            </div>
-
             <article class="workspace-card">
                 <div class="flex items-center justify-between mb-4">
                     <div>
-                        <h2 class="text-xl font-display font-bold mb-1">Current assignments</h2>
-                        <p class="text-sm text-muted-color">Existing mappings loaded from the live API.</p>
+                        <h2 class="text-xl font-display font-bold mb-1">Subjects</h2>
+                        <p class="text-sm text-muted-color">Available subjects in the selected school.</p>
                     </div>
-                    <span class="text-sm text-muted-color">{{ visibleAssignments.length }} total</span>
+                    <span class="text-xs uppercase tracking-[0.2em] text-muted-color">{{ visibleSubjects.length }}</span>
                 </div>
-                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    <div *ngFor="let assignment of visibleAssignments" class="rounded-2xl border border-surface-200 dark:border-surface-700 p-4">
-                        <div class="flex items-center justify-between gap-3">
-                            <div>
-                                <div class="font-semibold">{{ assignment.teacherName }}</div>
-                                <div class="text-sm text-muted-color">{{ assignment.subjectName }}</div>
-                            </div>
-                            <div class="flex flex-col items-end gap-2">
-                                <p-tag [value]="assignment.class" severity="success"></p-tag>
-                                <p-tag [value]="levelLabelFor(assignment.gradeLevel)" [severity]="severityForLevel(assignment.gradeLevel)"></p-tag>
-                            </div>
-                        </div>
+                <p-table *ngIf="!loading" [value]="visibleSubjects" [rows]="8" [paginator]="true" styleClass="p-datatable-sm">
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th>Subject</th>
+                            <th>Level</th>
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-subject>
+                        <tr>
+                            <td>
+                                <div class="font-semibold">{{ subject.name }}</div>
+                                <div class="text-xs text-muted-color">{{ subject.code }}</div>
+                            </td>
+                            <td>
+                                <p-tag [value]="levelLabelFor(subject.gradeLevel)" [severity]="severityForLevel(subject.gradeLevel)"></p-tag>
+                            </td>
+                            <td class="text-right">
+                                <button pButton type="button" icon="pi pi-pencil" class="p-button-text p-button-sm" (click)="openSubjectEditor(subject)"></button>
+                                <button pButton type="button" icon="pi pi-trash" class="p-button-text p-button-sm p-button-danger" (click)="deleteSubject(subject)"></button>
+                            </td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+                <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-surface-200 dark:border-surface-700 pt-4">
+                    <p class="text-sm text-muted-color">Manage subjects directly or jump to the full subject library.</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button pButton type="button" label="Add subject" icon="pi pi-plus" (click)="openSubjectCreator()"></button>
+                        <button pButton type="button" label="View all subjects" icon="pi pi-book" severity="secondary" (click)="openSubjectsLibrary()"></button>
                     </div>
+                </div>
+                <div *ngIf="loading" class="space-y-3">
+                    <p-skeleton *ngFor="let _ of skeletonRows" height="3.5rem" borderRadius="1rem"></p-skeleton>
                 </div>
             </article>
+
+            <p-drawer [(visible)]="assignmentsDrawerVisible" position="right" [modal]="true" [dismissible]="true" [style]="{ width: 'min(78rem, 96vw)' }" appendTo="body" header="Current assignments">
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between text-sm text-muted-color">
+                        <span>{{ visibleAssignments.length }} total</span>
+                        <span>{{ selectedSchoolId ? schoolNameFor(selectedSchoolId) : 'All schools' }}</span>
+                    </div>
+
+                    <div *ngIf="loading" class="space-y-3">
+                        <p-skeleton *ngFor="let _ of skeletonRows" height="3.5rem" borderRadius="1rem"></p-skeleton>
+                    </div>
+
+                    <p-table *ngIf="!loading" [value]="visibleAssignments" [rows]="12" [paginator]="true" styleClass="p-datatable-sm">
+                        <ng-template pTemplate="header">
+                            <tr>
+                                <th>Teacher</th>
+                                <th>Subject</th>
+                                <th>Class</th>
+                                <th>Level</th>
+                            </tr>
+                        </ng-template>
+                        <ng-template pTemplate="body" let-assignment>
+                            <tr>
+                                <td>
+                                    <div class="font-semibold">{{ assignment.teacherName }}</div>
+                                    <div class="text-xs text-muted-color">ID {{ assignment.teacherId }}</div>
+                                </td>
+                                <td>
+                                    <div class="font-semibold">{{ assignment.subjectName }}</div>
+                                    <div class="text-xs text-muted-color">Subject ID {{ assignment.subjectId }}</div>
+                                </td>
+                                <td><p-tag [value]="assignment.class" severity="success"></p-tag></td>
+                                <td><p-tag [value]="levelLabelFor(assignment.gradeLevel)" [severity]="severityForLevel(assignment.gradeLevel)"></p-tag></td>
+                            </tr>
+                        </ng-template>
+                    </p-table>
+                </div>
+            </p-drawer>
         </section>
     `
 })
@@ -170,6 +224,8 @@ export class AdminAssignments implements OnInit {
     private readonly auth = inject(AuthService);
     private readonly route = inject(ActivatedRoute);
     private readonly messages = inject(MessageService);
+    private readonly router = inject(Router);
+    private readonly confirmation = inject(ConfirmationService);
 
     loading = true;
     schools: SchoolResponse[] = [];
@@ -181,6 +237,9 @@ export class AdminAssignments implements OnInit {
     skeletonRows = Array.from({ length: 4 });
     selectedSchoolId: number | null = null;
     selectedTermId: number | null = null;
+    assignmentsDrawerVisible = false;
+    pendingCoverage: MissingCoverageEntry[] = [];
+    coveragePrefillApplied = false;
     draft: AssignmentDraft = { teacherId: null, teacherName: '', subjectIds: [], classes: [] };
 
     get isPlatformAdmin(): boolean {
@@ -221,21 +280,6 @@ export class AdminAssignments implements OnInit {
         return this.visibleSubjects
             .filter((subject) => allowedSubjectIds.size === 0 || allowedSubjectIds.has(subject.id))
             .map((subject) => ({ label: `${subject.name} (${normalizeSchoolLevel(subject.gradeLevel)})`, value: subject.id }));
-    }
-
-    get selectedClassLevel(): SchoolLevel | null {
-        const levels = this.draft.classes
-            .map((className) => this.classes.find((entry) => entry.className === className))
-            .filter((entry): entry is SchoolClassResponse => !!entry)
-            .map((entry) => normalizeSchoolLevel(entry.gradeLevel))
-            .filter((level): level is Exclude<SchoolLevel, 'General'> => level !== 'General');
-
-        if (levels.length === 0) {
-            return null;
-        }
-
-        const distinct = Array.from(new Set(levels));
-        return distinct.length === 1 ? distinct[0] : null;
     }
 
     get visibleTeachers(): UserResponse[] {
@@ -301,20 +345,12 @@ export class AdminAssignments implements OnInit {
                 this.schools = schools;
                 this.selectedSchoolId = this.isPlatformAdmin ? this.selectedSchoolId ?? this.schools[0]?.id ?? null : this.auth.schoolId();
                 this.selectedTermId = this.terms.some((term) => term.id === this.selectedTermId) ? this.selectedTermId : this.terms[0]?.id ?? null;
-                this.draft.teacherId = this.visibleTeachers.some((teacher) => teacher.id === this.draft.teacherId) ? this.draft.teacherId : this.visibleTeachers[0]?.id ?? null;
+                this.draft.teacherId = this.visibleTeachers.some((teacher) => teacher.id === this.draft.teacherId) ? this.draft.teacherId : null;
                 this.draft.subjectIds = this.draft.subjectIds.filter((subjectId) => this.visibleSubjects.some((subject) => subject.id === subjectId));
                 this.draft.classes = this.draft.classes.filter((className) => this.classOptions.some((option) => option.value === className));
-
-                if (this.draft.subjectIds.length === 0 && this.subjectOptions[0]?.value) {
-                    this.draft.subjectIds = [this.subjectOptions[0].value];
-                }
-
-                if (this.draft.classes.length === 0 && this.classOptions[0]?.value) {
-                    this.draft.classes = [this.classOptions[0].value];
-                }
-
                 this.onClassesChange(this.draft.classes);
                 this.onTeacherChange(this.draft.teacherId);
+                this.applyPendingCoveragePrefill();
                 this.loading = false;
             },
             error: () => {
@@ -325,11 +361,127 @@ export class AdminAssignments implements OnInit {
 
     generateTimetable(): void {
         const selectedTerm = this.terms.find((term) => term.id === this.selectedTermId)?.name ?? 'Term 1';
-        this.api.generateTimetable(selectedTerm).subscribe({
+        this.api.generateTimetable(selectedTerm, this.selectedSchoolId ?? undefined).subscribe({
             next: () => {
                 this.messages.add({ severity: 'success', summary: 'Timetable generated', detail: `${selectedTerm} timetable has been rebuilt for this school.` });
+                this.clearPendingCoverage();
+            },
+            error: (error) => {
+                const missingCoverage = this.parseMissingCoverageFromMessage(this.readErrorMessage(error, 'The timetable could not be generated.'));
+                if (missingCoverage.length > 0) {
+                    this.pendingCoverage = missingCoverage;
+                    this.coveragePrefillApplied = false;
+                    this.applyPendingCoveragePrefill();
+                    this.messages.add({
+                        severity: 'warn',
+                        summary: 'Teacher coverage missing',
+                        detail: 'The missing class-subject pairs have been prefilled. Choose a teacher and save the assignment before generating the timetable again.'
+                    });
+                    return;
+                }
+
+                this.messages.add({ severity: 'error', summary: 'Generate failed', detail: this.readErrorMessage(error, 'The timetable could not be generated.') });
             }
         });
+    }
+
+    openSubjectCreator(): void {
+        this.router.navigate(['/admin/subjects'], {
+            queryParams: this.selectedSchoolId ? { schoolId: this.selectedSchoolId, create: 1 } : { create: 1 }
+        });
+    }
+
+    openSubjectsLibrary(): void {
+        this.router.navigate(['/admin/subjects'], {
+            queryParams: this.selectedSchoolId ? { schoolId: this.selectedSchoolId } : undefined
+        });
+    }
+
+    openSubjectEditor(subject: SubjectResponse): void {
+        this.router.navigate(['/admin/subjects'], {
+            queryParams: { schoolId: subject.schoolId, focus: subject.id }
+        });
+    }
+
+    deleteSubject(subject: SubjectResponse): void {
+        this.confirmation.confirm({
+            message: `Delete ${subject.name}?`,
+            header: 'Delete subject',
+            icon: 'pi pi-exclamation-triangle',
+            acceptButtonStyleClass: 'p-button-danger',
+            accept: () =>
+                this.api.deleteSubject(subject.id, subject.schoolId).subscribe({
+                    next: () => {
+                        this.messages.add({ severity: 'info', summary: 'Subject deleted', detail: `${subject.name} removed.` });
+                        this.loadData();
+                    },
+                    error: (error) => {
+                        this.messages.add({ severity: 'error', summary: 'Delete failed', detail: this.readErrorMessage(error, 'The subject could not be deleted.') });
+                    }
+                })
+        });
+    }
+
+    exportAssignmentsPdf(): void {
+        const assignments = [...this.visibleAssignments].sort((left, right) => {
+            const teacherCompare = left.teacherName.localeCompare(right.teacherName);
+            if (teacherCompare !== 0) {
+                return teacherCompare;
+            }
+
+            const classCompare = left.class.localeCompare(right.class);
+            if (classCompare !== 0) {
+                return classCompare;
+            }
+
+            return left.subjectName.localeCompare(right.subjectName);
+        });
+
+        const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+        const margin = 40;
+        const schoolLabel = this.selectedSchoolId ? this.schoolNameFor(this.selectedSchoolId) : 'All schools';
+        const fileName = `assigned-teachers-${this.slugify(schoolLabel)}.pdf`;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        doc.text('Assigned teachers', margin, 42);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`School: ${schoolLabel}`, margin, 60);
+        doc.text(`Generated: ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date())}`, margin, 74);
+        doc.text(`Assignments: ${assignments.length}`, margin, 88);
+
+        if (assignments.length === 0) {
+            doc.text('No assignments are available for export.', margin, 112);
+            doc.save(fileName);
+            return;
+        }
+
+        autoTable(doc, {
+            startY: 104,
+            head: [['Teacher', 'Subject', 'Class', 'Level']],
+            body: assignments.map((assignment) => [
+                assignment.teacherName,
+                assignment.subjectName,
+                assignment.class,
+                this.levelLabelFor(assignment.gradeLevel)
+            ]),
+            theme: 'striped',
+            styles: {
+                fontSize: 8.5,
+                cellPadding: 4
+            },
+            headStyles: {
+                fillColor: [37, 99, 235]
+            },
+            margin: {
+                left: margin,
+                right: margin
+            }
+        });
+
+        doc.save(fileName);
     }
 
     onTeacherChange(teacherId: number | null): void {
@@ -357,22 +509,24 @@ export class AdminAssignments implements OnInit {
         }
 
         this.draft.subjectIds = this.draft.subjectIds.filter((subjectId) => allowedSubjectIds.has(subjectId));
-        if (this.draft.subjectIds.length === 0) {
-            const firstSubjectId = this.subjectOptions[0]?.value ?? null;
-            this.draft.subjectIds = firstSubjectId ? [firstSubjectId] : [];
-        }
+    }
+
+    clearPendingCoverage(): void {
+        this.pendingCoverage = [];
+        this.coveragePrefillApplied = false;
+    }
+
+    coverageLabelFor(entry: MissingCoverageEntry): string {
+        return `${entry.className} / ${entry.subjectName}`;
     }
 
     canSave(): boolean {
-        return !!this.draft.teacherId && this.draft.subjectIds.length > 0 && this.draft.classes.length > 0 && !!this.selectedClassLevel;
+        return !!this.draft.teacherId && this.draft.subjectIds.length > 0 && this.draft.classes.length > 0;
     }
 
     saveAssignment(): void {
         if (!this.canSave() || !this.draft.teacherId) {
-            const detail = this.draft.classes.length > 0 && !this.selectedClassLevel
-                ? 'Choose classes from the same level before saving the assignment.'
-                : 'Choose a teacher, at least one subject, and at least one class before saving the assignment.';
-            this.messages.add({ severity: 'warn', summary: 'Missing details', detail });
+            this.messages.add({ severity: 'warn', summary: 'Missing details', detail: 'Choose a teacher, at least one subject, and at least one class before saving the assignment.' });
             return;
         }
 
@@ -437,22 +591,51 @@ export class AdminAssignments implements OnInit {
             return new Set<number>();
         }
 
-        const levels = Array.from(new Set(selectedClasses.map((entry) => normalizeSchoolLevel(entry.gradeLevel))));
-        if (levels.length > 1) {
-            return new Set<number>();
-        }
-
-        const allowed = new Set(selectedClasses[0]?.subjectIds ?? []);
-        for (const schoolClass of selectedClasses.slice(1)) {
-            const classSubjects = new Set(schoolClass.subjectIds);
-            for (const subjectId of Array.from(allowed)) {
-                if (!classSubjects.has(subjectId)) {
-                    allowed.delete(subjectId);
-                }
+        const allowed = new Set<number>();
+        for (const schoolClass of selectedClasses) {
+            for (const subjectId of schoolClass.subjectIds) {
+                allowed.add(subjectId);
             }
         }
 
         return allowed;
+    }
+
+    private applyPendingCoveragePrefill(): void {
+        if (this.coveragePrefillApplied || this.pendingCoverage.length === 0) {
+            return;
+        }
+
+        const selectedClasses: string[] = [...new Set(this.pendingCoverage.map((entry: MissingCoverageEntry) => entry.className))].filter((className) =>
+            this.classOptions.some((option) => option.value === className)
+        );
+
+        if (selectedClasses.length === 0) {
+            return;
+        }
+
+        const allowedSubjectIds = this.allowedSubjectIdsForClasses(selectedClasses);
+        if (allowedSubjectIds.size === 0) {
+            return;
+        }
+
+        const subjectIds: number[] = [...new Set(this.pendingCoverage.flatMap((entry: MissingCoverageEntry) => {
+            const subject = this.visibleSubjects.find((item) => item.name.trim().toLowerCase() === entry.subjectName.trim().toLowerCase());
+            return subject ? [subject.id] : [];
+        }))].filter((subjectId) => allowedSubjectIds.has(subjectId));
+
+        if (subjectIds.length === 0) {
+            return;
+        }
+
+        this.draft.classes = selectedClasses;
+        this.draft.subjectIds = subjectIds;
+        this.coveragePrefillApplied = true;
+        this.messages.add({
+            severity: 'info',
+            summary: 'Coverage prefilled',
+            detail: 'The missing timetable coverage has been loaded into the assignment form.'
+        });
     }
 
     private applySchoolScopeFromQuery(): void {
@@ -461,10 +644,68 @@ export class AdminAssignments implements OnInit {
         if (Number.isFinite(schoolId)) {
             this.selectedSchoolId = schoolId;
         }
+
+        this.pendingCoverage = this.parseCoverageQuery(this.route.snapshot.queryParamMap.get('coverage'));
+        this.coveragePrefillApplied = false;
+    }
+
+    private parseCoverageQuery(coverageText: string | null): MissingCoverageEntry[] {
+        if (!coverageText) {
+            return [];
+        }
+
+        return coverageText
+            .split(';')
+            .map((entry) => entry.trim())
+            .filter(Boolean)
+            .map((entry) => {
+                const [classPart, subjectPart] = entry.split('|');
+                if (!classPart || !subjectPart) {
+                    return null;
+                }
+
+                try {
+                    return <MissingCoverageEntry>{
+                        className: decodeURIComponent(classPart),
+                        subjectName: decodeURIComponent(subjectPart)
+                    };
+                } catch {
+                    return null;
+                }
+            })
+            .filter((entry): entry is MissingCoverageEntry => entry !== null);
+    }
+
+    private parseMissingCoverageFromMessage(errorMessage: string): MissingCoverageEntry[] {
+        const match = errorMessage.match(/Missing:\s*(.+?)(?:\.|$)/i);
+        if (!match) {
+            return [];
+        }
+
+        return match[1]
+            .split(',')
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .map((part) => {
+                const pieces = part.split('/').map((segment) => segment.trim());
+                if (pieces.length < 2 || !pieces[0] || !pieces[1]) {
+                    return null;
+                }
+
+                return <MissingCoverageEntry>{ className: pieces[0], subjectName: pieces[1] };
+            })
+            .filter((entry): entry is MissingCoverageEntry => entry !== null);
     }
 
     private readErrorMessage(error: unknown, fallback: string): string {
         const problem = error as { error?: { detail?: string; title?: string; message?: string }; message?: string };
         return problem?.error?.detail ?? problem?.error?.title ?? problem?.error?.message ?? problem?.message ?? fallback;
+    }
+
+    private slugify(value: string): string {
+        return value
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'school';
     }
 }

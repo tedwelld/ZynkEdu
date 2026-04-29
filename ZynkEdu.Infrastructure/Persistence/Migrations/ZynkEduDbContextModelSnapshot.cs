@@ -502,6 +502,11 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.Property<int?>("SourceSubjectId")
                         .HasColumnType("int");
 
+                    b.Property<int>("WeeklyLoad")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.HasKey("Id");
 
                     b.HasIndex("GradeLevel", "Code")
@@ -897,6 +902,11 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.Property<int>("SchoolId")
                         .HasColumnType("int");
 
+                    b.Property<int>("WeeklyLoad")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
                     b.HasKey("Id");
 
                     b.HasIndex("SchoolId", "GradeLevel", "Code")
@@ -967,6 +977,82 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.HasIndex("SchoolId");
 
                     b.ToTable("TeacherUsers");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.TimetableDispatchLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DispatchedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("PublishedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TeacherId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Term")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolId", "TeacherId", "Term")
+                        .IsUnique();
+
+                    b.ToTable("TimetableDispatchLogs");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.TimetablePublication", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DispatchedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("PublishedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Term")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolId", "Term")
+                        .IsUnique();
+
+                    b.ToTable("TimetablePublications");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.TimetableSlot", b =>

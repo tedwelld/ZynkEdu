@@ -138,7 +138,7 @@ public sealed class TeacherAssignmentServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_RejectsSubjectLevelMismatch()
+    public async Task CreateAsync_AllowsCrossLevelSubjectAssignment()
     {
         var currentUser = new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 4, UserId = 44, UserName = "school.admin" };
         var databasePath = TestDatabase.CreateDatabasePath();
@@ -188,13 +188,14 @@ public sealed class TeacherAssignmentServiceTests
         await context.SaveChangesAsync();
 
         var service = new TeacherAssignmentService(context, currentUser);
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateAsync(new CreateTeacherAssignmentRequest(teacher.Id, subject.Id, "Form 1A")));
+        var assignment = await service.CreateAsync(new CreateTeacherAssignmentRequest(teacher.Id, subject.Id, "Form 1A"));
 
-        Assert.Contains("does not match the selected class level", ex.Message);
+        Assert.Equal(subject.Id, assignment.SubjectId);
+        Assert.Equal("Form 1A", assignment.Class);
     }
 
     [Fact]
-    public async Task UpdateAsync_RejectsSubjectLevelMismatch()
+    public async Task UpdateAsync_AllowsCrossLevelSubjectAssignment()
     {
         var currentUser = new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 5, UserId = 55, UserName = "school.admin" };
         var databasePath = TestDatabase.CreateDatabasePath();
@@ -270,13 +271,14 @@ public sealed class TeacherAssignmentServiceTests
         await context.SaveChangesAsync();
 
         var service = new TeacherAssignmentService(context, currentUser);
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.UpdateAsync(assignment.Id, new UpdateTeacherAssignmentRequest(teacher.Id, mismatchedSubject.Id, "Form 1A")));
+        var updated = await service.UpdateAsync(assignment.Id, new UpdateTeacherAssignmentRequest(teacher.Id, mismatchedSubject.Id, "Form 1A"));
 
-        Assert.Contains("does not match the selected class level", ex.Message);
+        Assert.Equal(mismatchedSubject.Id, updated.SubjectId);
+        Assert.Equal("Form 1A", updated.Class);
     }
 
     [Fact]
-    public async Task CreateBatchAsync_RejectsSubjectLevelMismatch()
+    public async Task CreateBatchAsync_AllowsCrossLevelSubjectAssignments()
     {
         var currentUser = new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 6, UserId = 66, UserName = "school.admin" };
         var databasePath = TestDatabase.CreateDatabasePath();
@@ -344,12 +346,13 @@ public sealed class TeacherAssignmentServiceTests
         var service = new TeacherAssignmentService(context, currentUser);
         var request = new CreateTeacherAssignmentsBatchRequest(teacher.Id, new[] { subject.Id }, new[] { "Form 1A", "Form 1B" });
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateBatchAsync(request));
-        Assert.Contains("does not match the selected class level", ex.Message);
+        var result = await service.CreateBatchAsync(request);
+        Assert.Equal(2, result.CreatedCount);
+        Assert.Equal(2, result.Assignments.Count);
     }
 
     [Fact]
-    public async Task CreateBatchAsync_RejectsMixedLevelClasses()
+    public async Task CreateBatchAsync_AllowsMixedLevelClasses()
     {
         var currentUser = new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 7, UserId = 77, UserName = "school.admin" };
         var databasePath = TestDatabase.CreateDatabasePath();
@@ -417,8 +420,9 @@ public sealed class TeacherAssignmentServiceTests
         var service = new TeacherAssignmentService(context, currentUser);
         var request = new CreateTeacherAssignmentsBatchRequest(teacher.Id, new[] { subject.Id }, new[] { "Form 1A", "Form 3A Sciences" });
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateBatchAsync(request));
-        Assert.Contains("same level", ex.Message);
+        var result = await service.CreateBatchAsync(request);
+        Assert.Equal(2, result.CreatedCount);
+        Assert.Equal(2, result.Assignments.Count);
     }
 
     [Fact]

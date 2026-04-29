@@ -7,7 +7,7 @@ import { ChartModule } from 'primeng/chart';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
 import { forkJoin, of } from 'rxjs';
-import { AcademicTermResponse, AttendanceDailySummaryResponse, ResultResponse, SchoolCalendarEventResponse, TeacherAssignmentResponse, TimetableResponse } from '../../core/api/api.models';
+import { AcademicTermResponse, AttendanceDailySummaryResponse, ResultResponse, SchoolCalendarEventResponse, TeacherAssignmentResponse } from '../../core/api/api.models';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
@@ -68,43 +68,29 @@ interface TeacherFeedItem {
                 ></app-metric-card>
             </section>
 
-            <section class="grid gap-6 xl:grid-cols-[1.05fr_0.95fr] items-stretch">
-                <article class="workspace-card h-full flex flex-col">
-                    <div class="flex items-center justify-between gap-4 mb-4">
+            <section class="grid gap-6">
+                <article class="workspace-card flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="flex h-16 w-16 items-center justify-center rounded-3xl bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-200">
+                            <i class="pi pi-bell text-2xl"></i>
+                        </div>
                         <div>
-                            <h2 class="text-xl font-display font-bold mb-1">Today&apos;s schedule</h2>
-                            <p class="text-sm text-muted-color">Your lessons for {{ todayLabel }} and the next teaching slots ahead.</p>
+                            <h2 class="text-xl font-display font-bold mb-1">Announcements and alerts</h2>
+                            <p class="text-sm text-muted-color">Open your school notices, deadlines, and timetable alerts in one place.</p>
                         </div>
-                        <span class="text-sm text-muted-color">{{ todaySchedule.length }} slot(s)</span>
                     </div>
 
-                    <div *ngIf="loading" class="space-y-3">
-                        <p-skeleton *ngFor="let _ of skeletonRows" height="4rem" borderRadius="1rem"></p-skeleton>
-                    </div>
-
-                    <div *ngIf="!loading && todaySchedule.length === 0" class="rounded-3xl border border-dashed border-surface-300 dark:border-surface-700 p-6 text-sm text-muted-color">
-                        No timetable slots matched today. Open the classes page to review your assigned load.
-                    </div>
-
-                    <div *ngIf="!loading && todaySchedule.length > 0" class="space-y-3">
-                        <div *ngFor="let slot of todaySchedule" class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4 transition-transform duration-200 hover:-translate-y-0.5">
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
-                                    <div class="text-xs uppercase tracking-[0.2em] text-muted-color">{{ slot.dayOfWeek }}</div>
-                                    <div class="text-lg font-display font-bold mt-1">{{ slot.class }}</div>
-                                    <div class="text-sm text-muted-color">{{ slot.subjectName }}</div>
-                                </div>
-                                <p-tag [value]="slot.startTime + ' - ' + slot.endTime" severity="info"></p-tag>
-                            </div>
-                        </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <span class="rounded-full border border-surface-200 dark:border-surface-700 px-4 py-2 text-sm text-muted-color">{{ announcements.length }} item(s)</span>
+                        <button pButton type="button" label="Open alerts" icon="pi pi-arrow-right" routerLink="/teacher/notifications"></button>
                     </div>
                 </article>
 
-                <article class="workspace-card h-full flex flex-col">
+                <article class="workspace-card">
                     <div class="flex items-center justify-between gap-4 mb-4">
                         <div>
-                            <h2 class="text-xl font-display font-bold mb-1">Announcements and alerts</h2>
-                            <p class="text-sm text-muted-color">Events and deadlines published by the school.</p>
+                            <h2 class="text-xl font-display font-bold mb-1">Latest notices</h2>
+                            <p class="text-sm text-muted-color">Recent announcements published by the school.</p>
                         </div>
                         <span class="text-sm text-muted-color">{{ announcements.length }} item(s)</span>
                     </div>
@@ -227,10 +213,7 @@ export class TeacherDashboard implements OnInit {
     activityFeed: TeacherFeedItem[] = [];
     announcements: SchoolCalendarEventResponse[] = [];
     attendanceSummaries: AttendanceDailySummaryResponse[] = [];
-    timetable: TimetableResponse[] = [];
     skeletonRows = Array.from({ length: 4 });
-    selectedTerm = 'Term 1';
-    todayLabel = new Date().toLocaleDateString(undefined, { weekday: 'long' });
     chartData!: ChartData<'line'>;
     chartOptions!: ChartOptions<'line'>;
 
@@ -246,21 +229,14 @@ export class TeacherDashboard implements OnInit {
 
                 this.api.getAcademicTerms(schoolId).subscribe({
                     next: (terms) => {
-                        const selectedTerm = terms[0]?.name ?? 'Term 1';
-                        this.selectedTerm = selectedTerm;
-
-                        const resultRequest = classNames.length > 0
-                            ? forkJoin(classNames.map((className) => this.api.getResultsByClass(className)))
-                            : of([] as ResultResponse[][]);
-
                         forkJoin({
-                            resultsByClass: resultRequest,
-                            timetable: this.api.getTeacherTimetable(selectedTerm),
+                            resultsByClass: classNames.length > 0
+                                ? forkJoin(classNames.map((className) => this.api.getResultsByClass(className)))
+                                : of([] as ResultResponse[][]),
                             attendanceSummaries: this.api.getAttendanceDailySummaries(this.serializeDate(new Date()), schoolId),
                             announcements: this.api.getCalendarEvents(terms[0]?.id ?? null)
                         }).subscribe({
-                            next: ({ resultsByClass, timetable, attendanceSummaries, announcements }) => {
-                                this.timetable = timetable;
+                            next: ({ resultsByClass, attendanceSummaries, announcements }) => {
                                 this.attendanceSummaries = attendanceSummaries;
                                 this.announcements = announcements;
                                 this.classInsights = classNames.map((className, index) => this.buildInsight(className, resultsByClass[index] ?? []));
@@ -327,11 +303,6 @@ export class TeacherDashboard implements OnInit {
                 direction: this.pendingResultsCount === '0' ? 'flat' : 'down'
             }
         ];
-    }
-
-    get todaySchedule(): TimetableResponse[] {
-        const today = this.todayLabel.toLowerCase();
-        return this.timetable.filter((slot) => slot.dayOfWeek.toLowerCase() === today);
     }
 
     get classCount(): string {

@@ -26,6 +26,7 @@ public sealed class SubjectService : ISubjectService
     {
         var resolvedSchoolId = ResolveSchoolId(schoolId);
         var gradeLevel = NormalizeGradeLevel(request.GradeLevel);
+        var weeklyLoad = NormalizeWeeklyLoad(request.WeeklyLoad);
         var code = string.IsNullOrWhiteSpace(request.Code)
             ? await _subjectCodeGenerator.GenerateAsync(request.Name, resolvedSchoolId, gradeLevel, null, cancellationToken)
             : NormalizeCode(request.Code);
@@ -34,13 +35,14 @@ public sealed class SubjectService : ISubjectService
             SchoolId = resolvedSchoolId,
             Code = code,
             Name = request.Name.Trim(),
-            GradeLevel = gradeLevel
+            GradeLevel = gradeLevel,
+            WeeklyLoad = weeklyLoad
         };
 
         _dbContext.Subjects.Add(subject);
         await _dbContext.SaveChangesAsync(cancellationToken);
         await _auditLogService.LogAsync(resolvedSchoolId, "Created", "Subject", subject.Id.ToString(), $"Created subject {subject.Name} ({subject.Code}).", cancellationToken);
-        return new SubjectResponse(subject.Id, subject.SchoolId, subject.Code ?? string.Empty, subject.Name, subject.GradeLevel);
+        return new SubjectResponse(subject.Id, subject.SchoolId, subject.Code ?? string.Empty, subject.Name, subject.GradeLevel, subject.WeeklyLoad);
     }
 
     public async Task<IReadOnlyList<SubjectResponse>> GetAllAsync(int? schoolId = null, CancellationToken cancellationToken = default)
@@ -55,7 +57,7 @@ public sealed class SubjectService : ISubjectService
 
         return await query
             .OrderBy(x => x.Name)
-            .Select(x => new SubjectResponse(x.Id, x.SchoolId, x.Code ?? string.Empty, x.Name, x.GradeLevel))
+            .Select(x => new SubjectResponse(x.Id, x.SchoolId, x.Code ?? string.Empty, x.Name, x.GradeLevel, x.WeeklyLoad))
             .ToListAsync(cancellationToken);
     }
 
@@ -70,10 +72,11 @@ public sealed class SubjectService : ISubjectService
             ? await _subjectCodeGenerator.GenerateAsync(subject.Name, subject.SchoolId, NormalizeGradeLevel(request.GradeLevel), subject.Id, cancellationToken)
             : NormalizeCode(request.Code);
         subject.GradeLevel = NormalizeGradeLevel(request.GradeLevel);
+        subject.WeeklyLoad = NormalizeWeeklyLoad(request.WeeklyLoad);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await _auditLogService.LogAsync(subject.SchoolId, "Updated", "Subject", subject.Id.ToString(), $"Updated subject {subject.Name} ({subject.Code}).", cancellationToken);
-        return new SubjectResponse(subject.Id, subject.SchoolId, subject.Code ?? string.Empty, subject.Name, subject.GradeLevel);
+        return new SubjectResponse(subject.Id, subject.SchoolId, subject.Code ?? string.Empty, subject.Name, subject.GradeLevel, subject.WeeklyLoad);
     }
 
     public async Task DeleteAsync(int id, int? schoolId = null, CancellationToken cancellationToken = default)
@@ -113,5 +116,15 @@ public sealed class SubjectService : ISubjectService
     private static string NormalizeGradeLevel(string? gradeLevel)
     {
         return SchoolLevelCatalog.NormalizeLevel(gradeLevel);
+    }
+
+    private static int NormalizeWeeklyLoad(int weeklyLoad)
+    {
+        if (weeklyLoad < 1 || weeklyLoad > 9)
+        {
+            throw new InvalidOperationException("The subject weekly load must be between 1 and 9.");
+        }
+
+        return weeklyLoad;
     }
 }

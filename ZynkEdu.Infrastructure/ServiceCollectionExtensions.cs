@@ -51,6 +51,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<ITimetableService, TimetableService>();
+        services.AddScoped<ITimetableDispatchService, TimetableDispatchService>();
         services.AddScoped<IAcademicCalendarService, AcademicCalendarService>();
         services.AddScoped<IAttendanceDispatchService, AttendanceDispatchService>();
         services.AddScoped<IReportEmailTemplateService, ReportEmailTemplateService>();
@@ -58,6 +59,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISmsSender, LoggingSmsSender>();
         services.AddHostedService<NotificationDispatchHostedService>();
         services.AddHostedService<AttendanceDispatchHostedService>();
+        services.AddHostedService<TimetableDispatchHostedService>();
         services.AddScoped<IPasswordHasher<Domain.Entities.AppUser>, PasswordHasher<Domain.Entities.AppUser>>();
 
         return services;

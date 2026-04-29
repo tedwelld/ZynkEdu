@@ -37,7 +37,6 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
         }
 
         EnsureClassHasSubjects(schoolClass);
-        EnsureSubjectMatchesClassLevel(subject.GradeLevel, schoolClass.GradeLevel);
         EnsureSubjectIsAssignedToClass(subject.Id, schoolClass);
         await EnsureAssignmentOwnershipAsync(resolvedSchoolId, subject.Id, trimmedClass, request.TeacherId, null, cancellationToken);
 
@@ -76,7 +75,6 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
         }
 
         var schoolClasses = await GetRequiredSchoolClassesAsync(resolvedSchoolId, classes, cancellationToken);
-        var classLevel = ResolveBatchClassLevel(schoolClasses);
 
         var teacher = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == request.TeacherId && x.SchoolId == resolvedSchoolId, cancellationToken);
         if (teacher is null || teacher.Role != UserRole.Teacher)
@@ -99,15 +97,6 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
             throw new InvalidOperationException("One or more subjects were not found in this school.");
         }
 
-        foreach (var subject in subjects)
-        {
-            EnsureSubjectMatchesClassLevel(subject.GradeLevel, classLevel);
-            foreach (var schoolClass in schoolClasses)
-            {
-                EnsureSubjectIsAssignedToClass(subject.Id, schoolClass);
-            }
-        }
-
         var existingKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var existingAssignments = await _dbContext.TeacherAssignments.AsNoTracking()
             .Where(x => x.SchoolId == resolvedSchoolId && subjectIds.Contains(x.SubjectId) && classes.Contains(x.Class))
@@ -128,6 +117,12 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
         {
             foreach (var className in classes.OrderBy(className => className))
             {
+                var schoolClass = schoolClasses.First(classItem => string.Equals(classItem.Name, className, StringComparison.OrdinalIgnoreCase));
+                if (schoolClass.Subjects.All(link => link.SubjectId != subject.Id))
+                {
+                    continue;
+                }
+
                 var key = BuildAssignmentKey(subject.Id, className);
                 if (existingKeys.Contains(key))
                 {
@@ -235,7 +230,6 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
         }
 
         EnsureClassHasSubjects(schoolClass);
-        EnsureSubjectMatchesClassLevel(subject.GradeLevel, schoolClass.GradeLevel);
         EnsureSubjectIsAssignedToClass(subject.Id, schoolClass);
         await EnsureAssignmentOwnershipAsync(resolvedSchoolId, subject.Id, trimmedClass, request.TeacherId, id, cancellationToken);
 
@@ -319,55 +313,6 @@ public sealed class TeacherAssignmentService : ITeacherAssignmentService
         }
 
         return schoolClasses;
-    }
-
-    private static string ResolveBatchClassLevel(IEnumerable<SchoolClass> classes)
-    {
-        var resolvedLevels = classes
-            .Select(classItem => SchoolLevelCatalog.NormalizeLevel(classItem.GradeLevel))
-            .ToArray();
-
-        var distinctLevels = resolvedLevels
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        if (distinctLevels.Length == 0)
-        {
-            throw new InvalidOperationException("The selected classes do not belong to a supported level.");
-        }
-
-        if (distinctLevels.Length > 1)
-        {
-            throw new InvalidOperationException("Choose classes from the same level before saving assignments.");
-        }
-
-        return distinctLevels[0];
-    }
-
-    private static void EnsureSubjectMatchesClassLevel(string subjectLevel, string classLevel)
-    {
-        var normalizedSubjectLevel = SchoolLevelCatalog.NormalizeLevel(subjectLevel);
-        var normalizedClassLevel = SchoolLevelCatalog.NormalizeLevel(classLevel);
-
-        if (normalizedSubjectLevel == SchoolLevelCatalog.General)
-        {
-            return;
-        }
-
-        if (normalizedClassLevel == SchoolLevelCatalog.General)
-        {
-            if (normalizedSubjectLevel != SchoolLevelCatalog.General)
-            {
-                throw new InvalidOperationException($"The selected subject is for {normalizedSubjectLevel}, which does not match the selected class level.");
-            }
-
-            return;
-        }
-
-        if (!string.Equals(normalizedSubjectLevel, normalizedClassLevel, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException($"The selected subject is for {normalizedSubjectLevel}, which does not match the selected class level.");
-        }
     }
 
     private static void EnsureClassHasSubjects(SchoolClass schoolClass)

@@ -7,6 +7,7 @@ public sealed record PlatformSubjectCatalogResponse(
     string Code,
     string Name,
     string GradeLevel,
+    int WeeklyLoad,
     int? SourceSchoolId,
     string? SourceSchoolName);
 

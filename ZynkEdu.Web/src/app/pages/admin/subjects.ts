@@ -106,6 +106,16 @@ type ImportTargetMode = 'catalog' | 'school';
                         (click)="publishAllCatalogSubjectsToSelectedSchool()"
                     ></button>
 
+                    <button
+                        *ngIf="isPlatformAdmin && viewMode === 'catalog'"
+                        pButton
+                        type="button"
+                        label="Add all to all schools"
+                        icon="pi pi-sitemap"
+                        severity="secondary"
+                        (click)="publishAllCatalogSubjectsToAllSchools()"
+                    ></button>
+
                     <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
                 </div>
             </div>
@@ -148,6 +158,7 @@ type ImportTargetMode = 'catalog' | 'school';
                                 <th>Code</th>
                                 <th>Subject</th>
                                 <th>Grade level</th>
+                                <th>Weekly load</th>
                                 <th>Average</th>
                                 <th>Band</th>
                                 <th class="text-right">Actions</th>
@@ -158,6 +169,7 @@ type ImportTargetMode = 'catalog' | 'school';
                                 <td class="font-semibold">{{ subject.code }}</td>
                                 <td class="font-semibold">{{ subject.name }}</td>
                                 <td><p-tag [value]="levelLabelFor(subject.gradeLevel)" [severity]="severityForLevel(subject.gradeLevel)"></p-tag></td>
+                                <td>{{ subject.weeklyLoad }}</td>
                                 <td>{{ averageFor(subject.name) }}%</td>
                                 <td>
                                     <p-tag [value]="bandFor(subject.name)" [severity]="severityFor(subject.name)"></p-tag>
@@ -178,6 +190,7 @@ type ImportTargetMode = 'catalog' | 'school';
                                 <th>Code</th>
                                 <th>Subject</th>
                                 <th>Grade level</th>
+                                <th>Weekly load</th>
                                 <th>Source school</th>
                                 <th class="text-right">Actions</th>
                             </tr>
@@ -187,6 +200,7 @@ type ImportTargetMode = 'catalog' | 'school';
                                 <td class="font-semibold">{{ subject.code }}</td>
                                 <td class="font-semibold">{{ subject.name }}</td>
                                 <td><p-tag [value]="levelLabelFor(subject.gradeLevel)" [severity]="severityForLevel(subject.gradeLevel)"></p-tag></td>
+                                <td>{{ subject.weeklyLoad }}</td>
                                 <td class="text-sm text-muted-color">
                                     {{ subject.sourceSchoolName ?? (subject.sourceSchoolId ? schoolNameFor(subject.sourceSchoolId) : 'Manual catalog entry') }}
                                 </td>
@@ -217,6 +231,10 @@ type ImportTargetMode = 'catalog' | 'school';
                         <label class="block text-sm font-semibold mb-2">Grade level</label>
                         <app-dropdown [options]="levelOptionsForEdit" [(ngModel)]="draft.gradeLevel" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search levels"></app-dropdown>
                     </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Weekly load</label>
+                        <input pInputText type="number" min="1" max="9" [(ngModel)]="draft.weeklyLoad" class="w-full" />
+                    </div>
                     <div class="flex justify-end gap-3 pt-3">
                         <button pButton type="button" label="Cancel" severity="secondary" (click)="drawerVisible = false"></button>
                         <button pButton type="button" [label]="drawerMode === 'create' ? 'Save subject' : 'Update subject'" icon="pi pi-check" (click)="saveSchoolSubject()"></button>
@@ -240,6 +258,10 @@ type ImportTargetMode = 'catalog' | 'school';
                     <div>
                         <label class="block text-sm font-semibold mb-2">Grade level</label>
                         <app-dropdown [options]="levelOptionsForEdit" [(ngModel)]="catalogDraft.gradeLevel" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search levels"></app-dropdown>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold mb-2">Weekly load</label>
+                        <input pInputText type="number" min="1" max="9" [(ngModel)]="catalogDraft.weeklyLoad" class="w-full" />
                     </div>
                     <div class="flex justify-end gap-3 pt-3">
                         <button pButton type="button" label="Cancel" severity="secondary" (click)="catalogDrawerVisible = false"></button>
@@ -357,14 +379,16 @@ export class AdminSubjects implements OnInit {
     skeletonRows = Array.from({ length: 4 });
     selectedSchoolId: number | null = null;
     pendingFocusSubjectId: number | null = null;
-    draft: { id?: number; schoolId: number | null; code: string; name: string; gradeLevel: string } = { schoolId: null, code: '', name: '', gradeLevel: 'General' };
+    pendingCreateSubject = false;
+    draft: { id?: number; schoolId: number | null; code: string; name: string; gradeLevel: string; weeklyLoad: number } = { schoolId: null, code: '', name: '', gradeLevel: 'General', weeklyLoad: 1 };
 
     catalogDrawerVisible = false;
     catalogDrawerMode: CatalogDialogMode = 'create';
-    catalogDraft: { id?: number; code: string; name: string; gradeLevel: string; sourceSchoolId?: number | null } = {
+    catalogDraft: { id?: number; code: string; name: string; gradeLevel: string; weeklyLoad: number; sourceSchoolId?: number | null } = {
         code: '',
         name: '',
         gradeLevel: 'General',
+        weeklyLoad: 1,
         sourceSchoolId: null
     };
 
@@ -405,6 +429,9 @@ export class AdminSubjects implements OnInit {
         if (Number.isFinite(focusId)) {
             this.pendingFocusSubjectId = focusId;
         }
+
+        const createFlag = this.route.snapshot.queryParamMap.get('create');
+        this.pendingCreateSubject = createFlag === '1' || createFlag?.toLowerCase() === 'true';
     }
 
     loadData(): void {
@@ -441,7 +468,9 @@ export class AdminSubjects implements OnInit {
                     this.catalogSubjects = catalogSubjects;
                     this.schools = schools;
                     this.selectedSchoolId = this.selectedSchoolId ?? this.schools[0]?.id ?? null;
-                    this.importTargetSchoolId = this.importTargetSchoolId ?? this.selectedSchoolId;
+                    if (!this.importDialogVisible) {
+                        this.importTargetSchoolId = this.importTargetSchoolId ?? this.selectedSchoolId;
+                    }
                     this.loading = false;
                 },
                 error: () => {
@@ -461,7 +490,10 @@ export class AdminSubjects implements OnInit {
                 this.dashboard = dashboard;
                 this.schools = schools;
                 this.selectedSchoolId = this.selectedSchoolId ?? this.schools[0]?.id ?? null;
-                this.importTargetSchoolId = this.importTargetSchoolId ?? this.selectedSchoolId;
+                if (!this.importDialogVisible) {
+                    this.importTargetSchoolId = this.importTargetSchoolId ?? this.selectedSchoolId;
+                }
+                this.openPendingCreateSubject();
                 this.openPendingSubjectFocus();
                 this.loading = false;
             },
@@ -490,6 +522,15 @@ export class AdminSubjects implements OnInit {
         if (subject) {
             this.openEditSchoolSubject(subject);
         }
+    }
+
+    private openPendingCreateSubject(): void {
+        if (!this.pendingCreateSubject) {
+            return;
+        }
+
+        this.pendingCreateSubject = false;
+        this.openCreateSchoolSubject();
     }
 
     get filteredSubjects(): SubjectResponse[] {
@@ -629,10 +670,6 @@ export class AdminSubjects implements OnInit {
         this.importTargetSchoolId = this.importTargetSchoolId ?? schoolId;
 
         if (this.viewMode === 'school') {
-            if (this.drawerVisible && this.drawerMode === 'create') {
-                this.draft.schoolId = schoolId;
-            }
-
             this.loadData();
             return;
         }
@@ -654,17 +691,18 @@ export class AdminSubjects implements OnInit {
     openCreateSchoolSubject(): void {
         this.drawerMode = 'create';
         this.draft = {
-            schoolId: this.selectedSchoolId ?? this.schools[0]?.id ?? null,
+            schoolId: this.isPlatformAdmin ? null : this.auth.schoolId(),
             code: '',
             name: '',
-            gradeLevel: this.selectedLevelFilter === 'General' ? 'ZGC Level' : this.selectedLevelFilter
+            gradeLevel: '' as SchoolLevel,
+            weeklyLoad: 1
         };
         this.drawerVisible = true;
     }
 
     openEditSchoolSubject(subject: SubjectResponse): void {
         this.drawerMode = 'edit';
-        this.draft = { id: subject.id, schoolId: subject.schoolId, code: subject.code, name: subject.name, gradeLevel: normalizeSchoolLevel(subject.gradeLevel) };
+        this.draft = { id: subject.id, schoolId: subject.schoolId, code: subject.code, name: subject.name, gradeLevel: normalizeSchoolLevel(subject.gradeLevel), weeklyLoad: subject.weeklyLoad };
         this.drawerVisible = true;
     }
 
@@ -673,7 +711,8 @@ export class AdminSubjects implements OnInit {
         this.catalogDraft = {
             code: '',
             name: '',
-            gradeLevel: this.selectedLevelFilter === 'General' ? 'ZGC Level' : this.selectedLevelFilter,
+            gradeLevel: '' as SchoolLevel,
+            weeklyLoad: 1,
             sourceSchoolId: null
         };
         this.catalogDrawerVisible = true;
@@ -686,6 +725,7 @@ export class AdminSubjects implements OnInit {
             code: subject.code,
             name: subject.name,
             gradeLevel: normalizeSchoolLevel(subject.gradeLevel),
+            weeklyLoad: subject.weeklyLoad,
             sourceSchoolId: subject.sourceSchoolId ?? null
         };
         this.catalogDrawerVisible = true;
@@ -698,7 +738,12 @@ export class AdminSubjects implements OnInit {
                 return;
             }
 
-            this.api.createSubject({ name: this.draft.name, code: this.draft.code || null, gradeLevel: this.draft.gradeLevel || null }, this.draft.schoolId).subscribe({
+            if (!this.draft.gradeLevel) {
+                this.messages.add({ severity: 'warn', summary: 'Missing level', detail: 'Choose a level before saving the subject.' });
+                return;
+            }
+
+            this.api.createSubject({ name: this.draft.name, code: this.draft.code || null, gradeLevel: this.draft.gradeLevel || null, weeklyLoad: this.draft.weeklyLoad || 1 }, this.draft.schoolId).subscribe({
                 next: () => {
                     this.messages.add({ severity: 'success', summary: 'Subject saved', detail: `${this.draft.name} added.` });
                     this.drawerVisible = false;
@@ -715,7 +760,7 @@ export class AdminSubjects implements OnInit {
             return;
         }
 
-        this.api.updateSubject(this.draft.id, { name: this.draft.name, code: this.draft.code || null, gradeLevel: this.draft.gradeLevel || null }, this.draft.schoolId).subscribe({
+        this.api.updateSubject(this.draft.id, { name: this.draft.name, code: this.draft.code || null, gradeLevel: this.draft.gradeLevel || null, weeklyLoad: this.draft.weeklyLoad || 1 }, this.draft.schoolId).subscribe({
             next: () => {
                 this.messages.add({ severity: 'success', summary: 'Subject updated', detail: `${this.draft.name} saved.` });
                 this.drawerVisible = false;
@@ -729,7 +774,12 @@ export class AdminSubjects implements OnInit {
 
     saveCatalogSubject(): void {
         if (this.catalogDrawerMode === 'create') {
-            this.api.createPlatformSubjectCatalog({ name: this.catalogDraft.name, code: this.catalogDraft.code || null, gradeLevel: this.catalogDraft.gradeLevel || null }).subscribe({
+            if (!this.catalogDraft.gradeLevel) {
+                this.messages.add({ severity: 'warn', summary: 'Missing level', detail: 'Choose a level before saving the catalog subject.' });
+                return;
+            }
+
+            this.api.createPlatformSubjectCatalog({ name: this.catalogDraft.name, code: this.catalogDraft.code || null, gradeLevel: this.catalogDraft.gradeLevel || null, weeklyLoad: this.catalogDraft.weeklyLoad || 1 }).subscribe({
                 next: () => {
                     this.messages.add({ severity: 'success', summary: 'Catalog saved', detail: `${this.catalogDraft.name} added to the platform catalog.` });
                     this.catalogDrawerVisible = false;
@@ -746,7 +796,7 @@ export class AdminSubjects implements OnInit {
             return;
         }
 
-        this.api.updatePlatformSubjectCatalog(this.catalogDraft.id, { name: this.catalogDraft.name, code: this.catalogDraft.code || null, gradeLevel: this.catalogDraft.gradeLevel || null }).subscribe({
+        this.api.updatePlatformSubjectCatalog(this.catalogDraft.id, { name: this.catalogDraft.name, code: this.catalogDraft.code || null, gradeLevel: this.catalogDraft.gradeLevel || null, weeklyLoad: this.catalogDraft.weeklyLoad || 1 }).subscribe({
             next: () => {
                 this.messages.add({ severity: 'success', summary: 'Catalog updated', detail: `${this.catalogDraft.name} saved.` });
                 this.catalogDrawerVisible = false;
@@ -799,11 +849,10 @@ export class AdminSubjects implements OnInit {
     openImportDialog(): void {
         this.importDialogVisible = true;
         this.importTargetMode = 'catalog';
-        this.importSourceSchoolId = this.selectedSchoolId ?? this.schools[0]?.id ?? null;
-        this.importTargetSchoolId = this.selectedSchoolId ?? this.schools[0]?.id ?? null;
+        this.importSourceSchoolId = null;
+        this.importTargetSchoolId = null;
         this.importSelectedSubjectIds = [];
         this.importSourceSubjects = [];
-        this.loadImportSourceSubjects();
     }
 
     onImportSourceSchoolChange(schoolId: number | null): void {
@@ -889,6 +938,22 @@ export class AdminSubjects implements OnInit {
             },
             error: (error) => {
                 this.messages.add({ severity: 'error', summary: 'Publish failed', detail: this.readErrorMessage(error, 'The catalog subjects could not be published.') });
+            }
+            });
+    }
+
+    publishAllCatalogSubjectsToAllSchools(): void {
+        this.api.publishAllCatalogSubjectsToAllSchools().subscribe({
+            next: (result) => {
+                this.messages.add({
+                    severity: 'success',
+                    summary: 'Catalog published',
+                    detail: `Published ${result.importedCount} subjects across all schools with ${result.skippedCount} duplicates skipped.`
+                });
+                this.loadData();
+            },
+            error: (error) => {
+                this.messages.add({ severity: 'error', summary: 'Publish failed', detail: this.readErrorMessage(error, 'The catalog subjects could not be published to all schools.') });
             }
         });
     }

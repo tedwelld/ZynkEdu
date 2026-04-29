@@ -49,6 +49,11 @@ public interface IAttendanceDispatchService
     Task DispatchDueRegistersAsync(CancellationToken cancellationToken = default);
 }
 
+public interface ITimetableDispatchService
+{
+    Task DispatchDueTimetablesAsync(CancellationToken cancellationToken = default);
+}
+
 public interface IStudentService
 {
     Task<StudentResponse> CreateAsync(CreateStudentRequest request, int? schoolId = null, CancellationToken cancellationToken = default);

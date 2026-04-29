@@ -113,16 +113,63 @@ public sealed class UserManagementService : IUserManagementService
 
     public async Task DeleteTeacherAsync(int id, CancellationToken cancellationToken = default)
     {
-        var user = await RequireUserAsync(id, UserRole.Teacher, cancellationToken);
-        user.IsActive = false;
-
-        var profile = await _dbContext.TeacherUsers.FirstOrDefaultAsync(x => x.Id == user.Id, cancellationToken);
-        if (profile is not null)
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            profile.IsActive = false;
-        }
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+            var user = await RequireUserAsync(id, UserRole.Teacher, cancellationToken);
+
+            var attendanceRegisters = await _dbContext.AttendanceRegisters
+                .Where(x => x.TeacherId == user.Id)
+                .ToListAsync(cancellationToken);
+            if (attendanceRegisters.Count > 0)
+            {
+                _dbContext.AttendanceRegisters.RemoveRange(attendanceRegisters);
+            }
+
+            var results = await _dbContext.Results
+                .Where(x => x.TeacherId == user.Id)
+                .ToListAsync(cancellationToken);
+            if (results.Count > 0)
+            {
+                _dbContext.Results.RemoveRange(results);
+            }
+
+            var timetableSlots = await _dbContext.TimetableSlots
+                .Where(x => x.TeacherId == user.Id)
+                .ToListAsync(cancellationToken);
+            if (timetableSlots.Count > 0)
+            {
+                _dbContext.TimetableSlots.RemoveRange(timetableSlots);
+            }
+
+            var assignments = await _dbContext.TeacherAssignments
+                .Where(x => x.TeacherId == user.Id)
+                .ToListAsync(cancellationToken);
+            if (assignments.Count > 0)
+            {
+                _dbContext.TeacherAssignments.RemoveRange(assignments);
+            }
+
+            var dispatchLogs = await _dbContext.TimetableDispatchLogs
+                .Where(x => x.TeacherId == user.Id)
+                .ToListAsync(cancellationToken);
+            if (dispatchLogs.Count > 0)
+            {
+                _dbContext.TimetableDispatchLogs.RemoveRange(dispatchLogs);
+            }
+
+            var profile = await _dbContext.TeacherUsers.FirstOrDefaultAsync(x => x.Id == user.Id, cancellationToken);
+            if (profile is not null)
+            {
+                _dbContext.TeacherUsers.Remove(profile);
+            }
+
+            _dbContext.Users.Remove(user);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        });
     }
 
     public async Task<UserResponse> UpdateAdminAsync(int id, UpdateSchoolUserRequest request, CancellationToken cancellationToken = default)
@@ -143,16 +190,22 @@ public sealed class UserManagementService : IUserManagementService
             throw new UnauthorizedAccessException("Only the platform admin can delete school admins.");
         }
 
-        var user = await RequireUserAsync(id, UserRole.Admin, cancellationToken);
-        user.IsActive = false;
-
-        var profile = await _dbContext.StaffAdmins.FirstOrDefaultAsync(x => x.Id == user.Id, cancellationToken);
-        if (profile is not null)
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            profile.IsActive = false;
-        }
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+            var user = await RequireUserAsync(id, UserRole.Admin, cancellationToken);
+            var profile = await _dbContext.StaffAdmins.FirstOrDefaultAsync(x => x.Id == user.Id, cancellationToken);
+            if (profile is not null)
+            {
+                _dbContext.StaffAdmins.Remove(profile);
+            }
+
+            _dbContext.Users.Remove(user);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        });
     }
 
     private async Task<UserResponse> CreateUserAsync(UserRole role, int schoolId, CreateSchoolUserRequest request, CancellationToken cancellationToken)

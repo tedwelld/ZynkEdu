@@ -12,6 +12,7 @@ export const platformRoutes: Routes = [
     { path: 'calendar', loadComponent: () => import('../admin/calendar').then((m) => m.AdminCalendar) },
     { path: 'subjects', loadComponent: () => import('../admin/subjects').then((m) => m.AdminSubjects) },
     { path: 'assignments', loadComponent: () => import('../admin/assignments').then((m) => m.AdminAssignments) },
+    { path: 'timetable', loadComponent: () => import('../admin/timetable').then((m) => m.AdminTimetable) },
     { path: 'results', loadComponent: () => import('../admin/results').then((m) => m.AdminResults) },
     { path: 'notifications', loadComponent: () => import('../admin/notifications').then((m) => m.AdminNotifications) },
     { path: 'reports', loadComponent: () => import('../admin/reports').then((m) => m.AdminReports) }

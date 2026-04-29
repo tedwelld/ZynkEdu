@@ -250,6 +250,7 @@ export interface SubjectResponse {
     code: string;
     name: string;
     gradeLevel: string;
+    weeklyLoad: number;
 }
 
 export interface SchoolClassResponse {
@@ -269,6 +270,7 @@ export interface PlatformSubjectCatalogResponse {
     code: string;
     name: string;
     gradeLevel: string;
+    weeklyLoad: number;
     sourceSchoolId?: number | null;
     sourceSchoolName?: string | null;
 }
@@ -365,12 +367,14 @@ export interface CreateSubjectRequest {
     name: string;
     code?: string | null;
     gradeLevel?: string | null;
+    weeklyLoad?: number;
 }
 
 export interface UpdateSubjectRequest {
     name: string;
     code?: string | null;
     gradeLevel?: string | null;
+    weeklyLoad?: number;
 }
 
 export interface CreateSchoolClassRequest {
@@ -480,6 +484,7 @@ export interface TimetableResponse {
     subjectId: number;
     subjectName: string;
     class: string;
+    gradeLevel: string;
     term: string;
     dayOfWeek: string;
     startTime: string;
@@ -488,6 +493,27 @@ export interface TimetableResponse {
 
 export interface GenerateTimetableRequest {
     term: string;
+}
+
+export interface PublishTimetableRequest {
+    term: string;
+}
+
+export interface UpsertTimetableSlotRequest {
+    teacherId: number;
+    subjectId: number;
+    class: string;
+    term: string;
+    dayOfWeek: string;
+    startTime: string;
+    endTime: string;
+}
+
+export interface TimetablePublicationResponse {
+    schoolId: number;
+    term: string;
+    publishedAt: string;
+    dispatchedAt?: string | null;
 }
 
 export interface AcademicTermResponse {

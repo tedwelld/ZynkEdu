@@ -125,6 +125,23 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         <app-dropdown [options]="levelOptions" [(ngModel)]="draft.gradeLevel" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search levels" (ngModelChange)="onLevelChange($event)"></app-dropdown>
                     </div>
                     <div>
+                        <label class="block text-sm font-semibold mb-2">Subjects</label>
+                        <p-multiSelect
+                            [options]="subjectOptionsForDraft"
+                            [(ngModel)]="draft.subjectIds"
+                            optionLabel="label"
+                            optionValue="value"
+                            display="chip"
+                            class="w-full"
+                            [filter]="true"
+                            filterPlaceholder="Search subjects"
+                            appendTo="body"
+                            [disabled]="subjectOptionsForDraft.length === 0 || !draft.isActive"
+                            placeholder="Select subjects"
+                        ></p-multiSelect>
+                        <p class="mt-2 text-sm text-muted-color">Subjects are limited to the selected level and any general subjects.</p>
+                    </div>
+                    <div>
                         <label class="block text-sm font-semibold mb-2">Class name</label>
                         <app-dropdown [options]="classNameOptions" [(ngModel)]="draft.className" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes"></app-dropdown>
                     </div>
@@ -190,7 +207,7 @@ export class AdminClasses implements OnInit {
     drawerMode: 'create' | 'edit' = 'create';
     subjectsVisible = false;
     activeClass: SchoolClassResponse | null = null;
-    draft: { id?: number; className: string; gradeLevel: SchoolLevel; isActive: boolean } = { className: '', gradeLevel: 'ZGC Level', isActive: true };
+    draft: { id?: number; className: string; gradeLevel: SchoolLevel; isActive: boolean; subjectIds: number[] } = { className: '', gradeLevel: '' as SchoolLevel, isActive: true, subjectIds: [] };
     subjectDraft: { subjectIds: number[] } = { subjectIds: [] };
 
     get isPlatformAdmin(): boolean {
@@ -226,6 +243,18 @@ export class AdminClasses implements OnInit {
 
     get classNameOptions(): { label: string; value: string }[] {
         return getClassesForLevel(this.draft.gradeLevel).map((value) => ({ label: value, value }));
+    }
+
+    get subjectOptionsForDraft(): { label: string; value: number }[] {
+        if (!this.draft.gradeLevel) {
+            return [];
+        }
+
+        const level = normalizeSchoolLevel(this.draft.gradeLevel);
+        return this.subjects
+            .filter((subject) => normalizeSchoolLevel(subject.gradeLevel) === level || normalizeSchoolLevel(subject.gradeLevel) === 'General')
+            .map((subject) => ({ label: `${subject.name} (${normalizeSchoolLevel(subject.gradeLevel)})`, value: subject.id }))
+            .sort((left, right) => left.label.localeCompare(right.label));
     }
 
     get subjectOptionsForActiveClass(): { label: string; value: number }[] {
@@ -307,15 +336,17 @@ export class AdminClasses implements OnInit {
 
     onLevelChange(level: SchoolLevel): void {
         this.draft.gradeLevel = normalizeSchoolLevel(level);
-        this.draft.className = this.classNameOptions[0]?.value ?? '';
+        this.draft.className = '';
+        this.draft.subjectIds = this.draft.subjectIds.filter((subjectId) => this.subjectOptionsForDraft.some((option) => option.value === subjectId));
     }
 
     openCreate(): void {
         this.drawerMode = 'create';
         this.draft = {
-            className: this.classNameOptions[0]?.value ?? '',
-            gradeLevel: 'ZGC Level',
-            isActive: true
+            className: '',
+            gradeLevel: '' as SchoolLevel,
+            isActive: true,
+            subjectIds: []
         };
         this.drawerVisible = true;
     }
@@ -326,20 +357,27 @@ export class AdminClasses implements OnInit {
             id: schoolClass.id,
             className: schoolClass.className,
             gradeLevel: normalizeSchoolLevel(schoolClass.gradeLevel),
-            isActive: schoolClass.isActive
+            isActive: schoolClass.isActive,
+            subjectIds: [...schoolClass.subjectIds]
         };
+        this.draft.subjectIds = this.draft.subjectIds.filter((subjectId) => this.subjectOptionsForDraft.some((option) => option.value === subjectId));
         this.drawerVisible = true;
     }
 
     openAssignSubjects(schoolClass: SchoolClassResponse): void {
         this.activeClass = schoolClass;
-        this.subjectDraft = { subjectIds: [...schoolClass.subjectIds] };
+        this.subjectDraft = { subjectIds: [...schoolClass.subjectIds].filter((subjectId) => this.subjectOptionsForActiveClass.some((option) => option.value === subjectId)) };
         this.subjectsVisible = true;
     }
 
     saveClass(): void {
         if (!this.selectedSchoolId && this.isPlatformAdmin) {
             this.messages.add({ severity: 'warn', summary: 'Missing school', detail: 'Choose a school before saving the class.' });
+            return;
+        }
+
+        if (!this.draft.gradeLevel) {
+            this.messages.add({ severity: 'warn', summary: 'Missing level', detail: 'Choose a level before saving the class.' });
             return;
         }
 
@@ -355,10 +393,8 @@ export class AdminClasses implements OnInit {
             };
 
             this.api.createClass(payload, this.selectedSchoolId ?? undefined).subscribe({
-                next: () => {
-                    this.messages.add({ severity: 'success', summary: 'Class created', detail: `${this.draft.className} added to the registry.` });
-                    this.drawerVisible = false;
-                    this.loadData();
+                next: (created) => {
+                    this.syncClassSubjects(created.id, `${this.draft.className} added to the registry.`);
                 },
                 error: (error) => {
                     this.messages.add({ severity: 'error', summary: 'Save failed', detail: this.readErrorMessage(error, 'The class could not be saved.') });
@@ -379,12 +415,38 @@ export class AdminClasses implements OnInit {
 
         this.api.updateClass(this.draft.id, payload, this.selectedSchoolId ?? undefined).subscribe({
             next: () => {
-                this.messages.add({ severity: 'success', summary: 'Class updated', detail: `${this.draft.className} saved.` });
+                this.syncClassSubjects(this.draft.id!, `${this.draft.className} saved.`);
+            },
+            error: (error) => {
+                this.messages.add({ severity: 'error', summary: 'Update failed', detail: this.readErrorMessage(error, 'The class could not be updated.') });
+            }
+        });
+    }
+
+    private syncClassSubjects(classId: number, successDetail: string): void {
+        if (!this.draft.isActive) {
+            this.messages.add({ severity: 'success', summary: this.drawerMode === 'create' ? 'Class created' : 'Class updated', detail: successDetail });
+            this.drawerVisible = false;
+            this.loadData();
+            return;
+        }
+
+        const subjectIds = [...new Set(this.draft.subjectIds)];
+        if (subjectIds.length === 0) {
+            this.messages.add({ severity: 'success', summary: this.drawerMode === 'create' ? 'Class created' : 'Class updated', detail: successDetail });
+            this.drawerVisible = false;
+            this.loadData();
+            return;
+        }
+
+        this.api.assignClassSubjects(classId, { subjectIds }, this.selectedSchoolId ?? undefined).subscribe({
+            next: () => {
+                this.messages.add({ severity: 'success', summary: this.drawerMode === 'create' ? 'Class created' : 'Class updated', detail: successDetail });
                 this.drawerVisible = false;
                 this.loadData();
             },
             error: (error) => {
-                this.messages.add({ severity: 'error', summary: 'Update failed', detail: this.readErrorMessage(error, 'The class could not be updated.') });
+                this.messages.add({ severity: 'error', summary: 'Subject assignment failed', detail: this.readErrorMessage(error, 'The class was saved, but its subjects could not be updated.') });
             }
         });
     }

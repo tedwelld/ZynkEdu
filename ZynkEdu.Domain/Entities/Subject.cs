@@ -8,5 +8,6 @@ public sealed class Subject : EntityBase, ISchoolScoped
     public string? Code { get; set; }
     public string Name { get; set; } = string.Empty;
     public string GradeLevel { get; set; } = string.Empty;
+    public int WeeklyLoad { get; set; } = 1;
     public ICollection<TeacherAssignment> TeacherAssignments { get; set; } = new List<TeacherAssignment>();
 }

@@ -4,13 +4,17 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { InputTextModule } from 'primeng/inputtext';
+import { TableModule } from 'primeng/table';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
-import { TeacherAssignmentResponse, UpdateSchoolUserRequest, UserResponse } from '../../core/api/api.models';
+import { AcademicTermResponse, TeacherAssignmentResponse, TimetableResponse, UpdateSchoolUserRequest, UserResponse } from '../../core/api/api.models';
 import { AuthService } from '../../core/auth/auth.service';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
+import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 
 interface AccountNotificationPreferences {
     attendanceAlerts: boolean;
@@ -42,7 +46,7 @@ const DEFAULT_PREFERENCES: AccountNotificationPreferences = {
 @Component({
     standalone: true,
     selector: 'app-teacher-profile',
-    imports: [CommonModule, FormsModule, RouterLink, ButtonModule, InputTextModule, MetricCardComponent, SkeletonModule, TagModule],
+    imports: [CommonModule, FormsModule, RouterLink, ButtonModule, InputTextModule, TableModule, AppDropdownComponent, MetricCardComponent, SkeletonModule, TagModule],
     template: `
         <section class="space-y-6">
             <header class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -152,6 +156,54 @@ const DEFAULT_PREFERENCES: AccountNotificationPreferences = {
                 </article>
             </div>
 
+            <article *ngIf="isTeacher" class="workspace-card">
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <h2 class="text-xl font-display font-bold mb-1">My timetable</h2>
+                        <p class="text-sm text-muted-color">This timetable only shows the classes, subjects, and times assigned to you.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <app-dropdown [options]="termOptions" [(ngModel)]="selectedTermId" optionLabel="label" optionValue="value" class="w-44" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search terms" (ngModelChange)="onTermChange($event)"></app-dropdown>
+                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="help" [disabled]="sortedTimetable.length === 0" (click)="exportTimetablePdf()"></button>
+                    </div>
+                </div>
+
+                <div *ngIf="timetableLoading" class="mt-4 space-y-3">
+                    <p-skeleton height="4.5rem" borderRadius="1rem"></p-skeleton>
+                    <p-skeleton height="4.5rem" borderRadius="1rem"></p-skeleton>
+                    <p-skeleton height="4.5rem" borderRadius="1rem"></p-skeleton>
+                </div>
+
+                <div *ngIf="!timetableLoading && sortedTimetable.length === 0" class="mt-4 rounded-3xl border border-dashed border-surface-300 dark:border-surface-700 p-6 text-sm text-muted-color">
+                    No timetable entries are available for the current term.
+                </div>
+
+                <div *ngIf="!timetableLoading && sortedTimetable.length > 0" class="mt-4 overflow-x-auto">
+                    <table class="min-w-full border-separate border-spacing-0">
+                        <thead>
+                            <tr class="text-left text-xs uppercase tracking-[0.18em] text-muted-color">
+                                <th class="px-4 py-3">Day</th>
+                                <th class="px-4 py-3 whitespace-nowrap">Time</th>
+                                <th class="px-4 py-3">Class</th>
+                                <th class="px-4 py-3">Subject</th>
+                                <th class="px-4 py-3 whitespace-nowrap">Level</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let slot of sortedTimetable; let index = index" class="border-t border-surface-200 dark:border-surface-800" [ngClass]="index % 2 === 0 ? 'bg-surface-0 dark:bg-surface-950' : 'bg-surface-50 dark:bg-surface-900/40'">
+                                <td class="px-4 py-4 font-semibold">{{ slot.dayOfWeek }}</td>
+                                <td class="px-4 py-4 whitespace-nowrap">{{ slot.startTime }} - {{ slot.endTime }}</td>
+                                <td class="px-4 py-4">{{ slot.class }}</td>
+                                <td class="px-4 py-4">{{ slot.subjectName }}</td>
+                                <td class="px-4 py-4 whitespace-nowrap">
+                                    <p-tag [value]="slot.gradeLevel" severity="secondary"></p-tag>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </article>
+
             <div class="grid gap-6 xl:grid-cols-[1fr_1fr]">
                 <article class="workspace-card">
                     <div class="flex items-center justify-between gap-3 mb-4">
@@ -239,8 +291,13 @@ export class TeacherProfile implements OnInit {
     readonly auth = inject(AuthService);
 
     loading = true;
+    timetableLoading = true;
     profile: UserResponse | null = null;
     assignments: TeacherAssignmentResponse[] = [];
+    timetable: TimetableResponse[] = [];
+    terms: AcademicTermResponse[] = [];
+    termOptions: { label: string; value: number }[] = [];
+    selectedTermId: number | null = null;
     draft = {
         displayName: '',
         password: ''
@@ -273,6 +330,22 @@ export class TeacherProfile implements OnInit {
         return Array.from(new Set(this.assignments.map((assignment) => assignment.subjectName)));
     }
 
+    get selectedTermName(): string | null {
+        return this.terms.find((term) => term.id === this.selectedTermId)?.name ?? null;
+    }
+
+    get sortedTimetable(): TimetableResponse[] {
+        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        return [...this.timetable].sort((left, right) => {
+            const dayDelta = dayOrder.indexOf(left.dayOfWeek) - dayOrder.indexOf(right.dayOfWeek);
+            if (dayDelta !== 0) {
+                return dayDelta;
+            }
+
+            return left.startTime.localeCompare(right.startTime);
+        });
+    }
+
     get quickLinks(): QuickLinkCard[] {
         if (this.isTeacher) {
             return [
@@ -298,6 +371,7 @@ export class TeacherProfile implements OnInit {
 
     loadProfile(): void {
         this.loading = true;
+        this.timetableLoading = true;
         const role = this.auth.role();
         const userId = this.auth.userId();
 
@@ -309,15 +383,20 @@ export class TeacherProfile implements OnInit {
         if (this.isTeacher) {
             forkJoin({
                 users: this.api.getTeachers(),
-                assignments: this.api.getAssignmentsByTeacher(userId, this.auth.schoolId() ?? undefined)
+                assignments: this.api.getAssignmentsByTeacher(userId, this.auth.schoolId() ?? undefined),
+                terms: this.api.getAcademicTerms()
             }).subscribe({
-                next: ({ users, assignments }) => {
+                next: ({ users, assignments, terms }) => {
                     this.profile = users.find((teacher) => teacher.id === userId) ?? null;
                     this.assignments = assignments;
+                    this.terms = terms;
+                    this.termOptions = terms.map((term) => ({ label: term.name, value: term.id }));
+                    this.selectedTermId = this.selectedTermId ?? this.termOptions[0]?.value ?? null;
                     this.resetDraft();
-                    this.loading = false;
+                    this.loadTeacherTimetable();
                 },
                 error: () => {
+                    this.timetableLoading = false;
                     this.loading = false;
                 }
             });
@@ -329,9 +408,11 @@ export class TeacherProfile implements OnInit {
                 next: (admins) => {
                     this.profile = admins.find((admin) => admin.id === userId) ?? null;
                     this.resetDraft();
+                    this.timetableLoading = false;
                     this.loading = false;
                 },
                 error: () => {
+                    this.timetableLoading = false;
                     this.loading = false;
                 }
             });
@@ -348,6 +429,7 @@ export class TeacherProfile implements OnInit {
             isActive: true
         };
         this.resetDraft();
+        this.timetableLoading = false;
         this.loading = false;
     }
 
@@ -385,6 +467,74 @@ export class TeacherProfile implements OnInit {
                 }, 2500);
             }
         });
+    }
+
+    onTermChange(termId: number | null): void {
+        this.selectedTermId = termId;
+        this.loadTeacherTimetable();
+    }
+
+    loadTeacherTimetable(): void {
+        if (!this.isTeacher) {
+            this.timetable = [];
+            this.timetableLoading = false;
+            return;
+        }
+
+        this.timetableLoading = true;
+        const selectedTerm = this.selectedTermName ?? 'Term 1';
+        this.api.getTeacherTimetable(selectedTerm).subscribe({
+            next: (timetable) => {
+                this.timetable = timetable;
+                this.timetableLoading = false;
+                this.loading = false;
+            },
+            error: () => {
+                this.timetable = [];
+                this.timetableLoading = false;
+                this.loading = false;
+            }
+        });
+    }
+
+    exportTimetablePdf(): void {
+        const termLabel = this.selectedTermName ?? 'All terms';
+        const fileName = `teacher-timetable-${termLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'timetable'}.pdf`;
+        const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+        const margin = 40;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        doc.text('My timetable', margin, 42);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`Teacher: ${this.auth.displayName()}`, margin, 60);
+        doc.text(`Term: ${termLabel}`, margin, 74);
+        doc.text(`Generated: ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date())}`, margin, 88);
+
+        autoTable(doc, {
+            startY: 104,
+            head: [['Day', 'Time', 'Class', 'Subject', 'Level']],
+            body: this.sortedTimetable.map((slot) => [slot.dayOfWeek, `${slot.startTime} - ${slot.endTime}`, slot.class, slot.subjectName, slot.gradeLevel]),
+            theme: 'grid',
+            styles: {
+                fontSize: 7,
+                cellPadding: 3,
+                minCellHeight: 24,
+                valign: 'middle',
+                overflow: 'linebreak'
+            },
+            headStyles: {
+                fillColor: [37, 99, 235]
+            },
+            margin: {
+                left: margin,
+                right: margin
+            }
+        });
+
+        doc.save(fileName);
     }
 
     loadPreferences(): void {

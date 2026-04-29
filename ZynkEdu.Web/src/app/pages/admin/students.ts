@@ -606,7 +606,7 @@ export class AdminStudents implements OnInit {
         this.drawerMode = 'create';
         this.selectedStudent = null;
         this.editStudentId = null;
-        this.draft = this.createEmptyDraft(this.isPlatformAdmin ? this.selectedSchoolId ?? this.schools[0]?.id ?? null : this.authSchoolId);
+        this.draft = this.createEmptyDraft(this.isPlatformAdmin ? null : this.authSchoolId);
         this.drawerVisible = true;
     }
 
@@ -654,7 +654,7 @@ export class AdminStudents implements OnInit {
     onLevelChange(level: string): void {
         const normalized = this.normalizeLevel(level);
         this.draft.level = normalized;
-        this.draft.class = LEVEL_CLASS_MAP[normalized][0];
+        this.draft.class = '';
     }
 
     saveStudent(): void {
@@ -818,12 +818,11 @@ export class AdminStudents implements OnInit {
     }
 
     private createEmptyDraft(schoolId: number | null = null): StudentDraft {
-        const level = 'ZGC Level';
         return {
             schoolId,
             fullName: '',
-            class: LEVEL_CLASS_MAP[level][0],
-            level,
+            class: '',
+            level: '',
             enrollmentYear: new Date().getFullYear(),
             subjectIds: [],
             parentEmail: '',
@@ -841,6 +840,11 @@ export class AdminStudents implements OnInit {
         const fullName = this.draft.fullName.trim();
         if (fullName.length < 2) {
             this.messages.add({ severity: 'warn', summary: 'Name required', detail: 'Enter the student full name.' });
+            return null;
+        }
+
+        if (!this.draft.level.trim()) {
+            this.messages.add({ severity: 'warn', summary: 'Level required', detail: 'Choose a level before saving the student.' });
             return null;
         }
 

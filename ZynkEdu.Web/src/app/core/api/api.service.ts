@@ -53,6 +53,9 @@ import {
     UpdateStudentStatusRequest,
     UpdateTeacherAssignmentRequest,
     UpsertAcademicTermRequest,
+    PublishTimetableRequest,
+    TimetablePublicationResponse,
+    UpsertTimetableSlotRequest,
     UserResponse,
     VerifyParentOtpRequest
 } from './api.models';
@@ -254,6 +257,10 @@ export class ApiService {
         return this.http.post<ImportSubjectsResultResponse>(`${API_BASE_URL}/platform/subjects/publish-all/${targetSchoolId}`, {});
     }
 
+    publishAllCatalogSubjectsToAllSchools(): Observable<ImportSubjectsResultResponse> {
+        return this.http.post<ImportSubjectsResultResponse>(`${API_BASE_URL}/platform/subjects/publish-all-schools`, {});
+    }
+
     getTeachers(schoolId?: number | null): Observable<UserResponse[]> {
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.get<UserResponse[]>(`${API_BASE_URL}/users/teachers${query}`);
@@ -365,8 +372,41 @@ export class ApiService {
         return this.http.get<TimetableResponse[]>(`${API_BASE_URL}/timetables/me${query}`);
     }
 
-    generateTimetable(term: string): Observable<TimetableResponse[]> {
-        return this.http.post<TimetableResponse[]>(`${API_BASE_URL}/timetables/generate`, { term });
+    getTimetables(schoolId?: number | null, term?: string): Observable<TimetableResponse[]> {
+        const params = new URLSearchParams();
+        if (schoolId) {
+            params.set('schoolId', String(schoolId));
+        }
+        if (term) {
+            params.set('term', term);
+        }
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return this.http.get<TimetableResponse[]>(`${API_BASE_URL}/timetables${query}`);
+    }
+
+    createTimetableSlot(request: UpsertTimetableSlotRequest, schoolId?: number | null): Observable<TimetableResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<TimetableResponse>(`${API_BASE_URL}/timetables${query}`, request);
+    }
+
+    updateTimetableSlot(id: number, request: UpsertTimetableSlotRequest, schoolId?: number | null): Observable<TimetableResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.put<TimetableResponse>(`${API_BASE_URL}/timetables/${id}${query}`, request);
+    }
+
+    deleteTimetableSlot(id: number, schoolId?: number | null): Observable<void> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.delete<void>(`${API_BASE_URL}/timetables/${id}${query}`);
+    }
+
+    generateTimetable(term: string, schoolId?: number | null): Observable<TimetableResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<TimetableResponse[]>(`${API_BASE_URL}/timetables/generate${query}`, { term });
+    }
+
+    publishTimetable(request: PublishTimetableRequest, schoolId?: number | null): Observable<TimetablePublicationResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<TimetablePublicationResponse>(`${API_BASE_URL}/timetables/publish${query}`, request);
     }
 
     getAcademicTerms(schoolId?: number | null): Observable<AcademicTermResponse[]> {

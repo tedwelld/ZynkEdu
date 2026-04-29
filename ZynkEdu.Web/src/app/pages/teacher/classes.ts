@@ -5,7 +5,6 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { SkeletonModule } from 'primeng/skeleton';
-import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -25,7 +24,7 @@ interface ClassStudentModalState {
 @Component({
     standalone: true,
     selector: 'app-teacher-classes',
-    imports: [CommonModule, FormsModule, RouterLink, ButtonModule, DialogModule, AppDropdownComponent, MetricCardComponent, SkeletonModule, TableModule, TagModule],
+    imports: [CommonModule, FormsModule, RouterLink, ButtonModule, DialogModule, AppDropdownComponent, MetricCardComponent, SkeletonModule, TagModule],
     template: `
         <section class="space-y-6">
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -46,67 +45,88 @@ interface ClassStudentModalState {
                 <app-metric-card label="Average" [value]="classAverage.toFixed(1) + '%'" delta="Current class" hint="Performance" icon="pi pi-bolt" tone="green" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></app-metric-card>
             </section>
 
-            <article class="workspace-card grid gap-4 xl:grid-cols-[0.7fr_1.3fr] items-start">
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-semibold mb-2">Choose class</label>
-                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClass" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadClassData()" (ngModelChange)="loadClassData()"></app-dropdown>
+            <article class="workspace-card space-y-4">
+                <div class="grid gap-4 xl:grid-cols-[0.7fr_1.3fr] items-start">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-2">Choose class</label>
+                            <app-dropdown [options]="classOptions" [(ngModel)]="selectedClass" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadClassData()" (ngModelChange)="loadClassData()"></app-dropdown>
+                        </div>
+
+                        <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
+                            <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Class load</div>
+                            <div class="text-2xl font-display font-bold mt-2">{{ selectedClass || 'No class selected' }}</div>
+                            <div class="text-sm text-muted-color mt-1">{{ classStudents.length }} students - {{ classResults.length }} results</div>
+                        </div>
                     </div>
 
                     <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
-                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Class load</div>
-                        <div class="text-2xl font-display font-bold mt-2">{{ selectedClass || 'No class selected' }}</div>
-                        <div class="text-sm text-muted-color mt-1">{{ classStudents.length }} students · {{ classResults.length }} results</div>
-                    </div>
-
-                    <div class="flex flex-wrap gap-3">
-                        <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="secondary" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
-                        <button pButton type="button" label="Enter results" icon="pi pi-table" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></button>
-                        <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="help" routerLink="/teacher/profile"></button>
+                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Selected class</div>
+                        <div class="text-2xl font-display font-bold mt-2">{{ selectedClass || 'Choose a class' }}</div>
+                        <div class="text-sm text-muted-color mt-1">View the full roster, open student profiles, and export the class list.</div>
                     </div>
                 </div>
 
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between gap-3">
+                <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-5 space-y-4">
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <h2 class="text-xl font-display font-bold mb-1">Students in class</h2>
-                            <p class="text-sm text-muted-color">Click a row to open the student modal.</p>
+                            <p class="text-sm text-muted-color">The roster now fills the full card area. Click any learner to open the student profile modal.</p>
                         </div>
-                        <button pButton type="button" label="Open results" icon="pi pi-table" severity="secondary" routerLink="/teacher/results"></button>
+                        <div class="flex flex-wrap gap-3">
+                            <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="secondary" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
+                            <button pButton type="button" label="Enter results" icon="pi pi-table" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></button>
+                            <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="contrast" (click)="exportClassPdf()"></button>
+                            <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="help" routerLink="/teacher/profile"></button>
+                        </div>
                     </div>
 
-                    <div *ngIf="loading" class="space-y-3">
-                        <p-skeleton *ngFor="let _ of skeletonRows" height="3.5rem" borderRadius="1rem"></p-skeleton>
+                    <div *ngIf="loading" class="grid gap-3">
+                        <p-skeleton *ngFor="let _ of skeletonRows" height="7rem" borderRadius="1.25rem"></p-skeleton>
                     </div>
 
-                    <p-table *ngIf="!loading" [value]="classStudents" [rowHover]="true" selectionMode="single" dataKey="id" styleClass="p-datatable-sm">
-                        <ng-template pTemplate="header">
-                            <tr>
-                                <th>Student</th>
-                                <th>Contact</th>
-                                <th>Average</th>
-                                <th class="text-right">View</th>
-                            </tr>
-                        </ng-template>
-                        <ng-template pTemplate="body" let-student>
-                            <tr [pSelectableRow]="student" class="cursor-pointer" (click)="openStudent(student)">
-                                <td>
-                                    <div class="font-semibold">{{ student.fullName }}</div>
-                                    <div class="text-xs text-muted-color">{{ student.studentNumber }}</div>
-                                </td>
-                                <td>
-                                    <div class="text-sm">{{ student.parentEmail }}</div>
-                                    <div class="text-xs text-muted-color">{{ student.parentPhone }}</div>
-                                </td>
-                                <td>
-                                    <p-tag [value]="studentAverage(student.id)" [severity]="studentAverageValue(student.id) >= 75 ? 'success' : studentAverageValue(student.id) >= 60 ? 'warning' : 'danger'"></p-tag>
-                                </td>
-                                <td class="text-right">
-                                    <button pButton type="button" icon="pi pi-eye" class="p-button-text p-button-sm" (click)="$event.stopPropagation(); openStudent(student)"></button>
-                                </td>
-                            </tr>
-                        </ng-template>
-                    </p-table>
+                    <ng-container *ngIf="!loading">
+                        <div *ngIf="classStudents.length === 0" class="rounded-3xl border border-dashed border-surface-300 dark:border-surface-700 p-8 text-center text-muted-color">
+                            No students are assigned to {{ selectedClass || 'the selected class' }} yet.
+                        </div>
+
+                        <div *ngIf="classStudents.length > 0" class="grid gap-3">
+                            <div
+                                *ngFor="let student of classStudents"
+                                class="rounded-3xl border border-surface-200 dark:border-surface-700 bg-surface-50/70 dark:bg-surface-900/30 p-4 transition-colors hover:border-primary hover:bg-primary-50/40 dark:hover:bg-primary-500/10 cursor-pointer"
+                                (click)="openStudent(student)"
+                            >
+                                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                    <div class="flex items-start gap-4 min-w-0">
+                                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-200 shrink-0">
+                                            <i class="pi pi-user text-lg"></i>
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="text-base font-semibold truncate">{{ student.fullName }}</div>
+                                            <div class="text-sm text-muted-color">{{ student.studentNumber }} - {{ student.class }}</div>
+                                            <div class="text-xs text-muted-color mt-1 truncate">{{ student.parentEmail || 'No parent email' }} - {{ student.parentPhone || 'No parent phone' }}</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <p-tag [value]="studentAverage(student.id)" [severity]="studentAverageValue(student.id) >= 75 ? 'success' : studentAverageValue(student.id) >= 60 ? 'warning' : 'danger'"></p-tag>
+                                        <button pButton type="button" icon="pi pi-eye" label="View" class="p-button-text p-button-sm" (click)="$event.stopPropagation(); openStudent(student)"></button>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3 grid gap-2 md:grid-cols-2">
+                                    <div class="rounded-2xl bg-surface-100/80 dark:bg-surface-900/50 px-3 py-2">
+                                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Parent email</div>
+                                        <div class="text-sm font-medium break-all">{{ student.parentEmail || 'Not set' }}</div>
+                                    </div>
+                                    <div class="rounded-2xl bg-surface-100/80 dark:bg-surface-900/50 px-3 py-2">
+                                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Parent phone</div>
+                                        <div class="text-sm font-medium">{{ student.parentPhone || 'Not set' }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </ng-container>
                 </div>
             </article>
 
@@ -115,7 +135,7 @@ interface ClassStudentModalState {
                     <div class="rounded-3xl bg-surface-100 dark:bg-surface-900/50 p-4">
                         <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Learner</div>
                         <div class="text-2xl font-display font-bold">{{ selectedStudent.fullName }}</div>
-                        <div class="text-sm text-muted-color">{{ selectedStudent.studentNumber }} · {{ selectedStudent.class }}</div>
+                        <div class="text-sm text-muted-color">{{ selectedStudent.studentNumber }} - {{ selectedStudent.class }}</div>
                     </div>
 
                     <div class="grid gap-3 md:grid-cols-2">
@@ -222,7 +242,7 @@ export class TeacherClasses implements OnInit {
 
     openStudent(student: StudentResponse): void {
         this.selectedStudent = student;
-        const rows = this.classResults.filter((result) => result.studentId === student.id);
+        const rows = this.resultsForStudent(student.id);
         this.studentState = {
             averageScore: rows.length === 0 ? 0 : rows.reduce((total, row) => total + row.score, 0) / rows.length,
             resultCount: rows.length,
@@ -248,7 +268,7 @@ export class TeacherClasses implements OnInit {
             startY: 80,
             head: [['Student', 'Number', 'Average', 'Latest comment']],
             body: this.classStudents.map((student) => {
-                const rows = this.classResults.filter((result) => result.studentId === student.id);
+                const rows = this.resultsForStudent(student.id);
                 const average = rows.length === 0 ? 0 : rows.reduce((total, row) => total + row.score, 0) / rows.length;
                 return [student.fullName, student.studentNumber, `${average.toFixed(1)}%`, rows[0]?.comment ?? 'No comment yet.'];
             }),
@@ -265,11 +285,15 @@ export class TeacherClasses implements OnInit {
     }
 
     studentAverageValue(studentId: number): number {
-        const rows = this.classResults.filter((result) => result.studentId === studentId);
+        const rows = this.resultsForStudent(studentId);
         if (rows.length === 0) {
             return 0;
         }
 
         return rows.reduce((total, row) => total + row.score, 0) / rows.length;
+    }
+
+    private resultsForStudent(studentId: number): ResultResponse[] {
+        return this.classResults.filter((result) => result.studentId === studentId);
     }
 }

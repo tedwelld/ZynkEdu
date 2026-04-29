@@ -11,4 +11,5 @@ public interface IPlatformSubjectCatalogService
     Task<ImportSubjectsResultResponse> ImportFromSchoolToCatalogAsync(ImportSchoolSubjectsRequest request, CancellationToken cancellationToken = default);
     Task<ImportSubjectsResultResponse> ImportFromSchoolToSchoolAsync(int targetSchoolId, ImportSchoolSubjectsRequest request, CancellationToken cancellationToken = default);
     Task<ImportSubjectsResultResponse> PublishAllCatalogToSchoolAsync(int targetSchoolId, CancellationToken cancellationToken = default);
+    Task<ImportSubjectsResultResponse> PublishAllCatalogToAllSchoolsAsync(CancellationToken cancellationToken = default);
 }
