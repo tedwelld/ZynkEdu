@@ -141,7 +141,7 @@ public sealed class TimetableServiceTests
     }
 
     [Fact]
-    public async Task GenerateAsync_SynchronizesPracticalSubjectsAcrossClasses()
+    public async Task GenerateAsync_StaggersPracticalSubjectsAcrossClasses()
     {
         var currentUser = new TestCurrentUserContext { Role = UserRole.PlatformAdmin, UserId = 902, UserName = "platform.admin" };
         var databasePath = TestDatabase.CreateDatabasePath();
@@ -168,8 +168,7 @@ public sealed class TimetableServiceTests
 
         var teachers = new[]
         {
-            CreateTeacher("practical.teacher1", "Practical Teacher 1"),
-            CreateTeacher("practical.teacher2", "Practical Teacher 2")
+            CreateTeacher("practical.teacher", "Practical Teacher")
         };
 
         var practicalSubject = new Subject
@@ -211,26 +210,128 @@ public sealed class TimetableServiceTests
         );
         await context.SaveChangesAsync();
 
+        context.TeacherAssignments.AddRange(
+            new TeacherAssignment { SchoolId = 81, TeacherId = teachers[0].Id, SubjectId = practicalSubject.Id, Class = form1A.Name },
+            new TeacherAssignment { SchoolId = 81, TeacherId = teachers[0].Id, SubjectId = practicalSubject.Id, Class = form1B.Name }
+        );
+        await context.SaveChangesAsync();
+
         var service = new TimetableService(context, currentUser);
         var generated = await service.GenerateAsync(new GenerateTimetableRequest("Term 1"), 81);
 
         Assert.Equal(4, generated.Count);
         Assert.All(generated, slot => Assert.Equal("Computer Science", slot.SubjectName));
-
-        var firstOccurrence = generated
-            .GroupBy(slot => new { slot.DayOfWeek, slot.StartTime, slot.EndTime })
-            .OrderBy(group => group.Key.DayOfWeek)
-            .ThenBy(group => group.Key.StartTime)
-            .ToList();
-
-        Assert.Equal(2, firstOccurrence.Count);
-        Assert.All(firstOccurrence, group => Assert.Equal(2, group.Count()));
-        Assert.All(firstOccurrence, group => Assert.Equal(2, group.Select(slot => slot.Class).Distinct(StringComparer.OrdinalIgnoreCase).Count()));
-
-        var teacherIds = generated.Select(slot => slot.TeacherId).Distinct().ToList();
-        Assert.Equal(2, teacherIds.Count);
+        Assert.Equal(1, generated.Select(slot => slot.TeacherId).Distinct().Count());
+        Assert.Equal(generated.Count, generated.Select(slot => $"{slot.DayOfWeek}|{slot.StartTime}").Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Empty(
+            generated.Where(slot => slot.Class == "Form 1A")
+                .Select(slot => $"{slot.DayOfWeek}|{slot.StartTime}")
+                .Intersect(
+                    generated.Where(slot => slot.Class == "Form 1B")
+                        .Select(slot => $"{slot.DayOfWeek}|{slot.StartTime}"),
+                    StringComparer.OrdinalIgnoreCase));
         Assert.Contains(generated, slot => slot.Class == "Form 1A");
         Assert.Contains(generated, slot => slot.Class == "Form 1B");
+    }
+
+    [Fact]
+    public async Task GenerateAsync_AutoAssignsAndBalancesPracticalSubjectsAcrossTeachers()
+    {
+        var currentUser = new TestCurrentUserContext { Role = UserRole.PlatformAdmin, UserId = 903, UserName = "platform.admin" };
+        var databasePath = TestDatabase.CreateDatabasePath();
+        var (connection, context) = await TestDatabase.CreateContextAsync(databasePath, currentUser);
+        await using var _ = connection;
+
+        var hasher = new PasswordHasher<AppUser>();
+
+        AppUser CreateTeacher(string username, string displayName)
+        {
+            var teacher = new AppUser
+            {
+                Username = username,
+                PasswordHash = string.Empty,
+                Role = UserRole.Teacher,
+                SchoolId = 82,
+                DisplayName = displayName,
+                CreatedAt = DateTime.UtcNow,
+                IsActive = true
+            };
+            teacher.PasswordHash = hasher.HashPassword(teacher, "Password123!");
+            return teacher;
+        }
+
+        var teachers = new[]
+        {
+            CreateTeacher("practical.teacher1", "Practical Teacher 1"),
+            CreateTeacher("practical.teacher2", "Practical Teacher 2")
+        };
+
+        var practicalSubject = new Subject
+        {
+            SchoolId = 82,
+            Code = "PRACT",
+            Name = "Woodwork",
+            GradeLevel = "ZGC Level",
+            WeeklyLoad = 1,
+            IsPractical = true
+        };
+
+        var form1A = new SchoolClass
+        {
+            SchoolId = 82,
+            Name = "Form 1A",
+            GradeLevel = "ZGC Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var form1B = new SchoolClass
+        {
+            SchoolId = 82,
+            Name = "Form 1B",
+            GradeLevel = "ZGC Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var form1C = new SchoolClass
+        {
+            SchoolId = 82,
+            Name = "Form 1C",
+            GradeLevel = "ZGC Level",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        context.Users.AddRange(teachers);
+        context.Subjects.Add(practicalSubject);
+        context.SchoolClasses.AddRange(form1A, form1B, form1C);
+        await context.SaveChangesAsync();
+
+        context.SchoolClassSubjects.AddRange(
+            new SchoolClassSubject { SchoolId = 82, SchoolClassId = form1A.Id, SubjectId = practicalSubject.Id, CreatedAt = DateTime.UtcNow },
+            new SchoolClassSubject { SchoolId = 82, SchoolClassId = form1B.Id, SubjectId = practicalSubject.Id, CreatedAt = DateTime.UtcNow },
+            new SchoolClassSubject { SchoolId = 82, SchoolClassId = form1C.Id, SubjectId = practicalSubject.Id, CreatedAt = DateTime.UtcNow }
+        );
+        await context.SaveChangesAsync();
+
+        var service = new TimetableService(context, currentUser);
+        var generated = await service.GenerateAsync(new GenerateTimetableRequest("Term 1"), 82);
+
+        Assert.Equal(3, generated.Count);
+        Assert.All(generated, slot => Assert.Equal("Woodwork", slot.SubjectName));
+        Assert.Equal(2, generated.Select(slot => slot.TeacherId).Distinct().Count());
+
+        var teacherLoad = await context.TeacherAssignments.AsNoTracking()
+            .GroupBy(x => x.TeacherId)
+            .Select(group => group.Count())
+            .OrderBy(count => count)
+            .ToListAsync();
+
+        Assert.Equal(2, teacherLoad.Count);
+        Assert.Equal(1, teacherLoad[0]);
+        Assert.Equal(2, teacherLoad[1]);
+        Assert.Equal(3, generated.Select(slot => $"{slot.TeacherId}|{slot.DayOfWeek}|{slot.StartTime}").Distinct(StringComparer.OrdinalIgnoreCase).Count());
     }
 
     [Fact]
