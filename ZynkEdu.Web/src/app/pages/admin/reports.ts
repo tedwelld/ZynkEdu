@@ -36,8 +36,8 @@ interface PreviewRow {
         <section class="space-y-6">
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                    <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Reports</p>
-                    <h1 class="text-3xl font-display font-bold m-0">Filter-first reports</h1>
+                    <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">System reports</p>
+                    <h1 class="text-3xl font-display font-bold m-0">System reports</h1>
                     <p class="text-muted-color mt-2 max-w-2xl">Generate exports by year, class, student name, and teacher name from the current live results data. Class-grouped PDFs and guardian slips keep the report flow safe and readable.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">

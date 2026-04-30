@@ -5,7 +5,9 @@
     width: 20rem;
     height: calc(100vh - 8rem);
     z-index: 999;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     user-select: none;
     top: 6rem;
     left: 2rem;
@@ -17,10 +19,38 @@
     padding: 0.5rem 1.5rem;
 }
 
+.layout-sidebar__scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-top: 0.25rem;
+}
+
+.layout-sidebar__footer {
+    flex: 0 0 auto;
+    padding-top: 0.75rem;
+}
+
+.layout-sidebar__card {
+    margin: 0 0 0.25rem;
+}
+
 .layout-menu {
     margin: 0;
     padding: 0;
     list-style-type: none;
+
+    .layout-menu__home {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .layout-menu__group {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
 
     .layout-root-menuitem {
         > .layout-menuitem-root-text {

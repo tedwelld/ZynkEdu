@@ -74,7 +74,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                     <button pButton type="button" label="Add Student" icon="pi pi-user-plus" class="w-full justify-start" routerLink="/admin/students"></button>
                     <button pButton type="button" label="Assign Teacher" icon="pi pi-sitemap" severity="secondary" class="w-full justify-start" routerLink="/admin/assignments"></button>
                     <button pButton type="button" label="Send Notification" icon="pi pi-bell" severity="help" class="w-full justify-start" routerLink="/admin/notifications"></button>
-                    <button pButton type="button" label="Open Reports" icon="pi pi-file-pdf" severity="contrast" class="w-full justify-start" routerLink="/admin/reports"></button>
+                    <button pButton type="button" label="Open System reports" icon="pi pi-file-pdf" severity="contrast" class="w-full justify-start" routerLink="/admin/reports"></button>
                 </div>
             </section>
 

@@ -10,23 +10,27 @@ import { AuthService } from '../../core/auth/auth.service';
     imports: [CommonModule, AppMenu, ButtonModule],
     template: `
         <aside class="layout-sidebar">
-            <div class="workspace-card mx-4 my-4">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-xs uppercase tracking-[0.22em] text-muted-color font-semibold">Signed in</p>
-                        <div class="text-xl font-display font-bold mt-1">ZynkEdu</div>
-                    </div>
-                    <i class="pi pi-user text-xl text-primary"></i>
-                </div>
-                <div class="mt-4 grid gap-2 text-sm">
-                    <div class="flex items-center justify-between">
-                        <span class="text-muted-color">Role</span>
-                        <span class="font-semibold">{{ roleLabel }}</span>
-                    </div>
-                </div>
-                <button pButton type="button" label="Logout" icon="pi pi-sign-out" severity="danger" class="w-full mt-4 logout-button" (click)="auth.logout()"></button>
+            <div class="layout-sidebar__scroll">
+                <app-menu></app-menu>
             </div>
-            <app-menu></app-menu>
+            <div class="layout-sidebar__footer">
+                <div class="workspace-card layout-sidebar__card">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs uppercase tracking-[0.22em] text-muted-color font-semibold">Signed in</p>
+                            <div class="text-xl font-display font-bold mt-1">ZynkEdu</div>
+                        </div>
+                        <i class="pi pi-user text-xl text-primary"></i>
+                    </div>
+                    <div class="mt-4 grid gap-2 text-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-muted-color">Role</span>
+                            <span class="font-semibold">{{ roleLabel }}</span>
+                        </div>
+                    </div>
+                    <button pButton type="button" label="Logout" icon="pi pi-sign-out" severity="danger" class="w-full mt-4 logout-button" (click)="auth.logout()"></button>
+                </div>
+            </div>
         </aside>
     `
 })
