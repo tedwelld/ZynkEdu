@@ -13,6 +13,8 @@ export const platformRoutes: Routes = [
     { path: 'subjects', loadComponent: () => import('../admin/subjects').then((m) => m.AdminSubjects) },
     { path: 'assignments', loadComponent: () => import('../admin/assignments').then((m) => m.AdminAssignments) },
     { path: 'timetable', loadComponent: () => import('../admin/timetable').then((m) => m.AdminTimetable) },
+    { path: 'grading', loadComponent: () => import('../admin/grading').then((m) => m.AdminGrading) },
+    { path: 'progression', loadComponent: () => import('../admin/progression').then((m) => m.AdminProgression) },
     { path: 'results', loadComponent: () => import('../admin/results').then((m) => m.AdminResults) },
     { path: 'notifications', loadComponent: () => import('../admin/notifications').then((m) => m.AdminNotifications) },
     { path: 'reports', loadComponent: () => import('../admin/reports').then((m) => m.AdminReports) }

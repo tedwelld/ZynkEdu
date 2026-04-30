@@ -104,7 +104,7 @@ interface ClassStudentModalState {
                                         <div class="min-w-0">
                                             <div class="text-base font-semibold truncate">{{ student.fullName }}</div>
                                             <div class="text-sm text-muted-color">{{ student.studentNumber }} - {{ student.class }}</div>
-                                            <div class="text-xs text-muted-color mt-1 truncate">{{ student.parentEmail || 'No parent email' }} - {{ student.parentPhone || 'No parent phone' }}</div>
+                                            <div class="text-xs text-muted-color mt-1 truncate">{{ student.parentEmail || 'No guardian email' }} - {{ student.parentPhone || 'No guardian phone' }}</div>
                                         </div>
                                     </div>
 
@@ -116,11 +116,11 @@ interface ClassStudentModalState {
 
                                 <div class="mt-3 grid gap-2 md:grid-cols-2">
                                     <div class="rounded-2xl bg-surface-100/80 dark:bg-surface-900/50 px-3 py-2">
-                                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Parent email</div>
+                                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Guardian email</div>
                                         <div class="text-sm font-medium break-all">{{ student.parentEmail || 'Not set' }}</div>
                                     </div>
                                     <div class="rounded-2xl bg-surface-100/80 dark:bg-surface-900/50 px-3 py-2">
-                                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Parent phone</div>
+                                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Guardian phone</div>
                                         <div class="text-sm font-medium">{{ student.parentPhone || 'Not set' }}</div>
                                     </div>
                                 </div>
@@ -140,11 +140,11 @@ interface ClassStudentModalState {
 
                     <div class="grid gap-3 md:grid-cols-2">
                         <div class="rounded-2xl border border-surface-200 dark:border-surface-700 p-3">
-                            <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Parent email</div>
+                            <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Guardian email</div>
                             <div class="font-semibold mt-1">{{ selectedStudent.parentEmail }}</div>
                         </div>
                         <div class="rounded-2xl border border-surface-200 dark:border-surface-700 p-3">
-                            <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Parent phone</div>
+                            <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Guardian phone</div>
                             <div class="font-semibold mt-1">{{ selectedStudent.parentPhone }}</div>
                         </div>
                     </div>

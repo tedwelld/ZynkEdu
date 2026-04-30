@@ -192,6 +192,10 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         <input pInputText [(ngModel)]="adminDraft.displayName" class="w-full" />
                     </div>
                     <div *ngIf="adminDrawerMode === 'create'">
+                        <label class="block text-sm font-semibold mb-2">Contact email</label>
+                        <input pInputText [(ngModel)]="adminDraft.contactEmail" class="w-full" placeholder="admin@example.com" />
+                    </div>
+                    <div *ngIf="adminDrawerMode === 'create'">
                         <label class="block text-sm font-semibold mb-2">Password</label>
                         <input pInputText [(ngModel)]="adminDraft.password" class="w-full" type="password" />
                     </div>
@@ -234,11 +238,12 @@ export class PlatformDashboard implements OnInit {
         adminPassword: '',
         adminIsActive: true
     };
-    adminDraft: { id?: number; schoolId: number | null; username: string; displayName: string; password: string; isActive: boolean } = {
+    adminDraft: { id?: number; schoolId: number | null; username: string; displayName: string; password: string; contactEmail: string; isActive: boolean } = {
         schoolId: null,
         username: '',
         displayName: '',
         password: '',
+        contactEmail: '',
         isActive: true
     };
 
@@ -434,6 +439,7 @@ export class PlatformDashboard implements OnInit {
             username: '',
             displayName: '',
             password: '',
+            contactEmail: '',
             isActive: true
         };
         this.adminDrawerVisible = true;
@@ -447,6 +453,7 @@ export class PlatformDashboard implements OnInit {
             username: admin.username,
             displayName: admin.displayName,
             password: '',
+            contactEmail: admin.contactEmail ?? '',
             isActive: admin.isActive
         };
         this.adminDrawerVisible = true;
@@ -476,7 +483,8 @@ export class PlatformDashboard implements OnInit {
             const request: CreateSchoolUserRequest = {
                 username: this.adminDraft.username,
                 displayName: this.adminDraft.displayName,
-                password: this.adminDraft.password
+                password: this.adminDraft.password,
+                contactEmail: this.adminDraft.contactEmail.trim() || null
             };
 
             this.api.createAdmin(request, this.adminDraft.schoolId).subscribe({

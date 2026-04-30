@@ -11,6 +11,4 @@ public interface ICurrentUserContext
     int? SchoolId { get; }
     string? UserName { get; }
     UserRole? Role { get; }
-    string? ParentPhone { get; }
-    string? ParentEmail { get; }
 }

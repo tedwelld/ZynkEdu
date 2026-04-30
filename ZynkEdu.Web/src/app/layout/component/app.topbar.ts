@@ -113,10 +113,6 @@ export class AppTopbar {
             return 'Teacher';
         }
 
-        if (role === 'Parent') {
-            return 'Parent';
-        }
-
         return 'Admin';
     }
 
@@ -152,10 +148,6 @@ export class AppTopbar {
 
         if (role === 'Teacher') {
             return '/teacher/dashboard';
-        }
-
-        if (role === 'Parent') {
-            return '/parent/dashboard';
         }
 
         return '/admin/dashboard';

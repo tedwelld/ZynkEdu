@@ -6,7 +6,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
     const auth = inject(AuthService);
     const token = auth.token();
 
-    if (!token || request.url.includes('/auth/login') || request.url.includes('/auth/parent-otp') || request.url.includes('/auth/verify-otp') || request.url.includes('/auth/schools')) {
+    if (!token || request.url.includes('/auth/login') || request.url.includes('/auth/schools')) {
         return next(request);
     }
 

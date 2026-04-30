@@ -5,6 +5,7 @@ import { ButtonModule } from 'primeng/button';
 import { MessageService } from 'primeng/api';
 import { InputTextModule } from 'primeng/inputtext';
 import { MultiSelectModule } from 'primeng/multiselect';
+import { PaginatorModule, PaginatorState } from 'primeng/paginator';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
 import { TimelineModule } from 'primeng/timeline';
@@ -19,14 +20,14 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 @Component({
     standalone: true,
     selector: 'app-admin-notifications',
-    imports: [CommonModule, FormsModule, ButtonModule, InputTextModule, MetricCardComponent, MultiSelectModule, AppDropdownComponent, SkeletonModule, TagModule, TextareaModule, TimelineModule],
+    imports: [CommonModule, FormsModule, ButtonModule, InputTextModule, MetricCardComponent, MultiSelectModule, AppDropdownComponent, PaginatorModule, SkeletonModule, TagModule, TextareaModule, TimelineModule],
     template: `
         <section class="space-y-6">
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Notifications</p>
                     <h1 class="text-3xl font-display font-bold m-0">Communication center</h1>
-                    <p class="text-muted-color mt-2 max-w-2xl">Compose SMS or email alerts for an individual student, an entire class, or everyone in the selected school.</p>
+                    <p class="text-muted-color mt-2 max-w-2xl">Compose SMS or email alerts for students, guardians, teachers, and school admins from one place.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
                     <app-dropdown
@@ -55,7 +56,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 <app-metric-card label="Email" [value]="emailCount" delta="Channel mix" hint="Email delivery" icon="pi pi-envelope" tone="purple"></app-metric-card>
             </section>
 
-            <div class="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+            <div class="grid gap-6 xl:grid-cols-1">
                 <article class="workspace-card">
                     <div class="flex items-center justify-between mb-4">
                         <div>
@@ -115,7 +116,16 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                             <div class="mt-2 text-xs text-muted-color">Choose one or more students in the selected school.</div>
                         </div>
                         <div *ngIf="draft.audience === 'All'" class="text-xs text-muted-color">
-                            Sends to every student in the selected school.
+                            Sends to every student and guardian in the selected school.
+                        </div>
+                        <div *ngIf="draft.audience === 'Teachers'" class="text-xs text-muted-color">
+                            Sends to all active teachers in the selected school.
+                        </div>
+                        <div *ngIf="draft.audience === 'Admins'" class="text-xs text-muted-color">
+                            Sends to all school admins in the selected school.
+                        </div>
+                        <div *ngIf="draft.audience === 'PlatformAdmins'" class="text-xs text-muted-color">
+                            Sends to all platform admins.
                         </div>
                         <button pButton type="button" label="Send notification" icon="pi pi-send" class="w-full" (click)="send()" [disabled]="isSendBlocked"></button>
                     </div>
@@ -133,7 +143,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         <p-skeleton *ngFor="let _ of skeletonRows" height="4rem" borderRadius="1rem"></p-skeleton>
                     </div>
                     <div *ngIf="!loading" class="space-y-4">
-                        <div *ngFor="let notification of notifications" class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
+                        <div *ngFor="let notification of pagedNotifications" class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
                             <div class="flex items-center justify-between gap-3">
                                 <div>
                                     <div class="font-semibold">{{ notification.title }}</div>
@@ -143,13 +153,14 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                             </div>
                             <div class="mt-3 grid gap-2">
                                 <div *ngFor="let recipient of notification.recipients.slice(0, 3)" class="flex items-center justify-between rounded-2xl bg-surface-50 dark:bg-surface-900/50 px-3 py-2 text-sm">
-                                    <span>{{ recipient.studentName }}</span>
+                                    <span>{{ recipient.recipientName }}</span>
                                     <span class="text-muted-color">{{ recipient.status }}</span>
                                 </div>
                                 <div class="text-xs text-muted-color">{{ notification.recipients.length }} recipient(s) · {{ notification.createdAt | date: 'medium' }}</div>
                             </div>
                         </div>
                     </div>
+                    <p-paginator *ngIf="!loading && notifications.length > sentFeedRows" [rows]="sentFeedRows" [first]="sentFeedFirst" [totalRecords]="notifications.length" (onPageChange)="onSentFeedPageChange($event)" styleClass="mt-4"></p-paginator>
                 </article>
             </div>
 
@@ -188,6 +199,8 @@ export class AdminNotifications implements OnInit {
     students: StudentResponse[] = [];
     skeletonRows = Array.from({ length: 4 });
     selectedSchoolId: number | null = this.auth.schoolId();
+    sentFeedFirst = 0;
+    readonly sentFeedRows = 5;
     draft = {
         title: '',
         message: '',
@@ -206,7 +219,10 @@ export class AdminNotifications implements OnInit {
     audienceOptions = [
         { label: 'Everyone', value: 'All' },
         { label: 'Class', value: 'Class' },
-        { label: 'Individual', value: 'Individual' }
+        { label: 'Individual', value: 'Individual' },
+        { label: 'Teachers', value: 'Teachers' },
+        { label: 'School admins', value: 'Admins' },
+        { label: 'Platform admins', value: 'PlatformAdmins' }
     ];
 
     get isPlatformAdmin(): boolean {
@@ -244,6 +260,10 @@ export class AdminNotifications implements OnInit {
 
     get recentNotifications(): NotificationResponse[] {
         return this.notifications.slice(0, 4);
+    }
+
+    get pagedNotifications(): NotificationResponse[] {
+        return this.notifications.slice(this.sentFeedFirst, this.sentFeedFirst + this.sentFeedRows);
     }
 
     get isSendBlocked(): boolean {
@@ -284,6 +304,7 @@ export class AdminNotifications implements OnInit {
                 this.students = students;
                 this.draft.schoolId = schoolId;
                 this.syncDraftTargets();
+                this.sentFeedFirst = 0;
                 this.loading = false;
             },
             error: () => {
@@ -296,6 +317,7 @@ export class AdminNotifications implements OnInit {
         this.selectedSchoolId = schoolId;
         this.draft.schoolId = schoolId;
         this.syncDraftTargets(true);
+        this.sentFeedFirst = 0;
         this.loadData();
     }
 
@@ -327,7 +349,8 @@ export class AdminNotifications implements OnInit {
             audience: this.draft.audience,
             schoolId: this.selectedSchoolId,
             className: this.draft.audience === 'Class' ? this.draft.className?.trim() ?? null : null,
-            studentIds: this.draft.audience === 'Individual' && this.draft.studentIds?.length ? this.draft.studentIds : null
+            studentIds: this.draft.audience === 'Individual' && this.draft.studentIds?.length ? this.draft.studentIds : null,
+            staffIds: null
         }).subscribe({
             next: () => {
                 this.messages.add({ severity: 'success', summary: 'Sent', detail: 'Notification dispatched successfully.' });
@@ -340,12 +363,17 @@ export class AdminNotifications implements OnInit {
                     className: '',
                     schoolId: this.selectedSchoolId
                 };
+                this.sentFeedFirst = 0;
                 this.loadData();
             },
             error: () => {
                 this.messages.add({ severity: 'error', summary: 'Failed', detail: 'Notification could not be dispatched.' });
             }
         });
+    }
+
+    onSentFeedPageChange(event: PaginatorState): void {
+        this.sentFeedFirst = event.first ?? 0;
     }
 
     private syncDraftTargets(clearAll = false): void {

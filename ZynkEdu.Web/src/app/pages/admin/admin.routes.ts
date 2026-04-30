@@ -10,6 +10,8 @@ export const adminRoutes: Routes = [
     { path: 'subjects', loadComponent: () => import('./subjects').then((m) => m.AdminSubjects) },
     { path: 'assignments', loadComponent: () => import('./assignments').then((m) => m.AdminAssignments) },
     { path: 'timetable', loadComponent: () => import('./timetable').then((m) => m.AdminTimetable) },
+    { path: 'grading', loadComponent: () => import('./grading').then((m) => m.AdminGrading) },
+    { path: 'progression', loadComponent: () => import('./progression').then((m) => m.AdminProgression) },
     { path: 'results', loadComponent: () => import('./results').then((m) => m.AdminResults) },
     { path: 'notifications', loadComponent: () => import('./notifications').then((m) => m.AdminNotifications) },
     { path: 'calendar', loadComponent: () => import('./calendar').then((m) => m.AdminCalendar) },

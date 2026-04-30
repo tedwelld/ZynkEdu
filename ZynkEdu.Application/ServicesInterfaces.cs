@@ -5,8 +5,6 @@ namespace ZynkEdu.Application.Abstractions;
 public interface IAuthService
 {
     Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
-    Task<ParentOtpResponse> RequestParentOtpAsync(ParentOtpRequest request, CancellationToken cancellationToken = default);
-    Task<LoginResponse> VerifyParentOtpAsync(VerifyParentOtpRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<SchoolResponse>> GetPublicSchoolsAsync(CancellationToken cancellationToken = default);
 }
 
@@ -57,7 +55,7 @@ public interface ITimetableDispatchService
 public interface IStudentService
 {
     Task<StudentResponse> CreateAsync(CreateStudentRequest request, int? schoolId = null, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<StudentResponse>> GetAllAsync(string? classFilter = null, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<StudentResponse>> GetAllAsync(string? classFilter = null, int? schoolId = null, bool includeInactive = false, CancellationToken cancellationToken = default);
     Task<StudentResponse?> GetByIdAsync(int id, int? schoolId = null, CancellationToken cancellationToken = default);
     Task<StudentResponse> UpdateAsync(int id, UpdateStudentRequest request, CancellationToken cancellationToken = default);
     Task<StudentResponse> UpdateStatusAsync(int id, UpdateStudentStatusRequest request, CancellationToken cancellationToken = default);
@@ -81,8 +79,6 @@ public interface IResultService
     Task<IReadOnlyList<ResultResponse>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ResultResponse>> GetStudentResultsAsync(int studentId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ResultResponse>> GetClassResultsAsync(string className, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<StudentCommentResponse>> GetParentResultsAsync(string destination, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<ParentPreviewReportResponse>> GetParentReportPreviewAsync(string destination, CancellationToken cancellationToken = default);
     Task<ResultSlipSendResponse> SendSlipAsync(int studentId, SendResultSlipRequest request, byte[] slipPdf, string slipFileName, int? schoolId = null, CancellationToken cancellationToken = default);
     Task<ResultResponse> ApproveAsync(int id, CancellationToken cancellationToken = default);
     Task<ResultResponse> RejectAsync(int id, CancellationToken cancellationToken = default);

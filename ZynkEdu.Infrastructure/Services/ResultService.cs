@@ -16,6 +16,7 @@ public sealed class ResultService : IResultService
     private readonly IEmailSender _emailSender;
     private readonly ISmsSender _smsSender;
     private readonly IReportEmailTemplateService _reportEmailTemplateService;
+    private readonly IGradingSchemeService _gradingSchemeService;
 
     public ResultService(
         ZynkEduDbContext dbContext,
@@ -24,7 +25,8 @@ public sealed class ResultService : IResultService
         IAuditLogService auditLogService,
         IEmailSender emailSender,
         ISmsSender smsSender,
-        IReportEmailTemplateService reportEmailTemplateService)
+        IReportEmailTemplateService reportEmailTemplateService,
+        IGradingSchemeService gradingSchemeService)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
@@ -33,6 +35,7 @@ public sealed class ResultService : IResultService
         _emailSender = emailSender;
         _smsSender = smsSender;
         _reportEmailTemplateService = reportEmailTemplateService;
+        _gradingSchemeService = gradingSchemeService;
     }
 
     public async Task<ResultResponse> CreateAsync(CreateResultRequest request, CancellationToken cancellationToken = default)
@@ -46,6 +49,12 @@ public sealed class ResultService : IResultService
 
         var student = await _dbContext.Students.FirstOrDefaultAsync(x => x.Id == request.StudentId && x.SchoolId == schoolId, cancellationToken)
             ?? throw new InvalidOperationException("Student was not found in this school.");
+
+        if (!string.Equals(student.Status, "Active", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(student.Status, "Suspended", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The selected student is not active in this class.");
+        }
 
         var subject = await _dbContext.Subjects.FirstOrDefaultAsync(x => x.Id == request.SubjectId && x.SchoolId == schoolId, cancellationToken)
             ?? throw new InvalidOperationException("Subject was not found in this school.");
@@ -69,7 +78,7 @@ public sealed class ResultService : IResultService
             SubjectId = subject.Id,
             TeacherId = teacher.Id,
             Score = request.Score,
-            Grade = GetGrade(request.Score),
+            Grade = await _gradingSchemeService.ResolveGradeAsync(schoolId, student.Level, request.Score, cancellationToken),
             Term = request.Term.Trim(),
             Comment = request.Comment?.Trim(),
             ApprovalStatus = "Pending",
@@ -228,36 +237,51 @@ public sealed class ResultService : IResultService
 
         var preview = await BuildParentPreviewReportForStudentAsync(student.Id, cancellationToken);
         var emailTemplate = _reportEmailTemplateService.BuildParentResultSlip(preview);
+        var guardianContacts = await LoadPreferredGuardianContactsAsync(student.Id, cancellationToken);
 
         var emailSent = false;
         var smsSent = false;
 
         if (request.SendEmail)
         {
-            if (string.IsNullOrWhiteSpace(student.ParentEmail))
+            var emailRecipients = guardianContacts.Select(x => x.Email).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (emailRecipients.Length == 0)
             {
-                throw new InvalidOperationException("The selected student does not have a parent email on file.");
+                throw new InvalidOperationException("The selected student does not have a guardian email on file.");
             }
 
-            await _emailSender.SendAsync(
-                student.ParentEmail,
-                emailTemplate.Subject,
-                emailTemplate.TextBody,
-                emailTemplate.HtmlBody,
-                slipPdf,
-                string.IsNullOrWhiteSpace(slipFileName) ? $"result-slip-{student.StudentNumber}.pdf" : slipFileName,
-                "application/pdf",
-                cancellationToken);
+            foreach (var destination in emailRecipients)
+            {
+                await _emailSender.SendAsync(
+                    destination,
+                    emailTemplate.Subject,
+                    emailTemplate.TextBody,
+                    emailTemplate.HtmlBody,
+                    slipPdf,
+                    string.IsNullOrWhiteSpace(slipFileName) ? $"result-slip-{student.StudentNumber}.pdf" : slipFileName,
+                    "application/pdf",
+                    cancellationToken);
+            }
             emailSent = true;
         }
 
-        if (request.SendSms && !string.IsNullOrWhiteSpace(student.ParentPhone))
+        if (request.SendSms)
         {
-            await _smsSender.SendAsync(
-                student.ParentPhone,
-                $"ZynkEdu results for {student.FullName} are ready. Please check your email or log in to view the slip.",
-                cancellationToken);
-            smsSent = true;
+            var smsRecipients = guardianContacts.Select(x => x.Phone).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (smsRecipients.Length == 0)
+            {
+                throw new InvalidOperationException("The selected student does not have a guardian phone on file.");
+            }
+
+            foreach (var destination in smsRecipients)
+            {
+                await _smsSender.SendAsync(
+                    destination,
+                    $"ZynkEdu results for {student.FullName} are ready. Please check your email or log in to view the slip.",
+                    cancellationToken);
+            }
+
+            smsSent = smsRecipients.Length > 0;
         }
 
         return new ResultSlipSendResponse(
@@ -265,6 +289,8 @@ public sealed class ResultService : IResultService
             student.FullName,
             student.ParentEmail,
             student.ParentPhone,
+            guardianContacts.Select(x => x.Email).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            guardianContacts.Select(x => x.Phone).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             emailSent,
             smsSent);
     }
@@ -320,15 +346,6 @@ public sealed class ResultService : IResultService
         return schoolId;
     }
 
-    private static string GetGrade(decimal score)
-    {
-        if (score >= 80) return "A";
-        if (score >= 70) return "B";
-        if (score >= 60) return "C";
-        if (score >= 50) return "D";
-        return "F";
-    }
-
     private async Task<ResultResponse> UpdateApprovalStateAsync(int id, string approvalStatus, bool lockResult, CancellationToken cancellationToken)
     {
         if (_currentUserContext.Role is not (UserRole.Admin or UserRole.PlatformAdmin))
@@ -370,6 +387,27 @@ public sealed class ResultService : IResultService
             result.CreatedAt.Year);
     }
 
+    private async Task<IReadOnlyList<(string Email, string Phone)>> LoadPreferredGuardianContactsAsync(int studentId, CancellationToken cancellationToken)
+    {
+        var guardians = await _dbContext.Guardians.AsNoTracking()
+            .Where(x => x.StudentId == studentId && x.IsActive)
+            .OrderByDescending(x => x.IsPrimary)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        if (guardians.Count == 0)
+        {
+            return Array.Empty<(string Email, string Phone)>();
+        }
+
+        var preferredGuardian = guardians.FirstOrDefault(guardian =>
+                guardian.IsPrimary && (!string.IsNullOrWhiteSpace(guardian.ParentEmail) || !string.IsNullOrWhiteSpace(guardian.ParentPhone)))
+            ?? guardians.FirstOrDefault(guardian => !string.IsNullOrWhiteSpace(guardian.ParentEmail) || !string.IsNullOrWhiteSpace(guardian.ParentPhone))
+            ?? guardians[0];
+
+        return [(preferredGuardian.ParentEmail, preferredGuardian.ParentPhone)];
+    }
+
     private async Task<IReadOnlyList<ParentPreviewReportResponse>> BuildParentPreviewReportsAsync(IEnumerable<Student> students, CancellationToken cancellationToken)
     {
         var schoolNames = await _dbContext.Schools.AsNoTracking()
@@ -408,9 +446,11 @@ public sealed class ResultService : IResultService
 
     private static ParentPreviewReportResponse BuildParentPreviewReport(Student student, IReadOnlyDictionary<int, string> schoolNames)
     {
+        var studentLevel = SchoolLevelCatalog.NormalizeLevel(student.Level);
         var subjectRows = student.SubjectEnrollments
             .Select(enrollment => enrollment.Subject)
             .Where(subject => subject is not null)
+            .Where(subject => SubjectMatchesStudentLevel(subject!, studentLevel))
             .GroupBy(subject => subject!.Id)
             .Select(group =>
             {
@@ -441,6 +481,7 @@ public sealed class ResultService : IResultService
         if (subjectRows.Count == 0)
         {
             subjectRows = student.Results
+                .Where(result => SubjectMatchesStudentLevel(result.Subject, studentLevel))
                 .Select(result => new ParentReportSubjectResponse(
                     result.SubjectId,
                     result.Subject.Name,
@@ -471,5 +512,11 @@ public sealed class ResultService : IResultService
             schoolNames.TryGetValue(student.SchoolId, out var schoolName) ? schoolName : $"School {student.SchoolId}",
             overallAverage,
             subjectRows);
+    }
+
+    private static bool SubjectMatchesStudentLevel(Subject subject, string studentLevel)
+    {
+        var subjectLevel = SchoolLevelCatalog.NormalizeLevel(subject.GradeLevel);
+        return subjectLevel == SchoolLevelCatalog.General || subjectLevel == studentLevel;
     }
 }

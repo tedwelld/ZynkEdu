@@ -23,20 +23,6 @@ public sealed class AuthController : ControllerBase
         return Ok(await _authService.LoginAsync(request, cancellationToken));
     }
 
-    [HttpPost("parent-otp")]
-    [AllowAnonymous]
-    public async Task<ActionResult<ParentOtpResponse>> RequestParentOtp([FromBody] ParentOtpRequest request, CancellationToken cancellationToken)
-    {
-        return Ok(await _authService.RequestParentOtpAsync(request, cancellationToken));
-    }
-
-    [HttpPost("verify-otp")]
-    [AllowAnonymous]
-    public async Task<ActionResult<LoginResponse>> VerifyParentOtp([FromBody] VerifyParentOtpRequest request, CancellationToken cancellationToken)
-    {
-        return Ok(await _authService.VerifyParentOtpAsync(request, cancellationToken));
-    }
-
     [HttpGet("schools")]
     [AllowAnonymous]
     public async Task<ActionResult<IReadOnlyList<SchoolResponse>>> GetSchools(CancellationToken cancellationToken)

@@ -64,7 +64,6 @@ interface FallingLetterStream {
                     <div class="auth-login-badge-row">
                         <span class="auth-login-badge">School</span>
                         <span class="auth-login-badge">Platform</span>
-                        <span class="auth-login-badge">Parent</span>
                     </div>
 
                     <div class="auth-login-copy">
@@ -88,14 +87,6 @@ interface FallingLetterStream {
                             (click)="mode = 'platform'"
                         >
                             Platform admin
-                        </button>
-                        <button
-                            type="button"
-                            class="auth-login-mode-button"
-                            [ngClass]="mode === 'parent' ? 'is-active' : ''"
-                            (click)="mode = 'parent'"
-                        >
-                            Parent
                         </button>
                     </div>
 
@@ -166,33 +157,6 @@ interface FallingLetterStream {
                             </div>
                         </div>
 
-                        <div *ngIf="mode === 'parent'" class="space-y-4">
-                            <div>
-                                <label class="auth-login-label">Email or phone</label>
-                                <input
-                                    pInputText
-                                    [(ngModel)]="parentIdentifier"
-                                    name="parentIdentifier"
-                                    class="w-full auth-login-control"
-                                    placeholder="Email address or phone number"
-                                    autocomplete="username"
-                                />
-                            </div>
-
-                            <div>
-                                <label class="auth-login-label">Password</label>
-                                <p-password
-                                    [(ngModel)]="password"
-                                    name="password"
-                                    [toggleMask]="true"
-                                    [feedback]="false"
-                                    styleClass="w-full auth-login-control"
-                                    inputStyleClass="w-full auth-login-input"
-                                    autocomplete="current-password"
-                                ></p-password>
-                            </div>
-                        </div>
-
                         <div class="auth-login-footer-row">
                             <label class="auth-login-remember">
                                 <input type="checkbox" />
@@ -226,14 +190,13 @@ export class Login implements OnInit {
     private readonly messages = inject(MessageService);
     readonly letterStreams = createFallingLetterStreams();
 
-    mode: 'staff' | 'platform' | 'parent' = 'staff';
+    mode: 'staff' | 'platform' = 'staff';
     loading = false;
     username = '';
     password = '';
     schoolQuery = '';
     selectedSchool: SchoolResponse | null = null;
     schoolSuggestions: SchoolResponse[] = [];
-    parentIdentifier = '';
 
     ngOnInit(): void {
         this.auth.loadSchools().subscribe({
@@ -280,11 +243,9 @@ export class Login implements OnInit {
 
         this.loading = true;
         const request =
-            this.mode === 'parent'
-                ? { username: this.parentIdentifier.trim(), password: this.password, schoolName: null }
-                : this.mode === 'platform'
-                    ? { username: this.username.trim(), password: this.password, schoolName: null }
-                    : { username: this.username.trim(), password: this.password, schoolName: this.selectedSchool?.name ?? this.schoolQuery };
+            this.mode === 'platform'
+                ? { username: this.username.trim(), password: this.password, schoolName: null }
+                : { username: this.username.trim(), password: this.password, schoolName: this.selectedSchool?.name ?? this.schoolQuery };
 
         this.auth.login(request).subscribe({
             next: () => {
@@ -303,11 +264,9 @@ export class Login implements OnInit {
 
     private getLoginErrorMessage(error: unknown): string {
         const fallback =
-            this.mode === 'parent'
-                ? 'Check your email or phone and password.'
-                : this.mode === 'platform'
-                    ? 'Check your platform admin details.'
-                    : 'Check your school, username, and password.';
+            this.mode === 'platform'
+                ? 'Check your platform admin details.'
+                : 'Check your school, username, and password.';
 
         const problem = error as { error?: { detail?: string; title?: string; message?: string }; message?: string };
         const detail = problem?.error?.detail ?? problem?.error?.title ?? problem?.error?.message ?? problem?.message;

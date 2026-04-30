@@ -8,10 +8,6 @@ function mapRoleToRoot(role: WorkspaceRole | null): string {
         return '/platform/dashboard';
     }
 
-    if (role === 'Parent') {
-        return '/parent/dashboard';
-    }
-
     if (role === 'Teacher') {
         return '/teacher/dashboard';
     }

@@ -48,6 +48,7 @@ public sealed class NotificationDispatchHostedService : BackgroundService
         var pendingRecipients = await db.NotificationRecipients
             .Include(x => x.Notification)
             .Include(x => x.Student)
+            .Include(x => x.StaffUser)
             .Where(x => x.Status == NotificationStatus.Pending)
             .OrderBy(x => x.Id)
             .Take(25)
@@ -68,7 +69,7 @@ public sealed class NotificationDispatchHostedService : BackgroundService
             {
                 var notification = recipient.Notification;
                 var student = recipient.Student;
-                var destination = recipient.Destination ?? student.ParentPhone;
+                var destination = recipient.Destination;
 
                 if (string.IsNullOrWhiteSpace(destination))
                 {
@@ -87,7 +88,7 @@ public sealed class NotificationDispatchHostedService : BackgroundService
                 }
                 else
                 {
-                    _logger.LogInformation("System notification {NotificationId} queued for student {StudentId}", notification.Id, student.Id);
+                    _logger.LogInformation("System notification {NotificationId} queued for recipient {RecipientId}", notification.Id, recipient.Id);
                 }
 
                 recipient.Status = NotificationStatus.Delivered;

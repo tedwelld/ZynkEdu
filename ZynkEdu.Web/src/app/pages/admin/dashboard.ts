@@ -123,11 +123,11 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                             </div>
                             <div class="grid grid-cols-2 gap-3 mt-4 text-sm">
                                 <div class="rounded-2xl bg-surface-0/70 dark:bg-surface-950/40 p-3">
-                                    <div class="text-muted-color">Parent email</div>
+                                    <div class="text-muted-color">Guardian email</div>
                                     <div class="font-semibold">{{ selectedStudent.parentEmail }}</div>
                                 </div>
                                 <div class="rounded-2xl bg-surface-0/70 dark:bg-surface-950/40 p-3">
-                                    <div class="text-muted-color">Parent phone</div>
+                                    <div class="text-muted-color">Guardian phone</div>
                                     <div class="font-semibold">{{ selectedStudent.parentPhone }}</div>
                                 </div>
                             </div>

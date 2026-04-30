@@ -28,6 +28,8 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuSec
                     { label: 'Subjects', icon: 'pi pi-fw pi-book', routerLink: ['/platform/subjects'] },
                     { label: 'Assignments', icon: 'pi pi-fw pi-sitemap', routerLink: ['/platform/assignments'] },
                     { label: 'Timetable', icon: 'pi pi-fw pi-clock', routerLink: ['/platform/timetable'] },
+                    { label: 'Grading', icon: 'pi pi-fw pi-sliders-h', routerLink: ['/platform/grading'] },
+                    { label: 'Progression', icon: 'pi pi-fw pi-sort-alt', routerLink: ['/platform/progression'] },
                     { label: 'Results', icon: 'pi pi-fw pi-chart-line', routerLink: ['/platform/results'] }
                 ]
             },
@@ -64,23 +66,6 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuSec
         ];
     }
 
-    if (role === 'Parent') {
-        return [
-            {
-                label: 'Parent',
-                items: [
-                    { label: 'Dashboard', icon: 'pi pi-fw pi-home', routerLink: ['/parent/dashboard'] },
-                    { label: 'Results', icon: 'pi pi-fw pi-chart-bar', routerLink: ['/parent/results'] },
-                    { label: 'Notifications', icon: 'pi pi-fw pi-comments', routerLink: ['/parent/notifications'] }
-                ]
-            },
-            {
-                label: 'More',
-                items: [{ label: 'Contact School', icon: 'pi pi-fw pi-envelope', routerLink: ['/parent/dashboard'], queryParams: { panel: 'support' } }]
-            }
-        ];
-    }
-
     return [
         {
             label: 'School',
@@ -91,7 +76,9 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuSec
                 { label: 'Teachers', icon: 'pi pi-fw pi-id-card', routerLink: ['/admin/teachers'] },
                 { label: 'Classes', icon: 'pi pi-fw pi-sitemap', routerLink: ['/admin/classes'] },
                 { label: 'Calendar', icon: 'pi pi-fw pi-calendar', routerLink: ['/admin/calendar'] },
-                { label: 'Timetable', icon: 'pi pi-fw pi-clock', routerLink: ['/admin/timetable'] }
+                { label: 'Timetable', icon: 'pi pi-fw pi-clock', routerLink: ['/admin/timetable'] },
+                { label: 'Grading', icon: 'pi pi-fw pi-sliders-h', routerLink: ['/admin/grading'] },
+                { label: 'Progression', icon: 'pi pi-fw pi-sort-alt', routerLink: ['/admin/progression'] }
             ]
         },
         {

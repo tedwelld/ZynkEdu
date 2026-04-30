@@ -11,7 +11,7 @@ import { TagModule } from 'primeng/tag';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { CreateResultRequest, ResultResponse, StudentResponse, TeacherAssignmentResponse } from '../../core/api/api.models';
+import { CreateResultRequest, GradingSchemeResponse, ResultResponse, StudentResponse, TeacherAssignmentResponse } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 import { buildTeacherClassResultsPdf } from '../../shared/report/report-pdf';
@@ -227,6 +227,7 @@ export class TeacherResults implements OnInit {
     skeletonRows = Array.from({ length: 4 });
     entryRows: ResultEntryRow[] = [];
     draftCount = 0;
+    gradingScheme: GradingSchemeResponse | null = null;
 
     ngOnInit(): void {
         const teacherId = this.auth.userId();
@@ -235,6 +236,7 @@ export class TeacherResults implements OnInit {
             next: (assignments) => {
                 this.assignments = assignments;
                 this.selectedClass = this.classOptions[0]?.value ?? '';
+                void this.loadGradingScheme();
                 this.loadClassData();
             },
             error: () => {
@@ -256,6 +258,10 @@ export class TeacherResults implements OnInit {
             .filter((assignment) => assignment.class === this.selectedClass)
             .map((assignment) => ({ label: assignment.subjectName, value: assignment.subjectId }))
             .filter((item, index, list) => list.findIndex((entry) => entry.value === item.value) === index);
+    }
+
+    get selectedClassLevel(): string {
+        return this.assignments.find((assignment) => assignment.class === this.selectedClass)?.gradeLevel ?? '';
     }
 
     get selectedSubjectName(): string {
@@ -518,7 +524,7 @@ export class TeacherResults implements OnInit {
         }
 
         const total = (testScore * ASSESSMENTS[0].weight + assignmentScore * ASSESSMENTS[1].weight + examScore * ASSESSMENTS[2].weight) / 100;
-        return Number.isFinite(total) ? total : null;
+        return Number.isFinite(total) ? Math.round(total * 10) / 10 : null;
     }
 
     private gradeForScore(score: number | null): string {
@@ -526,6 +532,44 @@ export class TeacherResults implements OnInit {
             return '-';
         }
 
+        const bands = this.gradingBandsForSelectedClass();
+        if (bands.length === 0) {
+            return this.defaultGradeForScore(score);
+        }
+
+        const rounded = Math.round(score * 10) / 10;
+        const match = bands.find((band) => rounded >= band.minScore && rounded <= band.maxScore);
+        return match?.grade ?? this.defaultGradeForScore(score);
+    }
+
+    private async loadGradingScheme(): Promise<void> {
+        const schoolId = this.auth.schoolId();
+        if (!schoolId) {
+            return;
+        }
+
+        this.api.getGradingScheme(schoolId).subscribe({
+            next: (scheme) => {
+                this.gradingScheme = scheme;
+                this.refreshEntryRows();
+            },
+            error: () => {
+                this.gradingScheme = null;
+                this.refreshEntryRows();
+            }
+        });
+    }
+
+    private gradingBandsForSelectedClass(): Array<{ grade: string; minScore: number; maxScore: number }> {
+        const level = this.selectedClassLevel;
+        if (!level || !this.gradingScheme) {
+            return [];
+        }
+
+        return this.gradingScheme.levels.find((entry) => entry.level === level)?.bands ?? [];
+    }
+
+    private defaultGradeForScore(score: number): string {
         if (score >= 80) {
             return 'A';
         }
@@ -542,6 +586,6 @@ export class TeacherResults implements OnInit {
             return 'D';
         }
 
-        return 'E';
+        return 'F';
     }
 }

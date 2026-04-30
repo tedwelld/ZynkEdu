@@ -37,8 +37,4 @@ public sealed class CurrentUserContext : ICurrentUserContext
             return Enum.TryParse<UserRole>(roleValue, out var role) ? role : null;
         }
     }
-
-    public string? ParentPhone => User?.FindFirstValue("parent_phone");
-
-    public string? ParentEmail => User?.FindFirstValue("parent_email");
 }

@@ -26,9 +26,9 @@ public sealed class StudentsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<StudentResponse>>> GetAll([FromQuery] string? classFilter, [FromQuery] int? schoolId, CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<StudentResponse>>> GetAll([FromQuery] string? classFilter, [FromQuery] int? schoolId, [FromQuery] bool includeInactive = false, CancellationToken cancellationToken = default)
     {
-        return Ok(await _studentService.GetAllAsync(classFilter, schoolId, cancellationToken));
+        return Ok(await _studentService.GetAllAsync(classFilter, schoolId, includeInactive, cancellationToken));
     }
 
     [HttpGet("{id:int}")]

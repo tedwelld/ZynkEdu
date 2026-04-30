@@ -28,19 +28,6 @@ public sealed class NotificationService : INotificationService
             audience = NotificationAudience.Individual;
         }
 
-        var targetStudents = audience switch
-        {
-            NotificationAudience.Individual => await ResolveStudentsByIdAsync(schoolId, request.StudentIds, cancellationToken),
-            NotificationAudience.Class => await ResolveStudentsByClassAsync(schoolId, request.ClassName, cancellationToken),
-            NotificationAudience.All => await _dbContext.Students.Where(x => x.SchoolId == schoolId).ToListAsync(cancellationToken),
-            _ => throw new InvalidOperationException("Choose a notification audience.")
-        };
-
-        if (targetStudents.Count == 0)
-        {
-            throw new InvalidOperationException("No matching students were found.");
-        }
-
         var notification = new Notification
         {
             SchoolId = schoolId,
@@ -51,14 +38,75 @@ public sealed class NotificationService : INotificationService
             CreatedAt = DateTime.UtcNow
         };
 
-        foreach (var student in targetStudents)
+        if (audience is NotificationAudience.Teachers or NotificationAudience.Admins or NotificationAudience.PlatformAdmins || request.StaffIds is { Count: > 0 })
         {
-            notification.Recipients.Add(new NotificationRecipient
+            var targetStaff = await ResolveStaffAsync(schoolId, audience, request.StaffIds, cancellationToken);
+            if (targetStaff.Count == 0)
             {
-                Student = student,
-                Status = NotificationStatus.Pending,
-                Destination = request.Type == NotificationType.Email ? student.ParentEmail : student.ParentPhone
-            });
+                throw new InvalidOperationException("No matching staff members were found.");
+            }
+
+            foreach (var staff in targetStaff)
+            {
+                notification.Recipients.Add(new NotificationRecipient
+                {
+                    StaffUserId = staff.Id,
+                    RecipientType = staff.Role.ToString(),
+                    Status = NotificationStatus.Pending,
+                    Destination = ResolveStaffDestination(staff, request.Type)
+                });
+            }
+        }
+        else
+        {
+            var targetStudents = audience switch
+            {
+                NotificationAudience.Individual => await ResolveStudentsByIdAsync(schoolId, request.StudentIds, cancellationToken),
+                NotificationAudience.Class => await ResolveStudentsByClassAsync(schoolId, request.ClassName, cancellationToken),
+                NotificationAudience.All or NotificationAudience.Guardians => await _dbContext.Students.Where(x => x.SchoolId == schoolId).ToListAsync(cancellationToken),
+                _ => throw new InvalidOperationException("Choose a notification audience.")
+            };
+
+            if (targetStudents.Count == 0)
+            {
+                throw new InvalidOperationException("No matching students were found.");
+            }
+
+            foreach (var student in targetStudents)
+            {
+                var guardians = await _dbContext.Guardians.AsNoTracking()
+                    .Where(x => x.StudentId == student.Id && x.IsActive)
+                    .OrderByDescending(x => x.IsPrimary)
+                    .ThenBy(x => x.Id)
+                    .ToListAsync(cancellationToken);
+
+                if (guardians.Count == 0 && (!string.IsNullOrWhiteSpace(student.ParentEmail) || !string.IsNullOrWhiteSpace(student.ParentPhone)))
+                {
+                    guardians.Add(new Guardian
+                    {
+                        SchoolId = student.SchoolId,
+                        StudentId = student.Id,
+                        DisplayName = student.FullName,
+                        Relationship = "Guardian",
+                        ParentEmail = student.ParentEmail,
+                        ParentPhone = student.ParentPhone,
+                        IsPrimary = true,
+                        IsActive = true,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+
+                foreach (var guardian in guardians)
+                {
+                    notification.Recipients.Add(new NotificationRecipient
+                    {
+                        StudentId = student.Id,
+                        RecipientType = "Guardian",
+                        Status = NotificationStatus.Pending,
+                        Destination = request.Type == NotificationType.Email ? guardian.ParentEmail : guardian.ParentPhone
+                    });
+                }
+            }
         }
 
         _dbContext.Notifications.Add(notification);
@@ -74,11 +122,12 @@ public sealed class NotificationService : INotificationService
             notification.CreatedAt,
             notification.Recipients.Select(x => new NotificationRecipientResponse(
                 x.StudentId,
-                x.Student.FullName,
+                x.Student?.FullName ?? x.StaffUser?.DisplayName ?? x.Destination ?? "Recipient",
                 x.Destination ?? string.Empty,
                 x.Status.ToString(),
                 x.Attempts,
-                x.LastError)).ToList());
+                x.LastError,
+                x.RecipientType)).ToList());
     }
 
     public async Task<IReadOnlyList<NotificationResponse>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -90,6 +139,8 @@ public sealed class NotificationService : INotificationService
         var notifications = await query
             .Include(x => x.Recipients)
                 .ThenInclude(x => x.Student)
+            .Include(x => x.Recipients)
+                .ThenInclude(x => x.StaffUser)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
 
@@ -103,11 +154,12 @@ public sealed class NotificationService : INotificationService
             notification.CreatedAt,
             notification.Recipients.Select(x => new NotificationRecipientResponse(
                 x.StudentId,
-                x.Student.FullName,
+                x.Student?.FullName ?? x.StaffUser?.DisplayName ?? x.Destination ?? "Recipient",
                 x.Destination ?? string.Empty,
                 x.Status.ToString(),
                 x.Attempts,
-                x.LastError)).ToList())).ToList();
+                x.LastError,
+                x.RecipientType)).ToList())).ToList();
     }
 
     private int ResolveSchoolId(int? requestedSchoolId)
@@ -183,5 +235,37 @@ public sealed class NotificationService : INotificationService
         }
 
         return students;
+    }
+
+    private async Task<List<AppUser>> ResolveStaffAsync(int schoolId, NotificationAudience audience, IReadOnlyList<int>? staffIds, CancellationToken cancellationToken)
+    {
+        var query = _dbContext.Users.AsNoTracking()
+            .Where(x => x.SchoolId == schoolId && x.IsActive && x.Role != UserRole.PlatformAdmin);
+
+        query = audience switch
+        {
+            NotificationAudience.Teachers => query.Where(x => x.Role == UserRole.Teacher),
+            NotificationAudience.Admins => query.Where(x => x.Role == UserRole.Admin),
+            NotificationAudience.PlatformAdmins => _dbContext.Users.AsNoTracking().Where(x => x.IsActive && x.Role == UserRole.PlatformAdmin),
+            _ => query
+        };
+
+        if (staffIds is { Count: > 0 })
+        {
+            var requestedIds = staffIds.Where(id => id > 0).Distinct().ToArray();
+            query = query.Where(x => requestedIds.Contains(x.Id));
+        }
+
+        return await query.OrderBy(x => x.DisplayName).ToListAsync(cancellationToken);
+    }
+
+    private static string ResolveStaffDestination(AppUser user, NotificationType type)
+    {
+        if (type == NotificationType.Email)
+        {
+            return user.ContactEmail ?? user.Username;
+        }
+
+        return user.Username;
     }
 }

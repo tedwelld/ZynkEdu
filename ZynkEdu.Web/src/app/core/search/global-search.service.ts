@@ -20,7 +20,7 @@ export class GlobalSearchService {
             return of(this.cache());
         }
 
-        if (role === 'Parent') {
+        if (false) {
             return this.api.getParentResults().pipe(
                 map((results) =>
                     results.map((result) => ({

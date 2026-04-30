@@ -22,6 +22,7 @@ import {
     BulkStudentSubjectEnrollmentResponse,
     CreateStudentRequest,
     DashboardResponse,
+    GuardianRequest,
     ResultResponse,
     SchoolResponse,
     StudentResponse,
@@ -61,6 +62,30 @@ const STATUS_OPTIONS = [
     { label: 'Archived', value: 'Archived' }
 ];
 
+const IDENTITY_DOCUMENT_TYPE_OPTIONS = [
+    { label: 'ID', value: 'ID' },
+    { label: 'Passport', value: 'Passport' },
+    { label: "Driver's license", value: "Driver's license" },
+    { label: 'Other', value: 'Other' }
+];
+
+const GUARDIAN_RELATIONSHIP_OPTIONS = [
+    { label: 'Mother', value: 'Mother' },
+    { label: 'Father', value: 'Father' },
+    { label: 'Stepmother', value: 'Stepmother' },
+    { label: 'Stepfather', value: 'Stepfather' },
+    { label: 'Grandmother', value: 'Grandmother' },
+    { label: 'Grandfather', value: 'Grandfather' },
+    { label: 'Aunt', value: 'Aunt' },
+    { label: 'Uncle', value: 'Uncle' },
+    { label: 'Sister', value: 'Sister' },
+    { label: 'Brother', value: 'Brother' },
+    { label: 'Older sibling', value: 'Older sibling' },
+    { label: 'Foster parent', value: 'Foster parent' },
+    { label: 'Legal guardian', value: 'Legal guardian' },
+    { label: 'Other', value: 'Other' }
+];
+
 const ALL_CLASS_LEVELS = [...new Set(Object.values(LEVEL_CLASS_MAP).flat())];
 
 interface StudentDraft {
@@ -70,9 +95,12 @@ interface StudentDraft {
     level: string;
     enrollmentYear: number | null;
     subjectIds: number[];
-    parentEmail: string;
-    parentPhone: string;
+    guardians: GuardianDraft[];
 }
+
+type GuardianDraft = GuardianRequest & {
+    localId: string;
+};
 
 @Component({
     standalone: true,
@@ -84,7 +112,7 @@ interface StudentDraft {
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Students</p>
                     <h1 class="text-3xl font-display font-bold m-0">Searchable student workspace</h1>
-                    <p class="text-muted-color mt-2 max-w-2xl">Instant search, class filters, performance tags, and a profile drawer with results trend and parent contact details.</p>
+                    <p class="text-muted-color mt-2 max-w-2xl">Instant search, class filters, performance tags, and a profile drawer with results trend and guardian contact details.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <app-dropdown *ngIf="isPlatformAdmin" [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-64" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (opened)="loadData()" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
@@ -150,7 +178,7 @@ interface StudentDraft {
                             <th>Status</th>
                             <th>Subjects</th>
                             <th>Performance</th>
-                            <th>Parent contact</th>
+                            <th>Guardian contact</th>
                             <th class="text-right">Actions</th>
                         </tr>
                     </ng-template>
@@ -252,14 +280,87 @@ interface StudentDraft {
                             </div>
                         </div>
 
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <div>
-                                <label class="block text-sm font-semibold mb-2">Parent email</label>
-                                <input pInputText [(ngModel)]="draft.parentEmail" class="w-full" />
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <label class="block text-sm font-semibold mb-1">Guardians</label>
+                                    <p class="text-xs text-muted-color m-0">Add one or more guardians. The first valid guardian is treated as primary.</p>
+                                </div>
+                                <button pButton type="button" label="Add guardian" icon="pi pi-user-plus" severity="secondary" class="p-button-sm" (click)="addGuardian()"></button>
                             </div>
-                            <div>
-                                <label class="block text-sm font-semibold mb-2">Parent phone</label>
-                                <input pInputText [(ngModel)]="draft.parentPhone" class="w-full" />
+
+                            <div *ngFor="let guardian of draft.guardians; let index = index" class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4 space-y-4">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div class="font-semibold">Guardian {{ index + 1 }}</div>
+                                        <div class="text-xs text-muted-color">{{ index === 0 ? 'Primary contact' : 'Additional contact' }}</div>
+                                    </div>
+                                    <button *ngIf="draft.guardians.length > 1" pButton type="button" icon="pi pi-trash" class="p-button-text p-button-sm p-button-danger" (click)="removeGuardian(index)"></button>
+                                </div>
+
+                                <div class="grid gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">Full name</label>
+                                        <input pInputText [(ngModel)]="guardian.displayName" class="w-full" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">Relationship</label>
+                                        <app-dropdown
+                                            [options]="relationshipOptions"
+                                            [(ngModel)]="guardian.relationship"
+                                            optionLabel="label"
+                                            optionValue="value"
+                                            class="w-full"
+                                            appendTo="body"
+                                            [filter]="true"
+                                            filterBy="label"
+                                            filterPlaceholder="Search relationships"
+                                            placeholder="Select relationship"
+                                        ></app-dropdown>
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">Phone</label>
+                                        <input pInputText [(ngModel)]="guardian.phone" class="w-full" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">Email</label>
+                                        <input pInputText [(ngModel)]="guardian.email" class="w-full" />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-semibold mb-2">Address</label>
+                                    <input pInputText [(ngModel)]="guardian.address" class="w-full" />
+                                </div>
+
+                                <div class="grid gap-4 md:grid-cols-3">
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">ID type</label>
+                                        <app-dropdown
+                                            [options]="identityDocumentTypeOptions"
+                                            [(ngModel)]="guardian.identityDocumentType"
+                                            optionLabel="label"
+                                            optionValue="value"
+                                            class="w-full"
+                                            appendTo="body"
+                                            [filter]="true"
+                                            filterBy="label"
+                                            filterPlaceholder="Search ID types"
+                                            placeholder="Select ID type"
+                                        ></app-dropdown>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">ID number</label>
+                                        <input pInputText [(ngModel)]="guardian.identityDocumentNumber" class="w-full" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold mb-2">Birth certificate no.</label>
+                                        <input pInputText [(ngModel)]="guardian.birthCertificateNumber" class="w-full" />
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -308,12 +409,33 @@ interface StudentDraft {
                                     <div class="font-semibold">{{ selectedStudent.subjects.length ? selectedStudent.subjects.join(', ') : 'None' }}</div>
                                 </div>
                                 <div class="rounded-2xl bg-surface-0/70 dark:bg-surface-950/40 p-3">
-                                    <div class="text-muted-color">Parent email</div>
-                                    <div class="font-semibold">{{ selectedStudent.parentEmail }}</div>
+                                    <div class="text-muted-color">Guardians</div>
+                                    <div class="font-semibold">{{ selectedStudent.guardians.length }}</div>
                                 </div>
-                                <div class="rounded-2xl bg-surface-0/70 dark:bg-surface-950/40 p-3">
-                                    <div class="text-muted-color">Parent phone</div>
-                                    <div class="font-semibold">{{ selectedStudent.parentPhone }}</div>
+                            </div>
+                        </div>
+
+                        <div class="workspace-card">
+                            <div class="flex items-center justify-between gap-3 mb-4">
+                                <h3 class="font-display font-bold mb-0">Guardians</h3>
+                                <span class="text-sm text-muted-color">{{ selectedStudent.guardians.length }} contact(s)</span>
+                            </div>
+                            <div class="space-y-3">
+                                <div *ngFor="let guardian of selectedStudent.guardians" class="rounded-2xl border border-surface-200 dark:border-surface-700 p-3">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <div class="font-semibold">{{ guardian.displayName }}</div>
+                                            <div class="text-sm text-muted-color">{{ guardian.relationship }}{{ guardian.isPrimary ? ' • Primary' : '' }}</div>
+                                        </div>
+                                        <p-tag [value]="guardian.isPrimary ? 'Primary' : 'Guardian'" [severity]="guardian.isPrimary ? 'success' : 'secondary'"></p-tag>
+                                    </div>
+                                    <div class="grid gap-2 md:grid-cols-2 text-sm mt-3">
+                                        <div>Email: <span class="font-semibold">{{ guardian.email }}</span></div>
+                                        <div>Phone: <span class="font-semibold">{{ guardian.phone }}</span></div>
+                                        <div *ngIf="guardian.address">Address: <span class="font-semibold">{{ guardian.address }}</span></div>
+                                        <div *ngIf="guardian.identityDocumentType || guardian.identityDocumentNumber">ID: <span class="font-semibold">{{ guardian.identityDocumentType || 'ID' }} {{ guardian.identityDocumentNumber }}</span></div>
+                                        <div *ngIf="guardian.birthCertificateNumber">Birth certificate: <span class="font-semibold">{{ guardian.birthCertificateNumber }}</span></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -430,6 +552,14 @@ export class AdminStudents implements OnInit {
 
     get statusOptions(): { label: string; value: string }[] {
         return STATUS_OPTIONS;
+    }
+
+    get identityDocumentTypeOptions(): { label: string; value: string }[] {
+        return IDENTITY_DOCUMENT_TYPE_OPTIONS;
+    }
+
+    get relationshipOptions(): { label: string; value: string }[] {
+        return GUARDIAN_RELATIONSHIP_OPTIONS;
     }
 
     get classOptions(): { label: string; value: string }[] {
@@ -621,9 +751,22 @@ export class AdminStudents implements OnInit {
             level: this.normalizeLevel(student.level),
             enrollmentYear: student.enrollmentYear,
             subjectIds: [...student.subjectIds],
-            parentEmail: student.parentEmail,
-            parentPhone: student.parentPhone
+            guardians: student.guardians.length > 0
+                ? student.guardians.map((guardian, index) => ({
+                    localId: `${student.id}-${guardian.id}-${index}`,
+                    displayName: guardian.displayName,
+                    relationship: guardian.relationship,
+                    phone: guardian.phone,
+                    email: guardian.email,
+                    address: guardian.address ?? null,
+                    identityDocumentType: guardian.identityDocumentType ?? null,
+                    identityDocumentNumber: guardian.identityDocumentNumber ?? null,
+                    birthCertificateNumber: guardian.birthCertificateNumber ?? null,
+                    isPrimary: guardian.isPrimary
+                }))
+                : [this.createBlankGuardian(true)]
         };
+        this.ensureFirstGuardianPrimary();
         this.drawerVisible = true;
     }
 
@@ -825,8 +968,7 @@ export class AdminStudents implements OnInit {
             level: '',
             enrollmentYear: new Date().getFullYear(),
             subjectIds: [],
-            parentEmail: '',
-            parentPhone: ''
+            guardians: [this.createBlankGuardian(true)]
         };
     }
 
@@ -860,13 +1002,9 @@ export class AdminStudents implements OnInit {
             return null;
         }
 
-        if (!this.isValidEmail(this.draft.parentEmail.trim())) {
-            this.messages.add({ severity: 'warn', summary: 'Email required', detail: 'Enter a valid parent email address.' });
-            return null;
-        }
-
-        if (this.draft.parentPhone.trim().length < 7) {
-            this.messages.add({ severity: 'warn', summary: 'Phone required', detail: 'Enter a parent phone number with at least 7 characters.' });
+        const guardians = this.normalizeGuardianDrafts(this.draft.guardians);
+        if (guardians.length === 0) {
+            this.messages.add({ severity: 'warn', summary: 'Guardian required', detail: 'Enter at least one guardian with a name, phone, and email.' });
             return null;
         }
 
@@ -878,8 +1016,7 @@ export class AdminStudents implements OnInit {
             level,
             enrollmentYear,
             subjectIds: [...this.draft.subjectIds],
-            parentEmail: this.draft.parentEmail.trim(),
-            parentPhone: this.draft.parentPhone.trim()
+            guardians
         };
     }
 
@@ -906,6 +1043,117 @@ export class AdminStudents implements OnInit {
 
     private isValidEmail(value: string): boolean {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    }
+
+    addGuardian(): void {
+        this.draft.guardians = [...this.draft.guardians, this.createBlankGuardian(this.draft.guardians.length === 0)];
+        this.ensureFirstGuardianPrimary();
+    }
+
+    removeGuardian(index: number): void {
+        this.draft.guardians = this.draft.guardians.filter((_, currentIndex) => currentIndex !== index);
+        if (this.draft.guardians.length === 0) {
+            this.draft.guardians = [this.createBlankGuardian(true)];
+        }
+
+        this.ensureFirstGuardianPrimary();
+    }
+
+    private createBlankGuardian(isPrimary = false): GuardianDraft {
+        return {
+            localId: this.createLocalId(),
+            displayName: '',
+            relationship: '',
+            phone: '',
+            email: '',
+            address: null,
+            identityDocumentType: null,
+            identityDocumentNumber: null,
+            birthCertificateNumber: null,
+            isPrimary
+        };
+    }
+
+    private normalizeGuardianDrafts(guardians: GuardianDraft[]): CreateStudentRequest['guardians'] {
+        const cleaned = guardians
+            .map((guardian, index) => {
+                const displayName = guardian.displayName.trim();
+                const relationship = guardian.relationship.trim();
+                const phone = guardian.phone.trim();
+                const email = guardian.email.trim();
+                const address = guardian.address?.trim() ?? null;
+                const identityDocumentType = guardian.identityDocumentType?.trim() ?? null;
+                const identityDocumentNumber = guardian.identityDocumentNumber?.trim() ?? null;
+                const birthCertificateNumber = guardian.birthCertificateNumber?.trim() ?? null;
+
+                const isBlank =
+                    !displayName &&
+                    !relationship &&
+                    !phone &&
+                    !email &&
+                    !address &&
+                    !identityDocumentType &&
+                    !identityDocumentNumber &&
+                    !birthCertificateNumber;
+
+                if (isBlank) {
+                    return null;
+                }
+
+                if (displayName.length < 2) {
+                    this.messages.add({ severity: 'warn', summary: 'Guardian name required', detail: `Enter a guardian name for guardian ${index + 1}.` });
+                    return undefined;
+                }
+
+                if (relationship.length < 2) {
+                    this.messages.add({ severity: 'warn', summary: 'Relationship required', detail: `Enter a guardian relationship for guardian ${index + 1}.` });
+                    return undefined;
+                }
+
+                if (phone.length < 7) {
+                    this.messages.add({ severity: 'warn', summary: 'Phone required', detail: `Enter a valid phone number for guardian ${index + 1}.` });
+                    return undefined;
+                }
+
+                if (!this.isValidEmail(email)) {
+                    this.messages.add({ severity: 'warn', summary: 'Email required', detail: `Enter a valid email address for guardian ${index + 1}.` });
+                    return undefined;
+                }
+
+                return {
+                    displayName,
+                    relationship,
+                    phone,
+                    email: email.toLowerCase(),
+                    address,
+                    identityDocumentType,
+                    identityDocumentNumber,
+                    birthCertificateNumber,
+                    isPrimary: index === 0 || guardian.isPrimary
+                };
+            })
+            .filter((guardian): guardian is NonNullable<typeof guardian> => guardian !== null && guardian !== undefined);
+
+        if (cleaned.length > 0 && !cleaned.some((guardian) => guardian.isPrimary)) {
+            cleaned[0].isPrimary = true;
+        }
+
+        return cleaned;
+    }
+
+    private ensureFirstGuardianPrimary(): void {
+        if (this.draft.guardians.length === 0) {
+            return;
+        }
+
+        this.draft.guardians = this.draft.guardians.map((guardian, index) => ({
+            ...guardian,
+            isPrimary: index === 0 || guardian.isPrimary
+        }));
+    }
+
+    private createLocalId(): string {
+        return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     }
 
     private buildChart(results: ResultResponse[]): void {
@@ -983,8 +1231,31 @@ export class AdminStudents implements OnInit {
             level,
             enrollmentYear: student.enrollmentYear,
             subjectIds: [...student.subjectIds],
-            parentEmail: student.parentEmail,
-            parentPhone: student.parentPhone
+            guardians: student.guardians.length > 0
+                ? student.guardians.map((guardian, index) => ({
+                    displayName: guardian.displayName,
+                    relationship: guardian.relationship,
+                    phone: guardian.phone,
+                    email: guardian.email,
+                    address: guardian.address ?? null,
+                    identityDocumentType: guardian.identityDocumentType ?? null,
+                    identityDocumentNumber: guardian.identityDocumentNumber ?? null,
+                    birthCertificateNumber: guardian.birthCertificateNumber ?? null,
+                    isPrimary: index === 0 || guardian.isPrimary
+                }))
+                : [
+                    {
+                        displayName: student.fullName,
+                        relationship: 'Guardian',
+                        phone: student.parentPhone,
+                        email: student.parentEmail,
+                        address: null,
+                        identityDocumentType: null,
+                        identityDocumentNumber: null,
+                        birthCertificateNumber: null,
+                        isPrimary: true
+                    }
+                ]
         };
     }
 }

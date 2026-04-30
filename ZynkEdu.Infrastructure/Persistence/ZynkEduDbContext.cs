@@ -24,10 +24,13 @@ public sealed class ZynkEduDbContext : DbContext
     public DbSet<TeacherUser> TeacherUsers => Set<TeacherUser>();
     public DbSet<Guardian> Guardians => Set<Guardian>();
     public DbSet<Student> Students => Set<Student>();
+    public DbSet<StudentMovement> StudentMovements => Set<StudentMovement>();
+    public DbSet<StudentProgressionRun> StudentProgressionRuns => Set<StudentProgressionRun>();
     public DbSet<Subject> Subjects => Set<Subject>();
     public DbSet<PlatformSubjectCatalog> PlatformSubjectCatalogs => Set<PlatformSubjectCatalog>();
     public DbSet<SchoolClass> SchoolClasses => Set<SchoolClass>();
     public DbSet<SchoolClassSubject> SchoolClassSubjects => Set<SchoolClassSubject>();
+    public DbSet<SchoolGradingBand> SchoolGradingBands => Set<SchoolGradingBand>();
     public DbSet<TeacherAssignment> TeacherAssignments => Set<TeacherAssignment>();
     public DbSet<Result> Results => Set<Result>();
     public DbSet<StudentNumberCounter> StudentNumberCounters => Set<StudentNumberCounter>();
@@ -62,6 +65,7 @@ public sealed class ZynkEduDbContext : DbContext
             entity.Property(x => x.Username).HasMaxLength(100);
             entity.Property(x => x.PasswordHash).HasMaxLength(512);
             entity.Property(x => x.DisplayName).HasMaxLength(200);
+            entity.Property(x => x.ContactEmail).HasMaxLength(200);
             entity.Property(x => x.Role).HasConversion<int>();
             entity.HasIndex(x => x.Username).IsUnique();
             entity.HasIndex(x => new { x.SchoolId, x.Role });
@@ -111,20 +115,25 @@ public sealed class ZynkEduDbContext : DbContext
         modelBuilder.Entity<Guardian>(entity =>
         {
             entity.Property(x => x.DisplayName).HasMaxLength(200);
+            entity.Property(x => x.Relationship).HasMaxLength(100);
             entity.Property(x => x.ParentEmail).HasMaxLength(200);
             entity.Property(x => x.ParentPhone).HasMaxLength(50);
-            entity.Property(x => x.PasswordHash).HasMaxLength(512);
-            entity.HasIndex(x => x.ParentEmail).IsUnique();
-            entity.HasIndex(x => x.ParentPhone).IsUnique();
+            entity.Property(x => x.Address).HasMaxLength(500);
+            entity.Property(x => x.IdentityDocumentType).HasMaxLength(100);
+            entity.Property(x => x.IdentityDocumentNumber).HasMaxLength(100);
+            entity.Property(x => x.BirthCertificateNumber).HasMaxLength(100);
+            entity.HasIndex(x => x.ParentEmail);
+            entity.HasIndex(x => x.ParentPhone);
             entity.HasIndex(x => x.SchoolId);
             entity.HasOne(x => x.Student)
-                .WithOne(x => x.Guardian)
-                .HasForeignKey<Student>(x => x.GuardianId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .WithMany(x => x.Guardians)
+                .HasForeignKey(x => x.StudentId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<Student>(entity =>
         {
+            entity.Property(x => x.ProfileKey).HasMaxLength(64);
             entity.Property(x => x.StudentNumber).HasMaxLength(50);
             entity.Property(x => x.FullName).HasMaxLength(200);
             entity.Property(x => x.Class).HasMaxLength(100);
@@ -134,9 +143,49 @@ public sealed class ZynkEduDbContext : DbContext
             entity.Property(x => x.ParentPhone).HasMaxLength(50);
             entity.Property(x => x.ParentPasswordHash).HasMaxLength(512);
             entity.HasIndex(x => x.GuardianId).IsUnique(false);
-            entity.HasIndex(x => x.ParentEmail).IsUnique();
-            entity.HasIndex(x => x.ParentPhone).IsUnique();
+            entity.HasIndex(x => x.ProfileKey);
+            entity.HasIndex(x => x.ParentEmail);
+            entity.HasIndex(x => x.ParentPhone);
             entity.HasIndex(x => new { x.SchoolId, x.StudentNumber }).IsUnique();
+            entity.HasOne(x => x.Guardian)
+                .WithMany()
+                .HasForeignKey(x => x.GuardianId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<StudentMovement>(entity =>
+        {
+            entity.Property(x => x.ProfileKey).HasMaxLength(64);
+            entity.Property(x => x.Action).HasMaxLength(40);
+            entity.Property(x => x.SourceClass).HasMaxLength(100);
+            entity.Property(x => x.SourceLevel).HasMaxLength(100);
+            entity.Property(x => x.DestinationClass).HasMaxLength(100);
+            entity.Property(x => x.DestinationLevel).HasMaxLength(100);
+            entity.Property(x => x.Reason).HasMaxLength(500);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.SchoolId, x.ProfileKey, x.CreatedAt });
+            entity.HasIndex(x => x.PromotionRunId);
+            entity.HasOne(x => x.SourceStudent)
+                .WithMany()
+                .HasForeignKey(x => x.SourceStudentId)
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(x => x.DestinationStudent)
+                .WithMany()
+                .HasForeignKey(x => x.DestinationStudentId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.PromotionRun)
+                .WithMany(x => x.Movements)
+                .HasForeignKey(x => x.PromotionRunId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<StudentProgressionRun>(entity =>
+        {
+            entity.Property(x => x.AcademicYearLabel).HasMaxLength(100);
+            entity.Property(x => x.Status).HasMaxLength(40);
+            entity.Property(x => x.Notes).HasMaxLength(2000);
+            entity.HasIndex(x => new { x.SchoolId, x.CreatedAt });
+            entity.HasIndex(x => new { x.SchoolId, x.AcademicYearLabel });
         });
 
         modelBuilder.Entity<StudentSubjectEnrollment>(entity =>
@@ -182,6 +231,16 @@ public sealed class ZynkEduDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.SubjectId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SchoolGradingBand>(entity =>
+        {
+            entity.Property(x => x.Level).HasMaxLength(100);
+            entity.Property(x => x.Grade).HasMaxLength(10);
+            entity.Property(x => x.MinScore).HasPrecision(5, 1);
+            entity.Property(x => x.MaxScore).HasPrecision(5, 1);
+            entity.HasIndex(x => new { x.SchoolId, x.Level, x.Grade }).IsUnique();
+            entity.HasIndex(x => new { x.SchoolId, x.Level, x.MinScore }).IsUnique();
         });
 
         modelBuilder.Entity<PlatformSubjectCatalog>(entity =>
@@ -261,6 +320,7 @@ public sealed class ZynkEduDbContext : DbContext
         modelBuilder.Entity<NotificationRecipient>(entity =>
         {
             entity.Property(x => x.Status).HasMaxLength(40);
+            entity.Property(x => x.RecipientType).HasMaxLength(40);
             entity.Property(x => x.Destination).HasMaxLength(200);
             entity.Property(x => x.LastError).HasMaxLength(1000);
             entity.HasOne(x => x.Notification)
@@ -270,6 +330,10 @@ public sealed class ZynkEduDbContext : DbContext
             entity.HasOne(x => x.Student)
                 .WithMany()
                 .HasForeignKey(x => x.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.StaffUser)
+                .WithMany()
+                .HasForeignKey(x => x.StaffUserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -337,6 +401,8 @@ public sealed class ZynkEduDbContext : DbContext
         ApplySchoolFilter<Subject>(modelBuilder);
         ApplySchoolFilter<SchoolClass>(modelBuilder);
         ApplySchoolFilter<SchoolClassSubject>(modelBuilder);
+        ApplySchoolFilter<StudentMovement>(modelBuilder);
+        ApplySchoolFilter<StudentProgressionRun>(modelBuilder);
         ApplySchoolFilter<TeacherAssignment>(modelBuilder);
         ApplySchoolFilter<Result>(modelBuilder);
         ApplySchoolFilter<StudentNumberCounter>(modelBuilder);

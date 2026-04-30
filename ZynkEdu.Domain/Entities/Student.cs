@@ -5,6 +5,7 @@ namespace ZynkEdu.Domain.Entities;
 public sealed class Student : EntityBase, ISchoolScoped
 {
     public int SchoolId { get; set; }
+    public string ProfileKey { get; set; } = string.Empty;
     public string StudentNumber { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
     public string Class { get; set; } = string.Empty;
@@ -13,6 +14,7 @@ public sealed class Student : EntityBase, ISchoolScoped
     public int EnrollmentYear { get; set; }
     public int? GuardianId { get; set; }
     public Guardian? Guardian { get; set; }
+    public ICollection<Guardian> Guardians { get; set; } = new List<Guardian>();
     public string ParentEmail { get; set; } = string.Empty;
     public string ParentPhone { get; set; } = string.Empty;
     public string ParentPasswordHash { get; set; } = string.Empty;

@@ -52,6 +52,7 @@ public sealed class UserManagementService : IUserManagementService
                 Role = UserRole.Teacher,
                 SchoolId = resolvedSchoolId,
                 DisplayName = request.DisplayName.Trim(),
+                ContactEmail = request.ContactEmail?.Trim().ToLowerInvariant(),
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
@@ -76,7 +77,7 @@ public sealed class UserManagementService : IUserManagementService
                 cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            return new UserResponse(user.Id, user.Username, user.DisplayName, user.Role.ToString(), user.SchoolId, user.CreatedAt, user.IsActive);
+            return new UserResponse(user.Id, user.Username, user.DisplayName, user.Role.ToString(), user.SchoolId, user.CreatedAt, user.IsActive, user.ContactEmail);
         });
     }
 
@@ -222,6 +223,7 @@ public sealed class UserManagementService : IUserManagementService
             Role = role,
             SchoolId = schoolId,
             DisplayName = request.DisplayName.Trim(),
+            ContactEmail = request.ContactEmail?.Trim().ToLowerInvariant(),
             CreatedAt = DateTime.UtcNow,
             IsActive = true
         };
@@ -255,13 +257,14 @@ public sealed class UserManagementService : IUserManagementService
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        return new UserResponse(user.Id, user.Username, user.DisplayName, user.Role.ToString(), user.SchoolId, user.CreatedAt, user.IsActive);
+        return new UserResponse(user.Id, user.Username, user.DisplayName, user.Role.ToString(), user.SchoolId, user.CreatedAt, user.IsActive, user.ContactEmail);
     }
 
     private async Task<UserResponse> UpdateUserAsync(AppUser user, UpdateSchoolUserRequest request, CancellationToken cancellationToken)
     {
         user.DisplayName = request.DisplayName.Trim();
         user.IsActive = request.IsActive;
+        user.ContactEmail = request.ContactEmail?.Trim().ToLowerInvariant();
 
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
@@ -312,7 +315,7 @@ public sealed class UserManagementService : IUserManagementService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return new UserResponse(user.Id, user.Username, user.DisplayName, user.Role.ToString(), user.SchoolId, user.CreatedAt, user.IsActive);
+        return new UserResponse(user.Id, user.Username, user.DisplayName, user.Role.ToString(), user.SchoolId, user.CreatedAt, user.IsActive, user.ContactEmail);
     }
 
     private async Task<IReadOnlyList<UserResponse>> GetUsersByRoleAsync(UserRole role, int? schoolId, CancellationToken cancellationToken)
@@ -331,7 +334,7 @@ public sealed class UserManagementService : IUserManagementService
 
             return await staffAdminQuery
                 .OrderBy(x => x.DisplayName)
-                .Select(x => new UserResponse(x.Id, x.Account.Username, x.DisplayName, x.Account.Role.ToString(), x.SchoolId, x.CreatedAt, x.IsActive))
+                .Select(x => new UserResponse(x.Id, x.Account.Username, x.DisplayName, x.Account.Role.ToString(), x.SchoolId, x.CreatedAt, x.IsActive, x.Account.ContactEmail))
                 .ToListAsync(cancellationToken);
         }
 
@@ -345,7 +348,7 @@ public sealed class UserManagementService : IUserManagementService
 
             return await teacherUserQuery
                 .OrderBy(x => x.DisplayName)
-                .Select(x => new UserResponse(x.Id, x.Account.Username, x.DisplayName, x.Account.Role.ToString(), x.SchoolId, x.CreatedAt, x.IsActive))
+                .Select(x => new UserResponse(x.Id, x.Account.Username, x.DisplayName, x.Account.Role.ToString(), x.SchoolId, x.CreatedAt, x.IsActive, x.Account.ContactEmail))
                 .ToListAsync(cancellationToken);
         }
 
@@ -356,7 +359,7 @@ public sealed class UserManagementService : IUserManagementService
         return await userQuery
             .Where(x => x.Role == role)
             .OrderBy(x => x.DisplayName)
-            .Select(x => new UserResponse(x.Id, x.Username, x.DisplayName, x.Role.ToString(), x.SchoolId, x.CreatedAt, x.IsActive))
+            .Select(x => new UserResponse(x.Id, x.Username, x.DisplayName, x.Role.ToString(), x.SchoolId, x.CreatedAt, x.IsActive, x.ContactEmail))
             .ToListAsync(cancellationToken);
     }
 

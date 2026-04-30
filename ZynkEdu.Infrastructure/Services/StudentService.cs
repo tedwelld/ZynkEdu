@@ -36,33 +36,16 @@ public sealed class StudentService : IStudentService
             throw new InvalidOperationException("At least one subject must be selected.");
         }
 
+        var guardians = NormalizeGuardians(request.Guardians);
+        if (guardians.Count == 0)
+        {
+            throw new InvalidOperationException("At least one guardian must be selected.");
+        }
+
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-
-            var parentEmail = request.ParentEmail.Trim().ToLowerInvariant();
-            var parentPhone = request.ParentPhone.Trim();
-
-            if (await _dbContext.Students.AnyAsync(x => x.ParentEmail == parentEmail, cancellationToken))
-            {
-                throw new InvalidOperationException("Parent email already exists.");
-            }
-
-            if (await _dbContext.Students.AnyAsync(x => x.ParentPhone == parentPhone, cancellationToken))
-            {
-                throw new InvalidOperationException("Parent phone already exists.");
-            }
-
-            if (await _dbContext.Guardians.AnyAsync(x => x.ParentEmail == parentEmail, cancellationToken))
-            {
-                throw new InvalidOperationException("Parent email already exists.");
-            }
-
-            if (await _dbContext.Guardians.AnyAsync(x => x.ParentPhone == parentPhone, cancellationToken))
-            {
-                throw new InvalidOperationException("Parent phone already exists.");
-            }
 
             var subjects = await _dbContext.Subjects
                 .Where(x => x.SchoolId == resolvedSchoolId && subjectIds.Contains(x.Id))
@@ -76,36 +59,21 @@ public sealed class StudentService : IStudentService
             var student = new Student
             {
                 SchoolId = resolvedSchoolId,
+                ProfileKey = Guid.NewGuid().ToString("N"),
                 StudentNumber = await _studentNumberGenerator.GenerateAsync(resolvedSchoolId, cancellationToken),
                 FullName = request.FullName.Trim(),
                 Class = request.Class.Trim(),
                 Level = NormalizeLevel(request.Level),
                 Status = "Active",
                 EnrollmentYear = request.EnrollmentYear,
-                ParentEmail = parentEmail,
-                ParentPhone = parentPhone,
+                ParentEmail = guardians[0].Email,
+                ParentPhone = guardians[0].Phone,
                 CreatedAt = DateTime.UtcNow
             };
 
             _dbContext.Students.Add(student);
             await _dbContext.SaveChangesAsync(cancellationToken);
-
-            var guardian = new Guardian
-            {
-                SchoolId = resolvedSchoolId,
-                StudentId = student.Id,
-                DisplayName = student.FullName,
-                ParentEmail = parentEmail,
-                ParentPhone = parentPhone,
-                PasswordHash = student.ParentPasswordHash,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow
-            };
-            _dbContext.Guardians.Add(guardian);
-            await _dbContext.SaveChangesAsync(cancellationToken);
-
-            student.GuardianId = guardian.Id;
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await UpsertGuardiansAsync(student, guardians, cancellationToken);
 
             _dbContext.StudentSubjectEnrollments.AddRange(subjects.Select(subject => new StudentSubjectEnrollment
             {
@@ -122,7 +90,7 @@ public sealed class StudentService : IStudentService
         });
     }
 
-    public async Task<IReadOnlyList<StudentResponse>> GetAllAsync(string? classFilter = null, int? schoolId = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<StudentResponse>> GetAllAsync(string? classFilter = null, int? schoolId = null, bool includeInactive = false, CancellationToken cancellationToken = default)
     {
         var resolvedSchoolId = _currentUserContext.Role == UserRole.PlatformAdmin
             ? schoolId
@@ -131,6 +99,11 @@ public sealed class StudentService : IStudentService
         var query = _currentUserContext.Role == UserRole.PlatformAdmin && resolvedSchoolId is null
             ? _dbContext.Students.AsNoTracking()
             : _dbContext.Students.AsNoTracking().Where(x => x.SchoolId == resolvedSchoolId);
+
+        if (!includeInactive)
+        {
+            query = query.Where(x => x.Status == "Active" || x.Status == "Suspended");
+        }
 
         HashSet<string>? assignedClasses = null;
         if (_currentUserContext.Role == UserRole.Teacher)
@@ -158,6 +131,7 @@ public sealed class StudentService : IStudentService
         var students = await query
             .Include(x => x.SubjectEnrollments)
                 .ThenInclude(x => x.Subject)
+            .Include(x => x.Guardians)
             .OrderBy(x => x.FullName)
             .ToListAsync(cancellationToken);
 
@@ -188,6 +162,7 @@ public sealed class StudentService : IStudentService
         var student = await query
             .Include(x => x.SubjectEnrollments)
                 .ThenInclude(x => x.Subject)
+            .Include(x => x.Guardians)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         return student is null ? null : Map(student);
     }
@@ -200,6 +175,12 @@ public sealed class StudentService : IStudentService
         if (subjectIds.Length == 0)
         {
             throw new InvalidOperationException("At least one subject must be selected.");
+        }
+
+        var guardians = NormalizeGuardians(request.Guardians);
+        if (guardians.Count == 0)
+        {
+            throw new InvalidOperationException("At least one guardian must be selected.");
         }
 
         var query = _currentUserContext.Role == UserRole.PlatformAdmin
@@ -216,29 +197,6 @@ public sealed class StudentService : IStudentService
         {
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-            var parentEmail = request.ParentEmail.Trim().ToLowerInvariant();
-            var parentPhone = request.ParentPhone.Trim();
-
-            if (await _dbContext.Students.AnyAsync(x => x.Id != id && x.ParentEmail == parentEmail, cancellationToken))
-            {
-                throw new InvalidOperationException("Parent email already exists.");
-            }
-
-            if (await _dbContext.Students.AnyAsync(x => x.Id != id && x.ParentPhone == parentPhone, cancellationToken))
-            {
-                throw new InvalidOperationException("Parent phone already exists.");
-            }
-
-            if (await _dbContext.Guardians.AnyAsync(x => x.StudentId != id && x.ParentEmail == parentEmail, cancellationToken))
-            {
-                throw new InvalidOperationException("Parent email already exists.");
-            }
-
-            if (await _dbContext.Guardians.AnyAsync(x => x.StudentId != id && x.ParentPhone == parentPhone, cancellationToken))
-            {
-                throw new InvalidOperationException("Parent phone already exists.");
-            }
-
             var subjects = await _dbContext.Subjects
                 .Where(x => x.SchoolId == student.SchoolId && subjectIds.Contains(x.Id))
                 .ToListAsync(cancellationToken);
@@ -252,40 +210,13 @@ public sealed class StudentService : IStudentService
             student.Class = request.Class.Trim();
             student.Level = NormalizeLevel(request.Level);
             student.EnrollmentYear = request.EnrollmentYear;
-            student.ParentEmail = parentEmail;
-            student.ParentPhone = parentPhone;
-
-            var guardian = await _dbContext.Guardians.FirstOrDefaultAsync(x => x.StudentId == student.Id, cancellationToken);
-            if (guardian is null)
-            {
-                guardian = new Guardian
-                {
-                    SchoolId = student.SchoolId,
-                    StudentId = student.Id,
-                    DisplayName = student.FullName,
-                    ParentEmail = parentEmail,
-                    ParentPhone = parentPhone,
-                    PasswordHash = student.ParentPasswordHash,
-                    IsActive = true,
-                    CreatedAt = DateTime.UtcNow
-                };
-                _dbContext.Guardians.Add(guardian);
-            }
-            else
-            {
-                guardian.DisplayName = student.FullName;
-                guardian.ParentEmail = parentEmail;
-                guardian.ParentPhone = parentPhone;
-                guardian.IsActive = true;
-                guardian.SchoolId = student.SchoolId;
-                guardian.PasswordHash = student.ParentPasswordHash;
-            }
+            student.ParentEmail = guardians[0].Email;
+            student.ParentPhone = guardians[0].Phone;
 
             _dbContext.StudentSubjectEnrollments.RemoveRange(student.SubjectEnrollments);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
-            student.GuardianId = guardian.Id;
-            await _dbContext.SaveChangesAsync(cancellationToken);
+            await UpsertGuardiansAsync(student, guardians, cancellationToken);
 
             _dbContext.StudentSubjectEnrollments.AddRange(subjects.Select(subject => new StudentSubjectEnrollment
             {
@@ -325,10 +256,10 @@ public sealed class StudentService : IStudentService
         var student = await query.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             ?? throw new InvalidOperationException("Student was not found in this school.");
 
-        var guardian = await _dbContext.Guardians.FirstOrDefaultAsync(x => x.StudentId == student.Id, cancellationToken);
-        if (guardian is not null)
+        var guardians = await _dbContext.Guardians.Where(x => x.StudentId == student.Id).ToListAsync(cancellationToken);
+        if (guardians.Count > 0)
         {
-            _dbContext.Guardians.Remove(guardian);
+            _dbContext.Guardians.RemoveRange(guardians);
         }
 
         _dbContext.Students.Remove(student);
@@ -423,7 +354,8 @@ public sealed class StudentService : IStudentService
     {
         var query = _dbContext.Students.AsNoTracking()
             .Include(x => x.SubjectEnrollments)
-                .ThenInclude(x => x.Subject);
+                .ThenInclude(x => x.Subject)
+            .Include(x => x.Guardians);
 
         var student = await query.FirstAsync(x => x.Id == id, cancellationToken);
         return Map(student);
@@ -543,9 +475,31 @@ public sealed class StudentService : IStudentService
             .OrderBy(x => x)
             .ToArray();
 
+        var guardians = student.Guardians
+            .OrderByDescending(x => x.IsPrimary)
+            .ThenBy(x => x.DisplayName)
+            .Select(x => new GuardianResponse(
+                x.Id,
+                x.StudentId,
+                x.DisplayName,
+                x.Relationship,
+                x.ParentPhone,
+                x.ParentEmail,
+                x.Address,
+                x.IdentityDocumentType,
+                x.IdentityDocumentNumber,
+                x.BirthCertificateNumber,
+                x.IsPrimary,
+                x.IsActive,
+                x.CreatedAt))
+            .ToArray();
+
+        var primaryGuardian = student.Guardians.OrderByDescending(x => x.IsPrimary).ThenBy(x => x.Id).FirstOrDefault();
+
         return new StudentResponse(
             student.Id,
             student.SchoolId,
+            student.ProfileKey,
             student.StudentNumber,
             student.FullName,
             student.Class,
@@ -554,9 +508,75 @@ public sealed class StudentService : IStudentService
             student.EnrollmentYear,
             subjectIds,
             subjects,
-            student.ParentEmail,
-            student.ParentPhone,
+            guardians,
+            primaryGuardian?.ParentEmail ?? student.ParentEmail,
+            primaryGuardian?.ParentPhone ?? student.ParentPhone,
             student.CreatedAt);
+    }
+
+    private async Task UpsertGuardiansAsync(Student student, IReadOnlyList<GuardianRequest> guardians, CancellationToken cancellationToken)
+    {
+        var existingGuardians = await _dbContext.Guardians.Where(x => x.StudentId == student.Id).ToListAsync(cancellationToken);
+        if (existingGuardians.Count > 0)
+        {
+            _dbContext.Guardians.RemoveRange(existingGuardians);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        var normalized = guardians.Select((guardian, index) => new Guardian
+        {
+            SchoolId = student.SchoolId,
+            StudentId = student.Id,
+            DisplayName = guardian.DisplayName.Trim(),
+            Relationship = guardian.Relationship.Trim(),
+            ParentPhone = guardian.Phone.Trim(),
+            ParentEmail = guardian.Email.Trim().ToLowerInvariant(),
+            Address = guardian.Address?.Trim() ?? string.Empty,
+            IdentityDocumentType = guardian.IdentityDocumentType?.Trim() ?? string.Empty,
+            IdentityDocumentNumber = guardian.IdentityDocumentNumber?.Trim() ?? string.Empty,
+            BirthCertificateNumber = guardian.BirthCertificateNumber?.Trim() ?? string.Empty,
+            IsPrimary = index == 0 || guardian.IsPrimary,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        }).ToList();
+
+        if (normalized.Count > 0 && !normalized.Any(x => x.IsPrimary))
+        {
+            normalized[0].IsPrimary = true;
+        }
+
+        _dbContext.Guardians.AddRange(normalized);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var primaryGuardian = normalized.FirstOrDefault(x => x.IsPrimary) ?? normalized[0];
+        student.GuardianId = primaryGuardian.Id;
+        student.ParentEmail = primaryGuardian.ParentEmail;
+        student.ParentPhone = primaryGuardian.ParentPhone;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static IReadOnlyList<GuardianRequest> NormalizeGuardians(IReadOnlyList<GuardianRequest> guardians)
+    {
+        var normalized = guardians
+            .Where(x => !string.IsNullOrWhiteSpace(x.DisplayName) && !string.IsNullOrWhiteSpace(x.Email) && !string.IsNullOrWhiteSpace(x.Phone))
+            .Select(x => new GuardianRequest(
+                x.DisplayName.Trim(),
+                x.Relationship.Trim(),
+                x.Phone.Trim(),
+                x.Email.Trim().ToLowerInvariant(),
+                x.Address?.Trim(),
+                x.IdentityDocumentType?.Trim(),
+                x.IdentityDocumentNumber?.Trim(),
+                x.BirthCertificateNumber?.Trim(),
+                x.IsPrimary))
+            .ToList();
+
+        if (normalized.Count > 0 && !normalized.Any(x => x.IsPrimary))
+        {
+            normalized[0] = normalized[0] with { IsPrimary = true };
+        }
+
+        return normalized;
     }
 
     private static string NormalizeStatus(string status)
@@ -580,6 +600,31 @@ public sealed class StudentService : IStudentService
         if (value.Equals("Archived", StringComparison.OrdinalIgnoreCase))
         {
             return "Archived";
+        }
+
+        if (value.Equals("TransferredOut", StringComparison.OrdinalIgnoreCase))
+        {
+            return "TransferredOut";
+        }
+
+        if (value.Equals("Exited", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Exited";
+        }
+
+        if (value.Equals("Graduated", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Graduated";
+        }
+
+        if (value.Equals("Promoted", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Promoted";
+        }
+
+        if (value.Equals("Reshuffled", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Reshuffled";
         }
 
         throw new InvalidOperationException("The selected status is not supported.");

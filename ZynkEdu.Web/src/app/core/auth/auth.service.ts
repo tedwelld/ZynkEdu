@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, Observable, of, tap, throwError } from 'rxjs';
 import { ApiService } from '../api/api.service';
-import { AuthSession, LoginRequest, LoginResponse, ParentOtpRequest, ParentOtpResponse, SchoolResponse, VerifyParentOtpRequest, WorkspaceRole } from '../api/api.models';
+import { AuthSession, LoginRequest, LoginResponse, SchoolResponse, WorkspaceRole } from '../api/api.models';
 
 const AUTH_STORAGE_KEY = 'zynkedu.auth.session';
 
@@ -34,14 +34,6 @@ export class AuthService {
                 return throwError(() => error);
             })
         );
-    }
-
-    requestParentOtp(request: ParentOtpRequest): Observable<ParentOtpResponse> {
-        return this.api.requestParentOtp(request);
-    }
-
-    verifyParentOtp(request: VerifyParentOtpRequest): Observable<LoginResponse> {
-        return this.api.verifyParentOtp(request).pipe(tap((response) => this.saveSession(response)));
     }
 
     loadSchools(force = false): Observable<SchoolResponse[]> {
@@ -78,7 +70,7 @@ export class AuthService {
     }
 
     navigateAfterLogin(role: WorkspaceRole): Promise<boolean> {
-        const target = role === 'Parent' ? '/parent/dashboard' : role === 'Teacher' ? '/teacher/dashboard' : role === 'PlatformAdmin' ? '/platform/dashboard' : '/admin/dashboard';
+        const target = role === 'Teacher' ? '/teacher/dashboard' : role === 'PlatformAdmin' ? '/platform/dashboard' : '/admin/dashboard';
         return this.router.navigateByUrl(target);
     }
 

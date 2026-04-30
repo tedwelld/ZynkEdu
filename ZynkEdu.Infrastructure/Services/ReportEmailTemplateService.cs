@@ -8,13 +8,13 @@ public sealed class ReportEmailTemplateService : IReportEmailTemplateService
 {
     public ReportEmailTemplate BuildParentResultSlip(ParentPreviewReportResponse report)
     {
-        var emailSubject = $"ZynkEdu results - {report.StudentName}";
+        var emailSubject = $"ZynkEdu result slip - {report.StudentName}";
         var overallAverage = report.OverallAverageMark.ToString("0.0");
 
         var text = new StringBuilder()
-            .AppendLine($"Hello {report.StudentName},")
+            .AppendLine("Hello guardian,")
             .AppendLine()
-            .AppendLine("Your latest result slip is attached.")
+            .AppendLine($"Your latest result slip for {report.StudentName} is attached.")
             .AppendLine()
             .AppendLine($"School: {report.SchoolName}")
             .AppendLine($"Student number: {report.StudentNumber}")
@@ -47,12 +47,12 @@ public sealed class ReportEmailTemplateService : IReportEmailTemplateService
             text += Environment.NewLine;
         }
 
-        text += Environment.NewLine + "Please log in to view the full report.";
+        text += Environment.NewLine + "Thank you.";
 
         var htmlBuilder = new StringBuilder();
         htmlBuilder.AppendLine("<div style=\"font-family:Arial,sans-serif;color:#0f172a;line-height:1.6\">");
-        htmlBuilder.AppendLine($"<h2 style=\"margin:0 0 12px\">Results for {Escape(report.StudentName)}</h2>");
-        htmlBuilder.AppendLine("<p>Your latest result slip is attached.</p>");
+        htmlBuilder.AppendLine($"<h2 style=\"margin:0 0 12px\">Result slip for {Escape(report.StudentName)}</h2>");
+        htmlBuilder.AppendLine($"<p>Hello guardian, your latest result slip for <strong>{Escape(report.StudentName)}</strong> is attached.</p>");
         htmlBuilder.AppendLine("<table style=\"border-collapse:collapse;margin:16px 0;width:100%\">");
         AddRow(htmlBuilder, "School", report.SchoolName);
         AddRow(htmlBuilder, "Student number", report.StudentNumber);
@@ -83,7 +83,7 @@ public sealed class ReportEmailTemplateService : IReportEmailTemplateService
         }
 
         htmlBuilder.AppendLine("</tbody></table>");
-        htmlBuilder.AppendLine("<p style=\"margin-top:16px\">Please log in to view the full report.</p>");
+        htmlBuilder.AppendLine("<p style=\"margin-top:16px\">Thank you.</p>");
         htmlBuilder.AppendLine("</div>");
 
         return new ReportEmailTemplate(emailSubject, text.Trim(), htmlBuilder.ToString());

@@ -7,7 +7,7 @@ import { SkeletonModule } from 'primeng/skeleton';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import * as XLSX from 'xlsx';
-import { forkJoin } from 'rxjs';
+import { firstValueFrom, forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { getClassLevel } from '../../core/school-levels';
@@ -38,12 +38,11 @@ interface PreviewRow {
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Reports</p>
                     <h1 class="text-3xl font-display font-bold m-0">Filter-first reports</h1>
-                    <p class="text-muted-color mt-2 max-w-2xl">Generate exports by year, class, student name, and teacher name from the current live results data. Class-grouped PDFs and parent-specific slips keep the report flow safe and readable.</p>
+                    <p class="text-muted-color mt-2 max-w-2xl">Generate exports by year, class, student name, and teacher name from the current live results data. Class-grouped PDFs and guardian slips keep the report flow safe and readable.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
                     <button pButton type="button" label="Generate PDF" icon="pi pi-file-pdf" (click)="generateReport()" [disabled]="loading || filteredResults.length === 0"></button>
-                    <button pButton type="button" label="Send parent slip" icon="pi pi-send" severity="info" (click)="sendParentSlip()" [disabled]="loading || !canSendParentSlip"></button>
                     <button pButton type="button" label="Export Excel" icon="pi pi-file-excel" severity="success" (click)="exportExcel()" [disabled]="loading || filteredResults.length === 0"></button>
                 </div>
             </div>
@@ -163,7 +162,7 @@ interface PreviewRow {
                 </div>
             </article>
 
-            <div class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+            <div class="grid gap-6 xl:grid-cols-1">
                 <article class="workspace-card">
                     <div class="flex items-center justify-between gap-3 mb-4">
                         <div>
@@ -179,7 +178,7 @@ interface PreviewRow {
                     </div>
 
                     <ng-container *ngIf="!loading">
-                        <p-table [value]="previewResults" styleClass="p-datatable-sm">
+                        <p-table [value]="previewResults" [rows]="10" [paginator]="true" styleClass="p-datatable-sm">
                             <ng-template pTemplate="header">
                                 <tr>
                                     <th>Year</th>
@@ -204,6 +203,10 @@ interface PreviewRow {
                             </ng-template>
                         </p-table>
                     </ng-container>
+
+                    <div class="flex flex-wrap gap-3 pt-4">
+                        <button pButton type="button" label="Send guardian reports" icon="pi pi-send" severity="info" (click)="sendGroupedGuardianReports()" [disabled]="loading || filteredResults.length === 0 || sendingGuardianReports"></button>
+                    </div>
                 </article>
 
                 <article class="workspace-card">
@@ -243,6 +246,7 @@ export class AdminReports implements OnInit {
     private readonly messages = inject(MessageService);
 
     loading = true;
+    sendingGuardianReports = false;
     schools: SchoolResponse[] = [];
     results: ResultResponse[] = [];
     selectedSchoolId: number | null = null;
@@ -359,10 +363,6 @@ export class AdminReports implements OnInit {
         return this.baseResults.find((result) => result.teacherId === this.selectedTeacherId)?.teacherName ?? 'Selected teacher';
     }
 
-    get canSendParentSlip(): boolean {
-        return this.selectedStudentId != null && this.selectedStudentResults.length > 0;
-    }
-
     get selectedStudentResults(): ResultResponse[] {
         if (this.selectedStudentId == null) {
             return [];
@@ -433,39 +433,60 @@ export class AdminReports implements OnInit {
         }
     }
 
-    sendParentSlip(): void {
-        if (this.selectedStudentId == null || this.selectedStudentResults.length === 0) {
-            this.messages.add({ severity: 'warn', summary: 'Select a student', detail: 'Choose a student before sending a parent slip.' });
+    async sendGroupedGuardianReports(): Promise<void> {
+        const studentIds = Array.from(new Set(this.filteredResults.map((result) => result.studentId)));
+        if (studentIds.length === 0) {
+            this.messages.add({ severity: 'warn', summary: 'No data', detail: 'There are no student results to send.' });
             return;
         }
 
-        this.api.getStudentById(this.selectedStudentId).subscribe({
-            next: (student) => {
+        this.sendingGuardianReports = true;
+        let sentCount = 0;
+        const failedStudents: string[] = [];
+
+        try {
+            for (const studentId of studentIds) {
                 try {
-                    const report = this.parentReportForSelectedStudent(student);
+                    const student = await firstValueFrom(this.api.getStudentById(studentId));
+                    const studentResults = this.filteredResults.filter((result) => result.studentId === studentId);
+                    if (studentResults.length === 0) {
+                        continue;
+                    }
+
+                    const report = this.guardianReportForStudent(student, studentResults);
                     const pdf = buildParentPreviewReportPdf(report);
                     const blob = pdf.output('blob');
-                    this.api.sendResultSlip(
-                        this.selectedStudentId as number,
-                        { sendEmail: true, sendSms: true },
-                        blob,
-                        this.selectedSchoolId
-                    ).subscribe({
-                        next: () => {
-                            this.messages.add({ severity: 'success', summary: 'Slip sent', detail: 'The selected student slip was sent to the registered parent contact.' });
-                        },
-                        error: () => {
-                            this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The parent slip could not be sent.' });
-                        }
-                    });
+
+                    await firstValueFrom(
+                        this.api.sendResultSlip(
+                            studentId,
+                            { sendEmail: true, sendSms: true },
+                            blob,
+                            student.schoolId
+                        )
+                    );
+
+                    sentCount++;
                 } catch {
-                    this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The parent slip could not be prepared.' });
+                    const studentName = this.filteredResults.find((result) => result.studentId === studentId)?.studentName ?? `Student ${studentId}`;
+                    failedStudents.push(studentName);
                 }
-            },
-            error: () => {
-                this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The selected student could not be loaded.' });
             }
-        });
+
+            if (sentCount > 0 && failedStudents.length === 0) {
+                this.messages.add({ severity: 'success', summary: 'Guardian reports sent', detail: `${sentCount} student report(s) were sent to guardians.` });
+            } else if (sentCount > 0) {
+                this.messages.add({
+                    severity: 'warn',
+                    summary: 'Partial send',
+                    detail: `${sentCount} report(s) were sent. ${failedStudents.length} student(s) could not be sent: ${failedStudents.join(', ')}.`
+                });
+            } else {
+                this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'No guardian reports could be sent.' });
+            }
+        } finally {
+            this.sendingGuardianReports = false;
+        }
     }
 
     exportExcel(): void {
@@ -560,8 +581,7 @@ export class AdminReports implements OnInit {
         return this.schools.find((school) => school.id === result.schoolId)?.name ?? `School ${result.schoolId}`;
     }
 
-    private parentReportForSelectedStudent(student: StudentResponse): ParentPreviewReportResponse {
-        const studentResults = this.selectedStudentResults;
+    private guardianReportForStudent(student: StudentResponse, studentResults: ResultResponse[]): ParentPreviewReportResponse {
         const firstResult = studentResults[0];
         if (!firstResult) {
             throw new Error('No student results');
@@ -590,7 +610,7 @@ export class AdminReports implements OnInit {
                     term: result.term,
                     createdAt: result.createdAt
                 }))
-        } as ParentPreviewReportResponse;
+            } as ParentPreviewReportResponse;
     }
 
     private uniqueTeachers(results: ResultResponse[]): { label: string; value: number }[] {

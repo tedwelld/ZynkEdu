@@ -23,8 +23,6 @@ import {
     LoginRequest,
     LoginResponse,
     NotificationResponse,
-    ParentOtpRequest,
-    ParentOtpResponse,
     ParentPreviewReportResponse,
     ResultResponse,
     ResultSlipSendResponse,
@@ -36,6 +34,12 @@ import {
     SendNotificationRequest,
     SendResultSlipRequest,
     SaveAttendanceRegisterRequest,
+    GradingSchemeResponse,
+    SaveGradingSchemeRequest,
+    StudentMovementRequest,
+    StudentMovementResponse,
+    StudentPromotionRunRequest,
+    StudentPromotionRunResponse,
     StudentCommentResponse,
     StudentResponse,
     CreateSubjectRequest,
@@ -57,7 +61,6 @@ import {
     TimetablePublicationResponse,
     UpsertTimetableSlotRequest,
     UserResponse,
-    VerifyParentOtpRequest
 } from './api.models';
 import { API_BASE_URL } from './api.constants';
 import { Observable } from 'rxjs';
@@ -68,14 +71,6 @@ export class ApiService {
 
     login(request: LoginRequest): Observable<LoginResponse> {
         return this.http.post<LoginResponse>(`${API_BASE_URL}/auth/login`, request);
-    }
-
-    requestParentOtp(request: ParentOtpRequest): Observable<ParentOtpResponse> {
-        return this.http.post<ParentOtpResponse>(`${API_BASE_URL}/auth/parent-otp`, request);
-    }
-
-    verifyParentOtp(request: VerifyParentOtpRequest): Observable<LoginResponse> {
-        return this.http.post<LoginResponse>(`${API_BASE_URL}/auth/verify-otp`, request);
     }
 
     getSchools(): Observable<SchoolResponse[]> {
@@ -171,7 +166,7 @@ export class ApiService {
         return this.http.get<AuditLogResponse[]>(`${API_BASE_URL}/admin/audit-logs${query}`);
     }
 
-    getStudents(classFilter?: string, schoolId?: number | null): Observable<StudentResponse[]> {
+    getStudents(classFilter?: string, schoolId?: number | null, includeInactive = false): Observable<StudentResponse[]> {
         const params = new URLSearchParams();
         if (classFilter) {
             params.set('classFilter', classFilter);
@@ -179,8 +174,21 @@ export class ApiService {
         if (schoolId) {
             params.set('schoolId', String(schoolId));
         }
+        if (includeInactive) {
+            params.set('includeInactive', 'true');
+        }
         const suffix = params.toString() ? `?${params.toString()}` : '';
         return this.http.get<StudentResponse[]>(`${API_BASE_URL}/students${suffix}`);
+    }
+
+    transferStudent(request: StudentMovementRequest, schoolId?: number | null): Observable<StudentMovementResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<StudentMovementResponse>(`${API_BASE_URL}/students/lifecycle/transfer${query}`, request);
+    }
+
+    commitPromotionRun(request: StudentPromotionRunRequest, schoolId?: number | null): Observable<StudentPromotionRunResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<StudentPromotionRunResponse>(`${API_BASE_URL}/students/lifecycle/promotion-runs${query}`, request);
     }
 
     getStudentById(id: number): Observable<StudentResponse> {
@@ -361,6 +369,16 @@ export class ApiService {
 
     lockResult(id: number): Observable<ResultResponse> {
         return this.http.post<ResultResponse>(`${API_BASE_URL}/results/${id}/lock`, {});
+    }
+
+    getGradingScheme(schoolId?: number | null): Observable<GradingSchemeResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<GradingSchemeResponse>(`${API_BASE_URL}/grading-schemes${query}`);
+    }
+
+    saveGradingScheme(request: SaveGradingSchemeRequest, schoolId?: number | null): Observable<GradingSchemeResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.put<GradingSchemeResponse>(`${API_BASE_URL}/grading-schemes${query}`, request);
     }
 
     getNotifications(): Observable<NotificationResponse[]> {

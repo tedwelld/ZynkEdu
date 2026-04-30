@@ -120,6 +120,10 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         <input pInputText [(ngModel)]="draft.displayName" class="w-full" />
                     </div>
                     <div *ngIf="drawerMode === 'create'">
+                        <label class="block text-sm font-semibold mb-2">Contact email</label>
+                        <input pInputText [(ngModel)]="draft.contactEmail" class="w-full" placeholder="teacher@example.com" />
+                    </div>
+                    <div *ngIf="drawerMode === 'create'">
                         <label class="block text-sm font-semibold mb-2">School</label>
                         <app-dropdown
                             [options]="schoolOptions"
@@ -213,10 +217,11 @@ export class AdminTeachers implements OnInit {
     drawerVisible = false;
     drawerMode: 'create' | 'edit' = 'create';
     skeletonRows = Array.from({ length: 5 });
-    draft: { id?: number; username: string; displayName: string; password: string; isActive: boolean; schoolId: number | null; subjectIds: number[]; classes: string[] } = {
+    draft: { id?: number; username: string; displayName: string; password: string; contactEmail: string; isActive: boolean; schoolId: number | null; subjectIds: number[]; classes: string[] } = {
         username: '',
         displayName: '',
         password: '',
+        contactEmail: '',
         isActive: true,
         schoolId: null,
         subjectIds: [],
@@ -399,6 +404,7 @@ export class AdminTeachers implements OnInit {
             username: '',
             displayName: '',
             password: '',
+            contactEmail: '',
             isActive: true,
             schoolId: this.isPlatformAdmin ? null : this.auth.schoolId(),
             subjectIds: [],
@@ -415,6 +421,7 @@ export class AdminTeachers implements OnInit {
             username: teacher.username,
             displayName: teacher.displayName,
             password: '',
+            contactEmail: teacher.contactEmail ?? '',
             isActive: teacher.isActive,
             schoolId: teacher.schoolId,
             subjectIds: [],
@@ -453,7 +460,8 @@ export class AdminTeachers implements OnInit {
                 this.api.createTeacher({
                     username: this.draft.username,
                     displayName: this.draft.displayName,
-                    password: this.draft.password
+                    password: this.draft.password,
+                    contactEmail: this.draft.contactEmail.trim() || null
                 }, this.draft.schoolId ?? undefined).subscribe({
                     next: () => {
                         this.messages.add({ severity: 'success', summary: 'Teacher created', detail: `${this.draft.displayName} added.` });

@@ -6,7 +6,11 @@ public enum NotificationAudience
 {
     All = 0,
     Individual = 1,
-    Class = 2
+    Class = 2,
+    Teachers = 3,
+    Admins = 4,
+    PlatformAdmins = 5,
+    Guardians = 6
 }
 
 public sealed record SendNotificationRequest(
@@ -16,15 +20,17 @@ public sealed record SendNotificationRequest(
     IReadOnlyList<int>? StudentIds = null,
     NotificationAudience Audience = NotificationAudience.All,
     int? SchoolId = null,
-    string? ClassName = null);
+    string? ClassName = null,
+    IReadOnlyList<int>? StaffIds = null);
 
 public sealed record NotificationRecipientResponse(
-    int StudentId,
-    string StudentName,
+    int? StudentId,
+    string RecipientName,
     string Destination,
     string Status,
     int Attempts,
-    string? LastError);
+    string? LastError,
+    string RecipientType);
 
 public sealed record NotificationResponse(
     int Id,

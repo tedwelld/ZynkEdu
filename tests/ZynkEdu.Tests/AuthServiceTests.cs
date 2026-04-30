@@ -1,10 +1,7 @@
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using ZynkEdu.Application.Contracts;
 using ZynkEdu.Domain.Entities;
 using ZynkEdu.Domain.Enums;
-using ZynkEdu.Infrastructure.Options;
 using ZynkEdu.Infrastructure.Persistence;
 using ZynkEdu.Infrastructure.Services;
 
@@ -13,44 +10,37 @@ namespace ZynkEdu.Tests;
 public sealed class AuthServiceTests
 {
     [Fact]
-    public async Task ParentOtpRoundTrip_IssuesTokenAfterVerification()
+    public async Task LoginAsync_IssuesTokenForPlatformAdmin()
     {
-        var currentUser = new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 1, UserId = 1 };
+        var currentUser = new TestCurrentUserContext { Role = UserRole.PlatformAdmin, UserId = 1 };
         var databasePath = TestDatabase.CreateDatabasePath();
         var (connection, context) = await TestDatabase.CreateContextAsync(databasePath, currentUser);
         await using var _ = connection;
 
-        context.Students.Add(new Student
+        var user = new AppUser
         {
+            Username = "platform.admin",
+            PasswordHash = string.Empty,
+            Role = UserRole.PlatformAdmin,
             SchoolId = 1,
-            StudentNumber = "SCH001-0001",
-            FullName = "Jane Doe",
-            Class = "Grade 3",
-            ParentEmail = "parent@example.com",
-            ParentPhone = "2777000000",
-            CreatedAt = DateTime.UtcNow
-        });
+            DisplayName = "Platform Admin",
+            CreatedAt = DateTime.UtcNow,
+            IsActive = true
+        };
+        var hasher = new PasswordHasher<AppUser>();
+        user.PasswordHash = hasher.HashPassword(user, "Password123!");
+        context.Users.Add(user);
         await context.SaveChangesAsync();
 
-        var sms = new RecordingSmsSender();
-        var email = new RecordingEmailSender();
         var authService = new AuthService(
             context,
-            new PasswordHasher<AppUser>(),
-            new JwtTokenService(TestDatabase.JwtOptions()),
-            email,
-            sms,
-            TestDatabase.ParentOtpOptions());
+            hasher,
+            new JwtTokenService(TestDatabase.JwtOptions()));
 
-        var challenge = await authService.RequestParentOtpAsync(new ParentOtpRequest("2777000000", null));
-        Assert.Single(sms.Messages);
-        Assert.Equal("2777000000", challenge.Destination);
+        var response = await authService.LoginAsync(new LoginRequest("platform.admin", "Password123!", null));
 
-        var storedChallenge = await context.ParentOtpChallenges.FirstAsync();
-        var otpCode = sms.Messages[0].Message.Split(' ')[4].TrimEnd('.');
-        var response = await authService.VerifyParentOtpAsync(new VerifyParentOtpRequest(storedChallenge.Id, otpCode));
-
-        Assert.Equal("Parent", response.Role);
+        Assert.Equal("PlatformAdmin", response.Role);
         Assert.NotEmpty(response.AccessToken);
+        Assert.Equal(user.Id, response.UserId);
     }
 }

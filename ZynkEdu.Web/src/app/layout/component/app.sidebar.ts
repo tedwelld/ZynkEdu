@@ -43,10 +43,6 @@ export class AppSidebar {
             return 'Teacher';
         }
 
-        if (role === 'Parent') {
-            return 'Parent';
-        }
-
         return 'School';
     }
 }

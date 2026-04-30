@@ -158,43 +158,27 @@ interface TimetableReportRow {
                         <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="help" [disabled]="displayedTimetable.length === 0" (click)="exportTimetablePdf()"></button>
                     </div>
 
-                    <div *ngIf="displayedTimetable.length === 0" class="rounded-2xl border border-dashed border-surface-300 dark:border-surface-700 p-6 text-center text-muted-color">
+                    <div *ngIf="previewRows.length === 0" class="rounded-2xl border border-dashed border-surface-300 dark:border-surface-700 p-6 text-center text-muted-color">
                         No timetable entries are available for the current selection.
                     </div>
 
-                    <div *ngIf="displayedTimetable.length > 0" class="overflow-x-auto">
+                    <div *ngIf="previewRows.length > 0" class="overflow-x-auto">
                         <table class="min-w-full border-separate border-spacing-0">
                             <thead>
                                 <tr class="text-left text-xs uppercase tracking-[0.18em] text-muted-color">
-                                    <th class="sticky left-0 z-10 bg-surface-0 dark:bg-surface-950 px-4 py-3">Day</th>
-                                    <th *ngFor="let session of sessionRows" class="px-4 py-3 whitespace-nowrap">{{ session.label }}</th>
+                                    <th class="sticky left-0 z-10 bg-surface-0 dark:bg-surface-950 px-4 py-3 whitespace-nowrap">Time</th>
+                                    <th *ngFor="let day of previewDayNames" class="px-4 py-3 whitespace-nowrap">{{ day }}</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr *ngFor="let row of filteredDayRows" class="border-t border-surface-200 dark:border-surface-800">
-                                    <td class="sticky left-0 z-10 bg-surface-0 dark:bg-surface-950 px-4 py-4 align-top">
-                                        <div class="font-semibold">{{ row.day }}</div>
-                                        <div class="text-xs text-muted-color">{{ row.filledCount }}/{{ sessionRows.length }} filled</div>
+                                <tr *ngFor="let row of previewRows; let rowIndex = index" class="border-t border-surface-200 dark:border-surface-800" [ngClass]="row.isBreak ? 'bg-surface-200/60 dark:bg-surface-800/50' : (rowIndex % 2 === 0 ? 'bg-surface-0 dark:bg-surface-950' : 'bg-surface-50 dark:bg-surface-900/40')">
+                                    <td class="sticky left-0 z-10 bg-inherit px-4 py-4 align-top font-semibold whitespace-nowrap">
+                                        {{ row.label }}
                                     </td>
-                                    <td *ngFor="let cell of row.cells" class="px-4 py-4 align-top">
-                                        <ng-container *ngIf="cell.slots.length > 0; else emptyPreviewCell">
-                                        <div class="space-y-2 min-w-52">
-                                            <div *ngFor="let slot of cell.slots" class="rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-0/90 dark:bg-surface-900/40 p-3">
-                                                <div class="font-semibold leading-tight">{{ slot.class }}</div>
-                                                <div class="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-primary">{{ slot.startTime }} - {{ slot.endTime }}</div>
-                                                <div class="mt-1 text-xs text-muted-color">{{ slot.subjectName }}</div>
-                                                <div class="mt-2 flex flex-wrap gap-1">
-                                                    <p-tag [value]="slot.teacherName" severity="secondary"></p-tag>
-                                                        <p-tag [value]="slot.gradeLevel" [severity]="severityForLevel(slot.gradeLevel)"></p-tag>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </ng-container>
-                                        <ng-template #emptyPreviewCell>
-                                            <div class="min-w-52 rounded-2xl border border-dashed border-surface-300 dark:border-surface-700 px-3 py-4 text-center text-sm text-muted-color">
-                                                Empty
-                                            </div>
-                                        </ng-template>
+                                    <td *ngFor="let cell of row.cells; let cellIndex = index" class="px-4 py-4 align-top">
+                                        <div class="min-h-20 rounded-2xl border border-surface-200 dark:border-surface-700 p-3 text-sm leading-6 whitespace-pre-line" [ngClass]="row.isBreak ? 'border-dashed text-center text-muted-color flex items-center justify-center' : 'bg-surface-0/90 dark:bg-surface-950/80'">
+                                            {{ cell || 'Empty' }}
+                                        </div>
                                     </td>
                                 </tr>
                             </tbody>
@@ -234,6 +218,7 @@ export class AdminTimetable implements OnInit {
     selectedClassFilter = 'All';
     selectedYearFilter = 'All';
     selectedLevelFilter: SchoolLevel = 'General';
+    readonly previewDayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
     get isPlatformAdmin(): boolean {
         return this.auth.role() === 'PlatformAdmin';
@@ -345,6 +330,10 @@ export class AdminTimetable implements OnInit {
         });
     }
 
+    get previewRows(): TimetableReportRow[] {
+        return this.buildPdfReportRows();
+    }
+
     get filteredDayRows(): TimetableRow[] {
         const slotLookup = new Map<string, TimetableResponse[]>();
         for (const slot of this.displayedTimetable) {
@@ -454,6 +443,11 @@ export class AdminTimetable implements OnInit {
     }
 
     exportTimetablePdf(): void {
+        const { doc, fileName } = this.createTimetablePdf();
+        doc.save(fileName);
+    }
+
+    private createTimetablePdf(): { doc: jsPDF; fileName: string } {
         const schoolLabel = this.selectedSchoolId ? this.schoolNameFor(this.selectedSchoolId) : 'All schools';
         const termLabel = this.selectedTermName ?? 'All terms';
         const levelLabel = this.selectedLevelLabel;
@@ -483,8 +477,7 @@ export class AdminTimetable implements OnInit {
 
         if (reportRows.length === 0) {
             doc.text('No timetable entries are available for export.', margin, 154);
-            doc.save(fileName);
-            return;
+            return { doc, fileName };
         }
 
         autoTable(doc, {
@@ -540,8 +533,7 @@ export class AdminTimetable implements OnInit {
                 right: margin
             }
         });
-
-        doc.save(fileName);
+        return { doc, fileName };
     }
 
     generateTimetable(): void {

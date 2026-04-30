@@ -1,5 +1,5 @@
-export type WorkspaceRole = 'PlatformAdmin' | 'Admin' | 'Teacher' | 'Parent';
-export type NotificationAudience = 'All' | 'Individual' | 'Class';
+export type WorkspaceRole = 'PlatformAdmin' | 'Admin' | 'Teacher';
+export type NotificationAudience = 'All' | 'Individual' | 'Class' | 'Teachers' | 'Admins' | 'PlatformAdmins' | 'Guardians';
 
 export interface SchoolResponse {
     id: number;
@@ -32,6 +32,34 @@ export interface UpdateSchoolRequest {
     adminContactEmail: string;
 }
 
+export interface GradingBandResponse {
+    grade: string;
+    minScore: number;
+    maxScore: number;
+}
+
+export interface GradingLevelResponse {
+    level: string;
+    bands: GradingBandResponse[];
+}
+
+export interface GradingSchemeResponse {
+    schoolId: number;
+    schoolName: string;
+    levels: GradingLevelResponse[];
+}
+
+export interface SaveGradingBandRequest {
+    level: string;
+    grade: string;
+    minScore: number;
+    maxScore: number;
+}
+
+export interface SaveGradingSchemeRequest {
+    bands: SaveGradingBandRequest[];
+}
+
 export interface LoginRequest {
     username: string;
     password: string;
@@ -44,22 +72,6 @@ export interface LoginResponse {
     schoolId?: number | null;
     userId?: number | null;
     displayName: string;
-}
-
-export interface ParentOtpRequest {
-    phone?: string | null;
-    email?: string | null;
-}
-
-export interface ParentOtpResponse {
-    challengeId: number;
-    destination: string;
-    expiresAt: string;
-}
-
-export interface VerifyParentOtpRequest {
-    challengeId: number;
-    code: string;
 }
 
 export interface DashboardResponse {
@@ -123,6 +135,7 @@ export interface AuditLogResponse {
 export interface StudentResponse {
     id: number;
     schoolId: number;
+    profileKey: string;
     studentNumber: string;
     fullName: string;
     class: string;
@@ -131,8 +144,85 @@ export interface StudentResponse {
     enrollmentYear: number;
     subjectIds: number[];
     subjects: string[];
+    guardians: GuardianResponse[];
     parentEmail: string;
     parentPhone: string;
+    createdAt: string;
+}
+
+export interface StudentMovementRequest {
+    studentId: number;
+    action: string;
+    targetSchoolId?: number | null;
+    targetClass?: string | null;
+    targetLevel?: string | null;
+    reason?: string | null;
+    notes?: string | null;
+    effectiveDate: string;
+    copySubjects?: boolean;
+}
+
+export interface StudentMovementResponse {
+    movementId: number;
+    schoolId: number;
+    sourceStudentId: number;
+    destinationStudentId?: number | null;
+    profileKey: string;
+    action: string;
+    sourceClass: string;
+    sourceLevel: string;
+    destinationClass?: string | null;
+    destinationLevel?: string | null;
+    sourceSchoolId?: number | null;
+    destinationSchoolId?: number | null;
+    reason?: string | null;
+    notes?: string | null;
+    effectiveDate: string;
+    createdAt: string;
+}
+
+export interface StudentPromotionRunRequest {
+    academicYearLabel: string;
+    notes?: string | null;
+    items: StudentMovementRequest[];
+}
+
+export interface StudentPromotionRunResponse {
+    runId: number;
+    schoolId: number;
+    academicYearLabel: string;
+    status: string;
+    notes?: string | null;
+    createdAt: string;
+    committedAt?: string | null;
+    movements: StudentMovementResponse[];
+}
+
+export interface GuardianRequest {
+    displayName: string;
+    relationship: string;
+    phone: string;
+    email: string;
+    address?: string | null;
+    identityDocumentType?: string | null;
+    identityDocumentNumber?: string | null;
+    birthCertificateNumber?: string | null;
+    isPrimary: boolean;
+}
+
+export interface GuardianResponse {
+    id: number;
+    studentId: number;
+    displayName: string;
+    relationship: string;
+    phone: string;
+    email: string;
+    address?: string | null;
+    identityDocumentType?: string | null;
+    identityDocumentNumber?: string | null;
+    birthCertificateNumber?: string | null;
+    isPrimary: boolean;
+    isActive: boolean;
     createdAt: string;
 }
 
@@ -302,6 +392,7 @@ export interface UserResponse {
     id: number;
     username: string;
     displayName: string;
+    contactEmail?: string | null;
     role: string;
     schoolId: number;
     createdAt: string;
@@ -349,6 +440,7 @@ export interface CreateSchoolUserRequest {
     username: string;
     displayName: string;
     password: string;
+    contactEmail?: string | null;
 }
 
 export interface CreateTeacherWithAssignmentRequest {
@@ -357,12 +449,14 @@ export interface CreateTeacherWithAssignmentRequest {
     password: string;
     subjectIds: number[];
     classes: string[];
+    contactEmail?: string | null;
 }
 
 export interface UpdateSchoolUserRequest {
     displayName: string;
     password?: string | null;
     isActive: boolean;
+    contactEmail?: string | null;
 }
 
 export interface CreateSubjectRequest {
@@ -402,8 +496,7 @@ export interface CreateStudentRequest {
     level: string;
     enrollmentYear: number;
     subjectIds: number[];
-    parentEmail: string;
-    parentPhone: string;
+    guardians: GuardianRequest[];
 }
 
 export interface UpdateStudentRequest extends CreateStudentRequest {}
@@ -444,15 +537,17 @@ export interface SendNotificationRequest {
     audience?: NotificationAudience;
     schoolId?: number | null;
     className?: string | null;
+    staffIds?: number[] | null;
 }
 
 export interface NotificationRecipientResponse {
-    studentId: number;
-    studentName: string;
+    studentId?: number | null;
+    recipientName: string;
     destination: string;
     status: string;
     attempts: number;
     lastError?: string | null;
+    recipientType: string;
 }
 
 export interface NotificationResponse {
@@ -476,6 +571,8 @@ export interface ResultSlipSendResponse {
     studentName: string;
     parentEmail: string;
     parentPhone: string;
+    guardianEmails: string[];
+    guardianPhones: string[];
     emailSent: boolean;
     smsSent: boolean;
 }

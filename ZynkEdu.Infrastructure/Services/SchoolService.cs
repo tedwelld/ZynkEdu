@@ -16,14 +16,22 @@ public sealed class SchoolService : ISchoolService
     private readonly ISchoolCodeGenerator _schoolCodeGenerator;
     private readonly IPasswordHasher<AppUser> _passwordHasher;
     private readonly IAuditLogService _auditLogService;
+    private readonly IGradingSchemeService _gradingSchemeService;
 
-    public SchoolService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext, ISchoolCodeGenerator schoolCodeGenerator, IPasswordHasher<AppUser> passwordHasher, IAuditLogService auditLogService)
+    public SchoolService(
+        ZynkEduDbContext dbContext,
+        ICurrentUserContext currentUserContext,
+        ISchoolCodeGenerator schoolCodeGenerator,
+        IPasswordHasher<AppUser> passwordHasher,
+        IAuditLogService auditLogService,
+        IGradingSchemeService gradingSchemeService)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
         _schoolCodeGenerator = schoolCodeGenerator;
         _passwordHasher = passwordHasher;
         _auditLogService = auditLogService;
+        _gradingSchemeService = gradingSchemeService;
     }
 
     public async Task<SchoolResponse> CreateAsync(SchoolCreateRequest request, CancellationToken cancellationToken = default)
@@ -44,6 +52,7 @@ public sealed class SchoolService : ISchoolService
 
         _dbContext.Schools.Add(school);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _gradingSchemeService.EnsureDefaultsAsync(school.Id, cancellationToken);
         await _auditLogService.LogAsync(school.Id, "Created", "School", school.Id.ToString(), $"Created school {school.Name} ({school.SchoolCode}).", cancellationToken);
 
         return new SchoolResponse(school.Id, school.SchoolCode, school.Name, school.Address, school.AdminContactEmail, school.CreatedAt);
@@ -72,6 +81,7 @@ public sealed class SchoolService : ISchoolService
 
             _dbContext.Schools.Add(school);
             await _dbContext.SaveChangesAsync(cancellationToken);
+            await _gradingSchemeService.EnsureDefaultsAsync(school.Id, cancellationToken);
 
             var username = request.AdminUsername.Trim().ToLowerInvariant();
             if (await _dbContext.Users.AnyAsync(x => x.Username == username, cancellationToken))

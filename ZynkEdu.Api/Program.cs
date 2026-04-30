@@ -124,6 +124,7 @@ static async Task<bool> SeedPlatformAdminAsync(IServiceProvider services, IConfi
         var dbContext = scope.ServiceProvider.GetRequiredService<ZynkEduDbContext>();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<AppUser>>();
         var schoolCodeGenerator = scope.ServiceProvider.GetRequiredService<ISchoolCodeGenerator>();
+        var gradingSchemeService = scope.ServiceProvider.GetRequiredService<IGradingSchemeService>();
         var firstSchool = await dbContext.Schools.AsNoTracking()
             .OrderBy(x => x.Id)
             .FirstOrDefaultAsync();
@@ -152,6 +153,8 @@ static async Task<bool> SeedPlatformAdminAsync(IServiceProvider services, IConfi
             dbContext.Schools.Add(firstSchool);
             await dbContext.SaveChangesAsync();
         }
+
+        await gradingSchemeService.EnsureDefaultsAsync(firstSchool.Id);
 
         var existing = await dbContext.Users.FirstOrDefaultAsync(x => x.Username == username && x.Role == UserRole.PlatformAdmin);
         if (existing is not null)

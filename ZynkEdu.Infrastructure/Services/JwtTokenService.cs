@@ -33,27 +33,6 @@ public sealed class JwtTokenService : IJwtTokenService
         return CreateJwt(claims, TimeSpan.FromMinutes(_options.ExpirationMinutes));
     }
 
-    public string CreateParentToken(string? phone, string? email)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.Name, phone ?? email ?? string.Empty),
-            new(ClaimTypes.Role, UserRole.Parent.ToString())
-        };
-
-        if (!string.IsNullOrWhiteSpace(phone))
-        {
-            claims.Add(new Claim("parent_phone", phone));
-        }
-
-        if (!string.IsNullOrWhiteSpace(email))
-        {
-            claims.Add(new Claim("parent_email", email));
-        }
-
-        return CreateJwt(claims, TimeSpan.FromMinutes(_options.ParentExpirationMinutes));
-    }
-
     private string CreateJwt(IEnumerable<Claim> claims, TimeSpan lifespan)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.SigningKey));

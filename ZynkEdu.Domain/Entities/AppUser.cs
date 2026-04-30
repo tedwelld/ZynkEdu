@@ -10,6 +10,7 @@ public sealed class AppUser : EntityBase, ISchoolScoped
     public UserRole Role { get; set; }
     public int SchoolId { get; set; }
     public string DisplayName { get; set; } = string.Empty;
+    public string? ContactEmail { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
 }

@@ -92,6 +92,10 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ContactEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -312,6 +316,16 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("BirthCertificateNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -320,7 +334,20 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("IdentityDocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("IdentityDocumentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
                     b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsPrimary")
                         .HasColumnType("bit");
 
                     b.Property<string>("ParentEmail")
@@ -333,26 +360,26 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<string>("PasswordHash")
+                    b.Property<string>("Relationship")
                         .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int>("SchoolId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("StudentId")
+                    b.Property<int>("StudentId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ParentEmail")
-                        .IsUnique();
+                    b.HasIndex("ParentEmail");
 
-                    b.HasIndex("ParentPhone")
-                        .IsUnique();
+                    b.HasIndex("ParentPhone");
 
                     b.HasIndex("SchoolId");
+
+                    b.HasIndex("StudentId");
 
                     b.ToTable("Guardians");
                 });
@@ -420,16 +447,26 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.Property<int>("NotificationId")
                         .HasColumnType("int");
 
+                    b.Property<string>("RecipientType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<int?>("StaffUserId")
+                        .HasColumnType("int");
+
                     b.Property<int>("Status")
                         .HasMaxLength(40)
                         .HasColumnType("int");
 
-                    b.Property<int>("StudentId")
+                    b.Property<int?>("StudentId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
                     b.HasIndex("NotificationId");
+
+                    b.HasIndex("StaffUserId");
 
                     b.HasIndex("StudentId");
 
@@ -491,15 +528,15 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
                     b.Property<bool>("IsPractical")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int?>("SourceSchoolId")
                         .HasColumnType("int");
@@ -726,6 +763,46 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.ToTable("SchoolClassSubjects");
                 });
 
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.SchoolGradingBand", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Grade")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal>("MaxScore")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
+
+                    b.Property<decimal>("MinScore")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolId", "Level", "Grade")
+                        .IsUnique();
+
+                    b.HasIndex("SchoolId", "Level", "MinScore")
+                        .IsUnique();
+
+                    b.ToTable("SchoolGradingBands");
+                });
+
             modelBuilder.Entity("ZynkEdu.Domain.Entities.StaffAdmin", b =>
                 {
                     b.Property<int>("Id")
@@ -799,6 +876,11 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("ProfileKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<int>("SchoolId")
                         .HasColumnType("int");
 
@@ -816,16 +898,97 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("GuardianId");
 
-                    b.HasIndex("ParentEmail")
-                        .IsUnique();
+                    b.HasIndex("ParentEmail");
 
-                    b.HasIndex("ParentPhone")
-                        .IsUnique();
+                    b.HasIndex("ParentPhone");
+
+                    b.HasIndex("ProfileKey");
 
                     b.HasIndex("SchoolId", "StudentNumber")
                         .IsUnique();
 
                     b.ToTable("Students");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.StudentMovement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DestinationClass")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("DestinationLevel")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("DestinationSchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DestinationStudentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EffectiveDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ProfileKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<int?>("PromotionRunId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SourceClass")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SourceLevel")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("SourceSchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SourceStudentId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DestinationStudentId");
+
+                    b.HasIndex("PromotionRunId");
+
+                    b.HasIndex("SourceStudentId");
+
+                    b.HasIndex("SchoolId", "ProfileKey", "CreatedAt");
+
+                    b.ToTable("StudentMovements");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.StudentNumberCounter", b =>
@@ -848,6 +1011,46 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("StudentNumberCounters");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.StudentProgressionRun", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AcademicYearLabel")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("CommittedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolId", "AcademicYearLabel");
+
+                    b.HasIndex("SchoolId", "CreatedAt");
+
+                    b.ToTable("StudentProgressionRuns");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.StudentSubjectEnrollment", b =>
@@ -899,15 +1102,15 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
                     b.Property<bool>("IsPractical")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int>("SchoolId")
                         .HasColumnType("int");
@@ -1164,6 +1367,17 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.Navigation("Student");
                 });
 
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.Guardian", b =>
+                {
+                    b.HasOne("ZynkEdu.Domain.Entities.Student", "Student")
+                        .WithMany("Guardians")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Student");
+                });
+
             modelBuilder.Entity("ZynkEdu.Domain.Entities.NotificationRecipient", b =>
                 {
                     b.HasOne("ZynkEdu.Domain.Entities.Notification", "Notification")
@@ -1172,13 +1386,19 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("ZynkEdu.Domain.Entities.AppUser", "StaffUser")
+                        .WithMany()
+                        .HasForeignKey("StaffUserId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.HasOne("ZynkEdu.Domain.Entities.Student", "Student")
                         .WithMany()
                         .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.Navigation("Notification");
+
+                    b.Navigation("StaffUser");
 
                     b.Navigation("Student");
                 });
@@ -1254,11 +1474,36 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("ZynkEdu.Domain.Entities.Student", b =>
                 {
                     b.HasOne("ZynkEdu.Domain.Entities.Guardian", "Guardian")
-                        .WithOne("Student")
-                        .HasForeignKey("ZynkEdu.Domain.Entities.Student", "GuardianId")
+                        .WithMany()
+                        .HasForeignKey("GuardianId")
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Guardian");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.StudentMovement", b =>
+                {
+                    b.HasOne("ZynkEdu.Domain.Entities.Student", "DestinationStudent")
+                        .WithMany()
+                        .HasForeignKey("DestinationStudentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ZynkEdu.Domain.Entities.StudentProgressionRun", "PromotionRun")
+                        .WithMany("Movements")
+                        .HasForeignKey("PromotionRunId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ZynkEdu.Domain.Entities.Student", "SourceStudent")
+                        .WithMany()
+                        .HasForeignKey("SourceStudentId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("DestinationStudent");
+
+                    b.Navigation("PromotionRun");
+
+                    b.Navigation("SourceStudent");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.StudentSubjectEnrollment", b =>
@@ -1339,11 +1584,6 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.Navigation("Entries");
                 });
 
-            modelBuilder.Entity("ZynkEdu.Domain.Entities.Guardian", b =>
-                {
-                    b.Navigation("Student");
-                });
-
             modelBuilder.Entity("ZynkEdu.Domain.Entities.Notification", b =>
                 {
                     b.Navigation("Recipients");
@@ -1356,9 +1596,16 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.Student", b =>
                 {
+                    b.Navigation("Guardians");
+
                     b.Navigation("Results");
 
                     b.Navigation("SubjectEnrollments");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.StudentProgressionRun", b =>
+                {
+                    b.Navigation("Movements");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.Subject", b =>

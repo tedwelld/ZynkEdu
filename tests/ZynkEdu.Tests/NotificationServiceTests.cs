@@ -41,6 +41,33 @@ public sealed class NotificationServiceTests
         context.Students.AddRange(studentA, studentB);
         await context.SaveChangesAsync();
 
+        context.Guardians.AddRange(
+            new Guardian
+            {
+                SchoolId = 9,
+                StudentId = studentA.Id,
+                DisplayName = "Alpha Guardian",
+                Relationship = "Mother",
+                ParentEmail = "alpha@example.com",
+                ParentPhone = "2777000001",
+                IsPrimary = true,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new Guardian
+            {
+                SchoolId = 9,
+                StudentId = studentB.Id,
+                DisplayName = "Beta Guardian",
+                Relationship = "Father",
+                ParentEmail = "beta@example.com",
+                ParentPhone = "2777000002",
+                IsPrimary = true,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+        await context.SaveChangesAsync();
+
         var service = new NotificationService(context, currentUser);
         var response = await service.SendAsync(new SendNotificationRequest(
             "Class alert",
@@ -88,6 +115,33 @@ public sealed class NotificationServiceTests
         };
 
         context.Students.AddRange(studentA, studentB);
+        await context.SaveChangesAsync();
+
+        context.Guardians.AddRange(
+            new Guardian
+            {
+                SchoolId = 4,
+                StudentId = studentA.Id,
+                DisplayName = "Gamma Guardian",
+                Relationship = "Mother",
+                ParentEmail = "gamma@example.com",
+                ParentPhone = "2777000003",
+                IsPrimary = true,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new Guardian
+            {
+                SchoolId = 4,
+                StudentId = studentB.Id,
+                DisplayName = "Delta Guardian",
+                Relationship = "Father",
+                ParentEmail = "delta@example.com",
+                ParentPhone = "2777000004",
+                IsPrimary = true,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
         await context.SaveChangesAsync();
 
         var service = new NotificationService(context, currentUser);

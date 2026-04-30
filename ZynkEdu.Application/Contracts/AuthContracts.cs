@@ -14,19 +14,6 @@ public sealed record LoginResponse(
     int? UserId,
     string DisplayName);
 
-public sealed record ParentOtpRequest(
-    string? Phone,
-    string? Email);
-
-public sealed record ParentOtpResponse(
-    int ChallengeId,
-    string Destination,
-    DateTime ExpiresAt);
-
-public sealed record VerifyParentOtpRequest(
-    int ChallengeId,
-    string Code);
-
 public sealed record SchoolCreateRequest(
     [Required, MinLength(2)] string Name,
     [Required, MinLength(3)] string Address,

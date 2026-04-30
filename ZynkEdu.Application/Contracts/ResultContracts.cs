@@ -18,6 +18,8 @@ public sealed record ResultSlipSendResponse(
     string StudentName,
     string ParentEmail,
     string ParentPhone,
+    IReadOnlyList<string> GuardianEmails,
+    IReadOnlyList<string> GuardianPhones,
     bool EmailSent,
     bool SmsSent);
 

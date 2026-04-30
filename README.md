@@ -1,6 +1,6 @@
 # ZynkEdu
 
-ZynkEdu is a multi-tenant school communication and academic management platform for platform administrators, school administrators, teachers, and parents.
+ZynkEdu is a multi-tenant school communication and academic management platform for platform administrators, school administrators, teachers, and guardians.
 
 It combines a .NET 10 ASP.NET Core API with an Angular 20 frontend and a shared-database model that isolates data by `SchoolId`.
 
@@ -8,7 +8,7 @@ It combines a .NET 10 ASP.NET Core API with an Angular 20 frontend and a shared-
 
 - Manage schools and school administrators from a platform admin workspace
 - Manage students, teachers, classes, subjects, subject assignments, results, reports, attendance, and notifications
-- Support parent logins for viewing results, comments, and notifications
+- Capture one or more guardians per student and use those contacts for reports and notifications
 - Enforce tenant isolation so records remain separated by school
 - Validate teacher assignments against the selected class level
 - Provide a shared platform subject catalog that can be imported into schools
@@ -18,11 +18,11 @@ It combines a .NET 10 ASP.NET Core API with an Angular 20 frontend and a shared-
 - Platform admin dashboard with multi-school oversight
 - School admin dashboards with school-scoped operational tools
 - Teacher workspace for assigned classes, attendance, and result entry
-- Parent workspace for results and notifications
+- Guardian communication through emailed reports and notifications
 - Subject management with level-aware subjects for `ZGC Level`, `O'Level`, and `A'Level`
 - Platform subject catalog for shared templates, imports from schools, publishing to schools, and school-to-school imports
 - Teacher assignment validation that requires subject level to match class level and blocks mixed-level batch selections
-- Notification workflow for SMS and email delivery abstractions
+- Notification workflow for SMS and email delivery abstractions, including staff and guardian delivery
 
 ## Repository Layout
 
@@ -42,7 +42,6 @@ The repository root also contains `ZynkEdu.slnx`, which is the current solution 
 - Entity Framework Core
 - Angular frontend
 - JWT authentication for staff users
-- Password-based authentication for parents
 - SQL Server LocalDB for local development
 - Shared-database multi-tenancy with tenant filtering by `SchoolId`
 
@@ -51,17 +50,15 @@ The repository root also contains `ZynkEdu.slnx`, which is the current solution 
 - `PlatformAdmin` - full access across schools, manages the platform school registry, manages platform-wide subject catalog features, and can create and manage school admin accounts
 - `Admin` - school-scoped administrative access that manages students, teachers, subjects, assignments, results, notifications, and reports for one school
 - `Teacher` - sees assigned classes and subject work and can enter results only for assigned subject/class combinations
-- `Parent` - views student results and academic notifications
 
 ## Frontend Routing
 
 The Angular app uses layout-driven, role-based routing.
 
-- Auth routes cover login, staff sign-in, parent login, and parent OTP verification flows
+- Auth routes cover login and staff sign-in flows
 - Platform routes: `/platform/dashboard`, `/platform/schools`, `/platform/admins`, `/platform/attendance`, `/platform/students`, `/platform/teachers`, `/platform/calendar`, `/platform/subjects`, `/platform/assignments`, `/platform/results`, `/platform/notifications`, `/platform/reports`
 - Admin routes: `/admin/dashboard`, `/admin/students`, `/admin/teachers`, `/admin/subjects`, `/admin/assignments`, `/admin/results`, `/admin/notifications`, `/admin/reports`
 - Teacher routes: `/teacher/dashboard`, `/teacher/classes`, `/teacher/results`, `/teacher/attendance`, `/teacher/notifications`
-- Parent routes: `/parent/dashboard`, `/parent/results`, `/parent/notifications`
 
 Route guards and role decoding keep each user type in its own workspace.
 
@@ -72,8 +69,8 @@ Route guards and role decoding keep each user type in its own workspace.
 - Database: SQL Server LocalDB
 - Frontend: Angular 20
 - UI libraries: PrimeNG, PrimeIcons, Tailwind CSS utilities, Chart.js
-- Authentication: JWT and password-based parent login
-- Messaging: SMS and email provider abstractions
+- Authentication: JWT for staff and platform users
+- Messaging: SMS and email provider abstractions for guardians and staff
 
 ## Development Prerequisites
 
@@ -88,8 +85,7 @@ Backend configuration lives in `ZynkEdu.Api/appsettings.json`.
 
 - `ConnectionStrings:DefaultConnection` - local development database connection string
 - `Jwt` - token issuer, audience, signing key, and expiration values
-- `ParentOtp` - OTP expiry and retry settings
-- `Email` - SMTP settings for parent-facing email delivery
+- `Email` - SMTP settings for guardian-facing email delivery and staff notifications
 - `Bootstrap:PlatformAdmin` - seeded platform admin credentials
 
 The default local development database connection string is:
@@ -164,6 +160,8 @@ The API also initializes the database on startup:
 - if pending migrations exist, the latest migrations are applied automatically
 - if LocalDB is not reachable, the API fails fast instead of starting in a broken state
 
+If startup fails with a migration or schema error after pulling changes, stop any running API process and run the database update script again. The most common cause is an out-of-date LocalDB schema or a running API instance that is still holding old assemblies open.
+
 ## Current Seeded Data
 
 The application no longer seeds the older demo school dataset. Startup now focuses on bootstrap only.
@@ -181,7 +179,7 @@ The application no longer seeds the older demo school dataset. Startup now focus
 - Demo teachers are not seeded
 - Demo subjects are not seeded
 - Demo students are not seeded
-- Demo parents are not seeded
+- Demo guardians are not seeded
 - Demo results are not seeded
 - Demo notifications are not seeded
 
@@ -205,6 +203,18 @@ Because the old school demo dataset is no longer seeded, new school records are 
 
 Use the platform admin workspace to create schools, create school admin accounts, add teachers and students, create subjects and assignments, and publish subjects from the platform catalog into schools.
 
+Student setup now captures guardian contact and identity details directly on the student record. A student can have multiple guardians, each with:
+
+- name
+- relationship
+- phone
+- email
+- address
+- ID, passport, or driver's license number
+- birth-certificate number
+
+The first primary guardian is used as the fallback contact for legacy flows.
+
 ## Subject And Assignment Model
 
 - Subjects are level-aware across the system
@@ -213,6 +223,7 @@ Use the platform admin workspace to create schools, create school admin accounts
 - Teacher assignment requests validate that the subject level matches the class level
 - Batch assignment saves require one level context
 - Platform admin subject catalog entries preserve level information during imports
+- Subjects can also be flagged as practical subjects for timetable generation
 
 ## Import And Catalog Workflow
 
@@ -227,13 +238,11 @@ Platform admins can manage a shared subject catalog and reuse it across schools.
 ## Authentication Notes
 
 - Staff users sign in with username and password
-- Parents sign in with phone or email plus password
-- Parent OTP flows are available for the parent login experience
 - JWT tokens are used for staff sessions
 
 ## Email Delivery
 
-The application sends parent-facing email through the SMTP settings in `ZynkEdu.Api/appsettings.json`.
+The application sends guardian-facing emails and staff notifications through the SMTP settings in `ZynkEdu.Api/appsettings.json`.
 
 If you are deploying outside local development, move SMTP credentials and JWT signing values to a secure secrets store or environment-specific configuration.
 
@@ -243,6 +252,7 @@ If you are deploying outside local development, move SMTP credentials and JWT si
 - The development database target is SQL Server LocalDB
 - The frontend uses the shared workspace shell and role-based navigation
 - The login page and other branding assets are loaded from the Angular asset pipeline
+- The parent portal has been retired and guardians are contacted through admin workflows and notifications
 - The repository is structured for future modules such as fees, report cards, and mobile apps
 
 ## Helpful Files

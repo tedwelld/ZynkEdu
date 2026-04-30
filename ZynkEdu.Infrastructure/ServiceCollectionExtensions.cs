@@ -17,7 +17,6 @@ public static class ServiceCollectionExtensions
         services.AddHttpContextAccessor();
 
         services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
-        services.Configure<ParentOtpOptions>(configuration.GetSection("ParentOtp"));
         services.Configure<EmailOptions>(configuration.GetSection("Email"));
 
         var connectionString = configuration.GetConnectionString("DefaultConnection")
@@ -43,6 +42,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ISchoolService, SchoolService>();
         services.AddScoped<ISubjectService, SubjectService>();
+        services.AddScoped<IGradingSchemeService, GradingSchemeService>();
+        services.AddScoped<IStudentLifecycleService, StudentLifecycleService>();
         services.AddScoped<IUserManagementService, UserManagementService>();
         services.AddScoped<IStudentService, StudentService>();
         services.AddScoped<IAttendanceService, AttendanceService>();

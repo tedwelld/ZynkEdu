@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { InputTextModule } from 'primeng/inputtext';
+import { PaginatorModule, PaginatorState } from 'primeng/paginator';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TagModule } from 'primeng/tag';
 import { forkJoin } from 'rxjs';
@@ -22,7 +23,7 @@ interface CalendarEventDraft {
 @Component({
     standalone: true,
     selector: 'app-admin-calendar',
-    imports: [CommonModule, FormsModule, ButtonModule, InputTextModule, AppDropdownComponent, SkeletonModule, TagModule],
+    imports: [CommonModule, FormsModule, ButtonModule, InputTextModule, AppDropdownComponent, PaginatorModule, SkeletonModule, TagModule],
     template: `
         <section class="space-y-6">
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -65,7 +66,7 @@ interface CalendarEventDraft {
                 </div>
             </section>
 
-            <div class="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+            <div class="grid gap-6">
                 <article class="workspace-card">
                     <div class="flex items-center justify-between gap-3 mb-4">
                         <div>
@@ -111,7 +112,7 @@ interface CalendarEventDraft {
 
                     <div *ngIf="!loading" class="space-y-3">
                         <ng-container *ngIf="viewMode === 'list'; else groupedEventsTemplate">
-                            <div *ngFor="let event of events" class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
+                            <div *ngFor="let event of pagedEvents" class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
                                 <div class="flex items-start justify-between gap-3">
                                     <div>
                                         <div class="font-semibold">{{ event.title }}</div>
@@ -145,6 +146,14 @@ interface CalendarEventDraft {
                             </div>
                         </ng-template>
                     </div>
+                    <p-paginator
+                        *ngIf="!loading && events.length > termEventsRows"
+                        [rows]="termEventsRows"
+                        [first]="termEventsFirst"
+                        [totalRecords]="events.length"
+                        (onPageChange)="onTermEventsPageChange($event)"
+                        styleClass="mt-4"
+                    ></p-paginator>
                 </article>
             </div>
         </section>
@@ -160,6 +169,8 @@ export class AdminCalendar implements OnInit {
     events: SchoolCalendarEventResponse[] = [];
     viewMode: 'list' | 'month' | 'week' = 'list';
     skeletonRows = Array.from({ length: 4 });
+    termEventsFirst = 0;
+    readonly termEventsRows = 10;
     eventDraft: CalendarEventDraft = {
         academicTermId: null,
         title: '',
@@ -171,9 +182,13 @@ export class AdminCalendar implements OnInit {
         return this.terms.map((term) => ({ label: term.name, value: term.id }));
     }
 
+    get pagedEvents(): SchoolCalendarEventResponse[] {
+        return this.events.slice(this.termEventsFirst, this.termEventsFirst + this.termEventsRows);
+    }
+
     get groupedEventsByPeriod(): { label: string; items: SchoolCalendarEventResponse[] }[] {
         const groups = new Map<string, SchoolCalendarEventResponse[]>();
-        for (const event of this.events) {
+        for (const event of this.pagedEvents) {
             const date = new Date(event.eventDate);
             const key = this.viewMode === 'week'
                 ? `Week of ${this.startOfWeek(date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
@@ -199,6 +214,7 @@ export class AdminCalendar implements OnInit {
             next: ({ terms, events }) => {
                 this.terms = terms;
                 this.events = events;
+                this.termEventsFirst = 0;
                 this.eventDraft.academicTermId = this.eventDraft.academicTermId ?? this.terms[0]?.id ?? null;
                 this.loading = false;
             },
@@ -206,6 +222,10 @@ export class AdminCalendar implements OnInit {
                 this.loading = false;
             }
         });
+    }
+
+    onTermEventsPageChange(state: PaginatorState): void {
+        this.termEventsFirst = state.first ?? 0;
     }
 
     saveTerm(term: AcademicTermResponse): void {
