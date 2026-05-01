@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import {
     AcademicTermResponse,
+    AccountingTransactionResponse,
     AssignClassSubjectsRequest,
     AuditLogResponse,
     BulkStudentSubjectEnrollmentResponse,
@@ -9,17 +10,32 @@ import {
     AttendanceDailySummaryResponse,
     AttendanceRegisterResponse,
     ClassPerformanceDto,
+    CollectionReportResponse,
+    CreateAccountantRequest,
+    CreateAdjustmentRequest,
+    CreateInvoiceRequest,
+    CreatePaymentRequest,
+    CreateRefundRequest,
     CreateResultRequest,
     CreateSchoolRequest,
     CreateSchoolWithAdminRequest,
     CreateSchoolCalendarEventRequest,
     CreateSchoolClassRequest,
     CreateSchoolUserRequest,
+    CreateLibraryBookCopyRequest,
+    CreateLibraryBookRequest,
     CreateTeacherWithAssignmentRequest,
     CreateStudentRequest,
     CreateTeacherAssignmentRequest,
     CreateTeacherAssignmentsBatchRequest,
     DashboardResponse,
+    DailyCashReportResponse,
+    DefaulterReportResponse,
+    FeeStructureRequest,
+    FeeStructureResponse,
+    AgingReportResponse,
+    RevenueByClassReportResponse,
+    StudentStatementResponse,
     LoginRequest,
     LoginResponse,
     NotificationResponse,
@@ -35,6 +51,13 @@ import {
     SendResultSlipRequest,
     SaveAttendanceRegisterRequest,
     GradingSchemeResponse,
+    LibraryBorrowerSummaryResponse,
+    LibraryBookCopyResponse,
+    LibraryBookResponse,
+    LibraryDashboardResponse,
+    LibraryLoanResponse,
+    IssueLibraryBookRequest,
+    RenewLibraryLoanRequest,
     SaveGradingSchemeRequest,
     StudentMovementRequest,
     StudentMovementResponse,
@@ -51,10 +74,13 @@ import {
     TeacherAssignmentBatchResponse,
     UpdateSchoolRequest,
     UpdateSchoolUserRequest,
+    UpdateLibraryBookCopyRequest,
+    UpdateLibraryBookRequest,
     UpdateSubjectRequest,
     UpdateSchoolClassRequest,
     UpdateStudentRequest,
     UpdateStudentStatusRequest,
+    ReturnLibraryBookRequest,
     UpdateTeacherAssignmentRequest,
     UpsertAcademicTermRequest,
     PublishTimetableRequest,
@@ -291,6 +317,124 @@ export class ApiService {
         return this.http.delete<void>(`${API_BASE_URL}/users/admins/${id}`);
     }
 
+    getLibraryAdmins(schoolId?: number | null): Observable<UserResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<UserResponse[]>(`${API_BASE_URL}/users/library-admins${query}`);
+    }
+
+    createLibraryAdmin(request: CreateSchoolUserRequest, schoolId: number): Observable<UserResponse> {
+        return this.http.post<UserResponse>(`${API_BASE_URL}/users/library-admins?schoolId=${schoolId}`, request);
+    }
+
+    updateLibraryAdmin(id: number, request: UpdateSchoolUserRequest): Observable<UserResponse> {
+        return this.http.put<UserResponse>(`${API_BASE_URL}/users/library-admins/${id}`, request);
+    }
+
+    deleteLibraryAdmin(id: number): Observable<void> {
+        return this.http.delete<void>(`${API_BASE_URL}/users/library-admins/${id}`);
+    }
+
+    getAccountants(schoolId?: number | null): Observable<UserResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<UserResponse[]>(`${API_BASE_URL}/admin/accountants${query}`);
+    }
+
+    createSchoolAccountant(request: CreateAccountantRequest): Observable<UserResponse> {
+        return this.http.post<UserResponse>(`${API_BASE_URL}/admin/accountants`, request);
+    }
+
+    createPlatformAccountant(request: CreateAccountantRequest, schoolId: number): Observable<UserResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<UserResponse>(`${API_BASE_URL}/platform/accountants${query}`, request);
+    }
+
+    createAccountant(request: CreateAccountantRequest, schoolId?: number | null): Observable<UserResponse> {
+        if (schoolId) {
+            return this.createPlatformAccountant(request, schoolId);
+        }
+
+        return this.createSchoolAccountant(request);
+    }
+
+    getFeeStructures(schoolId?: number | null): Observable<FeeStructureResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<FeeStructureResponse[]>(`${API_BASE_URL}/accounting/fee-structures${query}`);
+    }
+
+    saveFeeStructure(request: FeeStructureRequest, schoolId?: number | null): Observable<FeeStructureResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<FeeStructureResponse>(`${API_BASE_URL}/accounting/fee-structures${query}`, request);
+    }
+
+    getStudentStatement(studentId: number, schoolId?: number | null): Observable<StudentStatementResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<StudentStatementResponse>(`${API_BASE_URL}/accounting/students/${studentId}/statement${query}`);
+    }
+
+    postPayment(request: CreatePaymentRequest, schoolId?: number | null): Observable<AccountingTransactionResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<AccountingTransactionResponse>(`${API_BASE_URL}/accounting/payments${query}`, request);
+    }
+
+    postInvoice(request: CreateInvoiceRequest, schoolId?: number | null): Observable<AccountingTransactionResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<AccountingTransactionResponse>(`${API_BASE_URL}/accounting/invoices${query}`, request);
+    }
+
+    postAdjustment(request: CreateAdjustmentRequest, schoolId?: number | null): Observable<AccountingTransactionResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<AccountingTransactionResponse>(`${API_BASE_URL}/accounting/adjustments${query}`, request);
+    }
+
+    postRefund(request: CreateRefundRequest, schoolId?: number | null): Observable<AccountingTransactionResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<AccountingTransactionResponse>(`${API_BASE_URL}/accounting/refunds${query}`, request);
+    }
+
+    approveTransaction(transactionId: number, schoolId?: number | null): Observable<AccountingTransactionResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<AccountingTransactionResponse>(`${API_BASE_URL}/accounting/transactions/${transactionId}/approve${query}`, {});
+    }
+
+    getCollectionReport(schoolId?: number | null): Observable<CollectionReportResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<CollectionReportResponse>(`${API_BASE_URL}/accounting/reports/collection${query}`);
+    }
+
+    getAgingReport(schoolId?: number | null, asOf?: string | null): Observable<AgingReportResponse> {
+        const params = new URLSearchParams();
+        if (schoolId) {
+            params.set('schoolId', String(schoolId));
+        }
+        if (asOf) {
+            params.set('asOf', asOf);
+        }
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return this.http.get<AgingReportResponse>(`${API_BASE_URL}/accounting/reports/aging${query}`);
+    }
+
+    getDailyCashReport(schoolId?: number | null, date?: string | null): Observable<DailyCashReportResponse> {
+        const params = new URLSearchParams();
+        if (schoolId) {
+            params.set('schoolId', String(schoolId));
+        }
+        if (date) {
+            params.set('date', date);
+        }
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return this.http.get<DailyCashReportResponse>(`${API_BASE_URL}/accounting/reports/daily-cash${query}`);
+    }
+
+    getRevenueByClassReport(schoolId?: number | null): Observable<RevenueByClassReportResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<RevenueByClassReportResponse>(`${API_BASE_URL}/accounting/reports/revenue-by-class${query}`);
+    }
+
+    getDefaulters(schoolId?: number | null): Observable<DefaulterReportResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<DefaulterReportResponse>(`${API_BASE_URL}/accounting/reports/defaulters${query}`);
+    }
+
     createTeacher(request: CreateSchoolUserRequest, schoolId?: number | null): Observable<UserResponse> {
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.post<UserResponse>(`${API_BASE_URL}/users/teachers${query}`, request);
@@ -307,6 +451,95 @@ export class ApiService {
 
     deleteTeacher(id: number): Observable<void> {
         return this.http.delete<void>(`${API_BASE_URL}/users/teachers/${id}`);
+    }
+
+    getLibraryDashboard(schoolId?: number | null): Observable<LibraryDashboardResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<LibraryDashboardResponse>(`${API_BASE_URL}/library/dashboard${query}`);
+    }
+
+    getLibraryBooks(schoolId?: number | null): Observable<LibraryBookResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<LibraryBookResponse[]>(`${API_BASE_URL}/library/books${query}`);
+    }
+
+    getLibraryBook(id: number, schoolId?: number | null): Observable<LibraryBookResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<LibraryBookResponse>(`${API_BASE_URL}/library/books/${id}${query}`);
+    }
+
+    createLibraryBook(request: CreateLibraryBookRequest, schoolId?: number | null): Observable<LibraryBookResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<LibraryBookResponse>(`${API_BASE_URL}/library/books${query}`, request);
+    }
+
+    updateLibraryBook(id: number, request: UpdateLibraryBookRequest): Observable<LibraryBookResponse> {
+        return this.http.put<LibraryBookResponse>(`${API_BASE_URL}/library/books/${id}`, request);
+    }
+
+    deleteLibraryBook(id: number): Observable<void> {
+        return this.http.delete<void>(`${API_BASE_URL}/library/books/${id}`);
+    }
+
+    getLibraryCopies(bookId: number, schoolId?: number | null): Observable<LibraryBookCopyResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<LibraryBookCopyResponse[]>(`${API_BASE_URL}/library/books/${bookId}/copies${query}`);
+    }
+
+    addLibraryCopy(bookId: number, request: CreateLibraryBookCopyRequest): Observable<LibraryBookCopyResponse> {
+        return this.http.post<LibraryBookCopyResponse>(`${API_BASE_URL}/library/books/${bookId}/copies`, request);
+    }
+
+    updateLibraryCopy(id: number, request: UpdateLibraryBookCopyRequest): Observable<LibraryBookCopyResponse> {
+        return this.http.put<LibraryBookCopyResponse>(`${API_BASE_URL}/library/copies/${id}`, request);
+    }
+
+    deleteLibraryCopy(id: number): Observable<void> {
+        return this.http.delete<void>(`${API_BASE_URL}/library/copies/${id}`);
+    }
+
+    getLibraryLoans(schoolId?: number | null, activeOnly = false): Observable<LibraryLoanResponse[]> {
+        const params = new URLSearchParams();
+        if (schoolId) {
+            params.set('schoolId', String(schoolId));
+        }
+        if (activeOnly) {
+            params.set('activeOnly', 'true');
+        }
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return this.http.get<LibraryLoanResponse[]>(`${API_BASE_URL}/library/loans${query}`);
+    }
+
+    getLibraryOverdueLoans(schoolId?: number | null): Observable<LibraryLoanResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<LibraryLoanResponse[]>(`${API_BASE_URL}/library/loans/overdue${query}`);
+    }
+
+    getLibraryBorrowers(schoolId?: number | null): Observable<LibraryBorrowerSummaryResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<LibraryBorrowerSummaryResponse[]>(`${API_BASE_URL}/library/borrowers${query}`);
+    }
+
+    getLibraryBorrowerLoans(borrowerType: 'Student' | 'Teacher', borrowerId: number, schoolId?: number | null): Observable<LibraryLoanResponse[]> {
+        const params = new URLSearchParams();
+        params.set('borrowerId', String(borrowerId));
+        if (schoolId) {
+            params.set('schoolId', String(schoolId));
+        }
+        return this.http.get<LibraryLoanResponse[]>(`${API_BASE_URL}/library/borrowers/${borrowerType}/loans?${params.toString()}`);
+    }
+
+    issueLibraryBook(request: IssueLibraryBookRequest, schoolId?: number | null): Observable<LibraryLoanResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<LibraryLoanResponse>(`${API_BASE_URL}/library/loans/issue${query}`, request);
+    }
+
+    returnLibraryBook(id: number, request: ReturnLibraryBookRequest): Observable<LibraryLoanResponse> {
+        return this.http.post<LibraryLoanResponse>(`${API_BASE_URL}/library/loans/${id}/return`, request);
+    }
+
+    renewLibraryLoan(id: number, request: RenewLibraryLoanRequest): Observable<LibraryLoanResponse> {
+        return this.http.post<LibraryLoanResponse>(`${API_BASE_URL}/library/loans/${id}/renew`, request);
     }
 
     getAssignments(schoolId?: number | null): Observable<TeacherAssignmentResponse[]> {
@@ -557,6 +790,36 @@ export class ApiService {
             type: 'Notification',
             description: notification.type,
             route: `/admin/notifications?focus=${notification.id}`
+        };
+    }
+
+    toSearchHitLibraryBook(book: LibraryBookResponse): SearchHit {
+        return {
+            id: `library-book-${book.id}`,
+            label: book.title,
+            type: 'Book',
+            description: `${book.author} · ${book.availableCopies}/${book.totalCopies} available`,
+            route: `/library/books?schoolId=${book.schoolId}&focus=${book.id}`
+        };
+    }
+
+    toSearchHitLibraryLoan(loan: LibraryLoanResponse): SearchHit {
+        return {
+            id: `library-loan-${loan.id}`,
+            label: loan.bookTitle,
+            type: 'Loan',
+            description: `${loan.borrowerDisplayName} · Due ${loan.dueAt}`,
+            route: `/library/loans?schoolId=${loan.schoolId}&focus=${loan.id}`
+        };
+    }
+
+    toSearchHitLibraryAdmin(admin: UserResponse): SearchHit {
+        return {
+            id: `library-admin-${admin.id}`,
+            label: admin.displayName,
+            type: 'LibraryAdmin',
+            description: `${admin.username} · ${admin.role}`,
+            route: `/library/users?schoolId=${admin.schoolId}&focus=${admin.id}`
         };
     }
 }

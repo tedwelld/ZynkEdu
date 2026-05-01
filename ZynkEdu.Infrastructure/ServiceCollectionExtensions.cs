@@ -6,6 +6,7 @@ using ZynkEdu.Application.Abstractions;
 using ZynkEdu.Infrastructure.Messaging;
 using ZynkEdu.Infrastructure.Options;
 using ZynkEdu.Infrastructure.Persistence;
+using ZynkEdu.Infrastructure.Services.Accounting;
 using ZynkEdu.Infrastructure.Services;
 
 namespace ZynkEdu.Infrastructure;
@@ -45,6 +46,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGradingSchemeService, GradingSchemeService>();
         services.AddScoped<IStudentLifecycleService, StudentLifecycleService>();
         services.AddScoped<IUserManagementService, UserManagementService>();
+        services.AddScoped<IAccountingService, AccountingService>();
+        services.AddScoped<ILibraryService, LibraryService>();
         services.AddScoped<IStudentService, StudentService>();
         services.AddScoped<IAttendanceService, AttendanceService>();
         services.AddScoped<ITeacherAssignmentService, TeacherAssignmentService>();

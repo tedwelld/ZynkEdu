@@ -1,4 +1,5 @@
 using ZynkEdu.Application.Contracts;
+using ZynkEdu.Domain.Enums;
 
 namespace ZynkEdu.Application.Abstractions;
 
@@ -31,6 +32,15 @@ public interface ISubjectCodeGenerator
 public interface IAuditLogService
 {
     Task LogAsync(int? schoolId, string action, string entityType, string entityId, string summary, CancellationToken cancellationToken = default);
+    Task LogAsync(
+        int? schoolId,
+        string action,
+        string entityType,
+        string entityId,
+        string summary,
+        string? oldValue = null,
+        string? newValue = null,
+        CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AuditLogResponse>> GetRecentAsync(int? schoolId = null, int take = 10, CancellationToken cancellationToken = default);
 }
 
@@ -97,12 +107,39 @@ public interface IUserManagementService
     Task<UserResponse> CreateTeacherAsync(CreateSchoolUserRequest request, int? schoolId = null, CancellationToken cancellationToken = default);
     Task<UserResponse> CreateTeacherWithAssignmentAsync(CreateTeacherWithAssignmentRequest request, int? schoolId = null, CancellationToken cancellationToken = default);
     Task<UserResponse> CreateAdminAsync(int schoolId, CreateSchoolUserRequest request, CancellationToken cancellationToken = default);
+    Task<UserResponse> CreateLibraryAdminAsync(int schoolId, CreateSchoolUserRequest request, CancellationToken cancellationToken = default);
+    Task<UserResponse> CreateAccountantAsync(CreateAccountantRequest request, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UserResponse>> GetAccountantsAsync(int? schoolId = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserResponse>> GetTeachersAsync(int? schoolId = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<UserResponse>> GetAdminsAsync(int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UserResponse>> GetLibraryAdminsAsync(int? schoolId = null, CancellationToken cancellationToken = default);
     Task<UserResponse> UpdateTeacherAsync(int id, UpdateSchoolUserRequest request, CancellationToken cancellationToken = default);
     Task DeleteTeacherAsync(int id, CancellationToken cancellationToken = default);
     Task<UserResponse> UpdateAdminAsync(int id, UpdateSchoolUserRequest request, CancellationToken cancellationToken = default);
     Task DeleteAdminAsync(int id, CancellationToken cancellationToken = default);
+    Task<UserResponse> UpdateLibraryAdminAsync(int id, UpdateSchoolUserRequest request, CancellationToken cancellationToken = default);
+    Task DeleteLibraryAdminAsync(int id, CancellationToken cancellationToken = default);
+}
+
+public interface ILibraryService
+{
+    Task<LibraryDashboardResponse> GetDashboardAsync(int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LibraryBookResponse>> GetBooksAsync(int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<LibraryBookResponse?> GetBookAsync(int id, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<LibraryBookResponse> CreateBookAsync(CreateLibraryBookRequest request, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<LibraryBookResponse> UpdateBookAsync(int id, UpdateLibraryBookRequest request, CancellationToken cancellationToken = default);
+    Task DeleteBookAsync(int id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LibraryBookCopyResponse>> GetCopiesAsync(int bookId, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<LibraryBookCopyResponse> AddCopyAsync(int bookId, CreateLibraryBookCopyRequest request, CancellationToken cancellationToken = default);
+    Task<LibraryBookCopyResponse> UpdateCopyAsync(int id, UpdateLibraryBookCopyRequest request, CancellationToken cancellationToken = default);
+    Task DeleteCopyAsync(int id, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LibraryLoanResponse>> GetLoansAsync(int? schoolId = null, bool activeOnly = false, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LibraryLoanResponse>> GetOverdueLoansAsync(int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LibraryLoanResponse>> GetBorrowerLoansAsync(LibraryBorrowerType borrowerType, int borrowerId, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<LibraryLoanResponse> IssueAsync(IssueLibraryBookRequest request, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<LibraryLoanResponse> ReturnAsync(int id, ReturnLibraryBookRequest request, CancellationToken cancellationToken = default);
+    Task<LibraryLoanResponse> RenewAsync(int id, RenewLibraryLoanRequest request, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LibraryBorrowerSummaryResponse>> GetBorrowerSummariesAsync(int? schoolId = null, CancellationToken cancellationToken = default);
 }
 
 public interface IDashboardService

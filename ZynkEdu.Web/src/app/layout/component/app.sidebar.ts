@@ -43,8 +43,16 @@ export class AppSidebar {
             return 'Platform';
         }
 
+        if (role === 'LibraryAdmin') {
+            return 'Library';
+        }
+
         if (role === 'Teacher') {
             return 'Teacher';
+        }
+
+        if (role === 'AccountantSuper' || role === 'AccountantSenior' || role === 'AccountantJunior') {
+            return 'Accounting';
         }
 
         return 'School';

@@ -8,7 +8,7 @@ namespace ZynkEdu.Api.Controllers;
 
 [ApiController]
 [Route("api/students")]
-[Authorize(Roles = RoleNames.AdminTeacherOrPlatformAdmin)]
+[Authorize(Roles = RoleNames.AdminTeacherAccountingOrPlatformAdmin)]
 public sealed class StudentsController : ControllerBase
 {
     private readonly IStudentService _studentService;

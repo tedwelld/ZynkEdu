@@ -10,4 +10,6 @@ public sealed record AuditLogResponse(
     string EntityType,
     string EntityId,
     string Summary,
+    string? OldValue,
+    string? NewValue,
     DateTime CreatedAt);

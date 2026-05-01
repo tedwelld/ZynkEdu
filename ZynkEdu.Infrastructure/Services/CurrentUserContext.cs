@@ -21,13 +21,15 @@ public sealed class CurrentUserContext : ICurrentUserContext
 
     public bool IsPlatformAdmin => Role == UserRole.PlatformAdmin;
 
-    public bool HasSchoolScope => Role is UserRole.Admin or UserRole.Teacher;
+    public bool HasSchoolScope => Role is UserRole.Admin or UserRole.Teacher or UserRole.LibraryAdmin or UserRole.AccountantSuper or UserRole.AccountantSenior or UserRole.AccountantJunior;
 
     public int? UserId => int.TryParse(User?.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 
     public int? SchoolId => int.TryParse(User?.FindFirstValue("school_id"), out var schoolId) ? schoolId : null;
 
     public string? UserName => User?.FindFirstValue(ClaimTypes.Name);
+
+    public string? DisplayName => User?.FindFirstValue("display_name");
 
     public UserRole? Role
     {

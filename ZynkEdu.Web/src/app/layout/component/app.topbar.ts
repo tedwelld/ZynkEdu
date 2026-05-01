@@ -105,12 +105,20 @@ export class AppTopbar {
             return 'Platform';
         }
 
+        if (role === 'LibraryAdmin') {
+            return 'Library';
+        }
+
         if (role === 'Admin') {
             return 'School';
         }
 
         if (role === 'Teacher') {
             return 'Teacher';
+        }
+
+        if (role === 'AccountantSuper' || role === 'AccountantSenior' || role === 'AccountantJunior') {
+            return 'Accounting';
         }
 
         return 'Admin';
@@ -146,8 +154,16 @@ export class AppTopbar {
             return '/platform/dashboard';
         }
 
+        if (role === 'LibraryAdmin') {
+            return '/library/dashboard';
+        }
+
         if (role === 'Teacher') {
             return '/teacher/dashboard';
+        }
+
+        if (role === 'AccountantSuper' || role === 'AccountantSenior' || role === 'AccountantJunior') {
+            return '/accountant/dashboard';
         }
 
         return '/admin/dashboard';

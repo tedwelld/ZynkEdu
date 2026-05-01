@@ -12,5 +12,7 @@ public sealed class AuditLog : EntityBase
     public string EntityType { get; set; } = string.Empty;
     public string EntityId { get; set; } = string.Empty;
     public string Summary { get; set; } = string.Empty;
+    public string? OldValue { get; set; }
+    public string? NewValue { get; set; }
     public DateTime CreatedAt { get; set; }
 }

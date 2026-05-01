@@ -42,6 +42,16 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuMod
                     ]
                 },
                 {
+                    label: 'Library',
+                    icon: 'pi pi-fw pi-book',
+                    items: [
+                        { label: 'Dashboard', icon: 'pi pi-fw pi-chart-bar', routerLink: ['/library/dashboard'] },
+                        { label: 'Books', icon: 'pi pi-fw pi-book', routerLink: ['/library/books'] },
+                        { label: 'Loans', icon: 'pi pi-fw pi-external-link', routerLink: ['/library/loans'] },
+                        { label: 'Users', icon: 'pi pi-fw pi-user', routerLink: ['/library/users'] }
+                    ]
+                },
+                {
                     label: 'Communications',
                     icon: 'pi pi-fw pi-comments',
                     items: [
@@ -53,6 +63,32 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuMod
                     icon: 'pi pi-fw pi-file-pdf',
                     items: [
                         { label: 'System reports', icon: 'pi pi-fw pi-file-pdf', routerLink: ['/platform/reports'] }
+                    ]
+                },
+                {
+                    label: 'Accounting',
+                    icon: 'pi pi-fw pi-calculator',
+                    items: [
+                        { label: 'Accounting setup', icon: 'pi pi-fw pi-wallet', routerLink: ['/platform/accounting'] }
+                    ]
+                }
+            ]
+        };
+    }
+
+    if (role === 'AccountantSuper' || role === 'AccountantSenior' || role === 'AccountantJunior') {
+        return {
+            home: { label: 'Dashboard', icon: 'pi pi-fw pi-wallet', routerLink: ['/accountant/dashboard'] },
+            groups: [
+                {
+                    label: 'Accounting',
+                    icon: 'pi pi-fw pi-calculator',
+                    items: [
+                        { label: 'Dashboard', icon: 'pi pi-fw pi-chart-bar', routerLink: ['/accountant/dashboard'] },
+                        { label: 'Students', icon: 'pi pi-fw pi-users', routerLink: ['/accountant/students'] },
+                        { label: 'Payments', icon: 'pi pi-fw pi-credit-card', routerLink: ['/accountant/payments'] },
+                        { label: 'Invoices', icon: 'pi pi-fw pi-file', routerLink: ['/accountant/invoices'] },
+                        { label: 'Reports', icon: 'pi pi-fw pi-file-pdf', routerLink: ['/accountant/reports'] }
                     ]
                 }
             ]
@@ -86,6 +122,24 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuMod
         };
     }
 
+    if (role === 'LibraryAdmin') {
+        return {
+            home: { label: 'Dashboard', icon: 'pi pi-fw pi-book', routerLink: ['/library/dashboard'] },
+            groups: [
+                {
+                    label: 'Library',
+                    icon: 'pi pi-fw pi-book',
+                    items: [
+                        { label: 'Dashboard', icon: 'pi pi-fw pi-chart-bar', routerLink: ['/library/dashboard'] },
+                        { label: 'Books', icon: 'pi pi-fw pi-book', routerLink: ['/library/books'] },
+                        { label: 'Loans', icon: 'pi pi-fw pi-external-link', routerLink: ['/library/loans'] },
+                        { label: 'Users', icon: 'pi pi-fw pi-user', routerLink: ['/library/users'] }
+                    ]
+                }
+            ]
+        };
+    }
+
     return {
         home: { label: 'Dashboard', icon: 'pi pi-fw pi-home', routerLink: ['/admin/dashboard'] },
         groups: [
@@ -113,6 +167,16 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuMod
                 ]
             },
             {
+                label: 'Library',
+                icon: 'pi pi-fw pi-book',
+                items: [
+                    { label: 'Dashboard', icon: 'pi pi-fw pi-chart-bar', routerLink: ['/library/dashboard'] },
+                    { label: 'Books', icon: 'pi pi-fw pi-book', routerLink: ['/library/books'] },
+                    { label: 'Loans', icon: 'pi pi-fw pi-external-link', routerLink: ['/library/loans'] },
+                    { label: 'Users', icon: 'pi pi-fw pi-user', routerLink: ['/library/users'] }
+                ]
+            },
+            {
                 label: 'Communications',
                 icon: 'pi pi-fw pi-comments',
                 items: [
@@ -124,6 +188,13 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuMod
                 icon: 'pi pi-fw pi-file-pdf',
                 items: [
                     { label: 'System reports', icon: 'pi pi-fw pi-file-pdf', routerLink: ['/admin/reports'] }
+                ]
+            },
+            {
+                label: 'Accounting',
+                icon: 'pi pi-fw pi-calculator',
+                items: [
+                    { label: 'Accounting setup', icon: 'pi pi-fw pi-wallet', routerLink: ['/admin/accounting'] }
                 ]
             }
         ]

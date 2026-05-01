@@ -309,7 +309,7 @@ export class TeacherProfile implements OnInit {
     saveMessage = '';
 
     get canEditProfile(): boolean {
-        return this.isTeacher || this.isSchoolAdmin;
+        return this.isTeacher || this.isSchoolAdmin || this.isLibraryAdmin;
     }
 
     get isTeacher(): boolean {
@@ -320,8 +320,20 @@ export class TeacherProfile implements OnInit {
         return this.auth.role() === 'Admin';
     }
 
+    get isLibraryAdmin(): boolean {
+        return this.auth.role() === 'LibraryAdmin';
+    }
+
     get homeRoute(): string {
-        return this.isTeacher ? '/teacher/dashboard' : '/admin/dashboard';
+        if (this.isTeacher) {
+            return '/teacher/dashboard';
+        }
+
+        if (this.isLibraryAdmin) {
+            return '/library/dashboard';
+        }
+
+        return '/admin/dashboard';
     }
 
     get assignedClasses(): string[] {
@@ -355,6 +367,15 @@ export class TeacherProfile implements OnInit {
                 { label: 'Results', value: 'Enter', delta: 'Marks entry', hint: 'Assessments and grades', icon: 'pi pi-table', tone: 'purple', route: '/teacher/results' },
                 { label: 'My classes', value: `${this.assignedClasses.length}`, delta: 'Teaching load', hint: 'Assigned classes', icon: 'pi pi-users', tone: 'green', route: '/teacher/classes' },
                 { label: 'Dashboard', value: 'Home', delta: 'Control center', hint: 'Overview and alerts', icon: 'pi pi-home', tone: 'orange', route: '/teacher/dashboard' }
+            ];
+        }
+
+        if (this.isLibraryAdmin) {
+            return [
+                { label: 'Books', value: 'Manage', delta: 'Catalog', hint: 'Library titles', icon: 'pi pi-book', tone: 'blue', route: '/library/books' },
+                { label: 'Loans', value: 'Track', delta: 'Circulation', hint: 'Issue and returns', icon: 'pi pi-clock', tone: 'purple', route: '/library/loans' },
+                { label: 'Users', value: 'Review', delta: 'Library staff', hint: 'Library admin accounts', icon: 'pi pi-user', tone: 'green', route: '/library/users' },
+                { label: 'Dashboard', value: 'Home', delta: 'Control center', hint: 'Overview and alerts', icon: 'pi pi-home', tone: 'orange', route: '/library/dashboard' }
             ];
         }
 
@@ -396,6 +417,22 @@ export class TeacherProfile implements OnInit {
                     this.selectedTermId = this.selectedTermId ?? this.termOptions[0]?.value ?? null;
                     this.resetDraft();
                     this.loadTeacherTimetable();
+                },
+                error: () => {
+                    this.timetableLoading = false;
+                    this.loading = false;
+                }
+            });
+            return;
+        }
+
+        if (this.isLibraryAdmin) {
+            this.api.getLibraryAdmins(this.auth.schoolId() ?? undefined).subscribe({
+                next: (libraryAdmins) => {
+                    this.profile = libraryAdmins.find((libraryAdmin) => libraryAdmin.id === userId) ?? null;
+                    this.resetDraft();
+                    this.timetableLoading = false;
+                    this.loading = false;
                 },
                 error: () => {
                     this.timetableLoading = false;
@@ -457,7 +494,11 @@ export class TeacherProfile implements OnInit {
             isActive: this.profile.isActive
         };
 
-        const request$ = this.isTeacher ? this.api.updateTeacher(this.profile.id, request) : this.api.updateAdmin(this.profile.id, request);
+        const request$ = this.isTeacher
+            ? this.api.updateTeacher(this.profile.id, request)
+            : this.isLibraryAdmin
+                ? this.api.updateLibraryAdmin(this.profile.id, request)
+                : this.api.updateAdmin(this.profile.id, request);
         request$.subscribe({
             next: (updated) => {
                 this.profile = updated;

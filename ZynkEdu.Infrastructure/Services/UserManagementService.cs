@@ -4,6 +4,7 @@ using ZynkEdu.Application.Abstractions;
 using ZynkEdu.Application.Contracts;
 using ZynkEdu.Application.Security;
 using ZynkEdu.Domain.Entities;
+using ZynkEdu.Domain.Entities.Accounting;
 using ZynkEdu.Domain.Enums;
 using ZynkEdu.Infrastructure.Persistence;
 
@@ -91,6 +92,63 @@ public sealed class UserManagementService : IUserManagementService
         return await CreateUserAsync(UserRole.Admin, schoolId, request, cancellationToken);
     }
 
+    public async Task<UserResponse> CreateLibraryAdminAsync(int schoolId, CreateSchoolUserRequest request, CancellationToken cancellationToken = default)
+    {
+        if (_currentUserContext.Role is not (UserRole.PlatformAdmin or UserRole.Admin))
+        {
+            throw new UnauthorizedAccessException("Only school and platform admins can create library admins.");
+        }
+
+        return await CreateUserAsync(UserRole.LibraryAdmin, schoolId, request, cancellationToken);
+    }
+
+    public async Task<UserResponse> CreateAccountantAsync(CreateAccountantRequest request, int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        if (_currentUserContext.Role is not (UserRole.PlatformAdmin or UserRole.Admin))
+        {
+            throw new UnauthorizedAccessException("Only school and platform admins can create accountants.");
+        }
+
+        var resolvedSchoolId = ResolveAccountingSchoolId(schoolId, allowPlatformDefault: false);
+        var role = request.Role switch
+        {
+            UserRole.AccountantSuper or UserRole.AccountantSenior or UserRole.AccountantJunior => request.Role,
+            _ => throw new InvalidOperationException("Choose a valid accountant role.")
+        };
+
+        return await CreateUserAsync(role, resolvedSchoolId, new CreateSchoolUserRequest(
+            request.Username,
+            string.IsNullOrWhiteSpace(request.DisplayName) ? request.Username.Trim() : request.DisplayName,
+            request.Password,
+            request.ContactEmail), cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<UserResponse>> GetAccountantsAsync(int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        if (_currentUserContext.Role is not (UserRole.PlatformAdmin or UserRole.Admin))
+        {
+            throw new UnauthorizedAccessException("Only school and platform admins can view accountants.");
+        }
+
+        var query = _dbContext.AccountantUsers.AsNoTracking().Include(x => x.Account).AsQueryable();
+        if (_currentUserContext.Role == UserRole.PlatformAdmin)
+        {
+            if (schoolId is not null)
+            {
+                query = query.Where(x => x.SchoolId == schoolId);
+            }
+        }
+        else
+        {
+            query = query.Where(x => x.SchoolId == RequireSchoolId());
+        }
+
+        return await query
+            .OrderBy(x => x.DisplayName)
+            .Select(x => new UserResponse(x.Id, x.Account.Username, x.DisplayName, x.Account.Role.ToString(), x.SchoolId, x.CreatedAt, x.IsActive, x.Account.ContactEmail))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<UserResponse>> GetTeachersAsync(int? schoolId = null, CancellationToken cancellationToken = default)
     {
         return await GetUsersByRoleAsync(UserRole.Teacher, schoolId, cancellationToken);
@@ -104,6 +162,16 @@ public sealed class UserManagementService : IUserManagementService
         }
 
         return await GetUsersByRoleAsync(UserRole.Admin, schoolId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<UserResponse>> GetLibraryAdminsAsync(int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        if (_currentUserContext.Role is not (UserRole.PlatformAdmin or UserRole.Admin or UserRole.LibraryAdmin))
+        {
+            throw new UnauthorizedAccessException("Only school and platform admins can view library admins.");
+        }
+
+        return await GetUsersByRoleAsync(UserRole.LibraryAdmin, schoolId, cancellationToken);
     }
 
     public async Task<UserResponse> UpdateTeacherAsync(int id, UpdateSchoolUserRequest request, CancellationToken cancellationToken = default)
@@ -209,6 +277,47 @@ public sealed class UserManagementService : IUserManagementService
         });
     }
 
+    public async Task<UserResponse> UpdateLibraryAdminAsync(int id, UpdateSchoolUserRequest request, CancellationToken cancellationToken = default)
+    {
+        if (_currentUserContext.Role is not (UserRole.PlatformAdmin or UserRole.Admin or UserRole.LibraryAdmin))
+        {
+            throw new UnauthorizedAccessException("Only school, library, and platform admins can edit library admins.");
+        }
+
+        if (_currentUserContext.Role == UserRole.LibraryAdmin && _currentUserContext.UserId != id)
+        {
+            throw new UnauthorizedAccessException("Library admins can only edit their own profile.");
+        }
+
+        var user = await RequireUserAsync(id, UserRole.LibraryAdmin, cancellationToken);
+        return await UpdateUserAsync(user, request, cancellationToken);
+    }
+
+    public async Task DeleteLibraryAdminAsync(int id, CancellationToken cancellationToken = default)
+    {
+        if (_currentUserContext.Role is not (UserRole.PlatformAdmin or UserRole.Admin))
+        {
+            throw new UnauthorizedAccessException("Only school and platform admins can delete library admins.");
+        }
+
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            var user = await RequireUserAsync(id, UserRole.LibraryAdmin, cancellationToken);
+            var profile = await _dbContext.LibraryAdminUsers.FirstOrDefaultAsync(x => x.Id == user.Id, cancellationToken);
+            if (profile is not null)
+            {
+                _dbContext.LibraryAdminUsers.Remove(profile);
+            }
+
+            _dbContext.Users.Remove(user);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        });
+    }
+
     private async Task<UserResponse> CreateUserAsync(UserRole role, int schoolId, CreateSchoolUserRequest request, CancellationToken cancellationToken)
     {
         var username = request.Username.Trim().ToLowerInvariant();
@@ -247,6 +356,30 @@ public sealed class UserManagementService : IUserManagementService
         else if (role == UserRole.Teacher)
         {
             _dbContext.TeacherUsers.Add(new TeacherUser
+            {
+                Id = user.Id,
+                SchoolId = schoolId,
+                DisplayName = user.DisplayName,
+                IsActive = true,
+                CreatedAt = user.CreatedAt
+            });
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        else if (role == UserRole.LibraryAdmin)
+        {
+            _dbContext.LibraryAdminUsers.Add(new LibraryAdminUser
+            {
+                Id = user.Id,
+                SchoolId = schoolId,
+                DisplayName = user.DisplayName,
+                IsActive = true,
+                CreatedAt = user.CreatedAt
+            });
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        else if (role is UserRole.AccountantSuper or UserRole.AccountantSenior or UserRole.AccountantJunior)
+        {
+            _dbContext.AccountantUsers.Add(new AccountantUser
             {
                 Id = user.Id,
                 SchoolId = schoolId,
@@ -313,6 +446,48 @@ public sealed class UserManagementService : IUserManagementService
                 profile.SchoolId = user.SchoolId;
             }
         }
+        else if (user.Role == UserRole.LibraryAdmin)
+        {
+            var profile = await _dbContext.LibraryAdminUsers.FirstOrDefaultAsync(x => x.Id == user.Id, cancellationToken);
+            if (profile is null)
+            {
+                _dbContext.LibraryAdminUsers.Add(new LibraryAdminUser
+                {
+                    Id = user.Id,
+                    SchoolId = user.SchoolId,
+                    DisplayName = user.DisplayName,
+                    IsActive = user.IsActive,
+                    CreatedAt = user.CreatedAt
+                });
+            }
+            else
+            {
+                profile.DisplayName = user.DisplayName;
+                profile.IsActive = user.IsActive;
+                profile.SchoolId = user.SchoolId;
+            }
+        }
+        else if (user.Role is UserRole.AccountantSuper or UserRole.AccountantSenior or UserRole.AccountantJunior)
+        {
+            var profile = await _dbContext.AccountantUsers.FirstOrDefaultAsync(x => x.Id == user.Id, cancellationToken);
+            if (profile is null)
+            {
+                _dbContext.AccountantUsers.Add(new AccountantUser
+                {
+                    Id = user.Id,
+                    SchoolId = user.SchoolId,
+                    DisplayName = user.DisplayName,
+                    IsActive = user.IsActive,
+                    CreatedAt = user.CreatedAt
+                });
+            }
+            else
+            {
+                profile.DisplayName = user.DisplayName;
+                profile.IsActive = user.IsActive;
+                profile.SchoolId = user.SchoolId;
+            }
+        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return new UserResponse(user.Id, user.Username, user.DisplayName, user.Role.ToString(), user.SchoolId, user.CreatedAt, user.IsActive, user.ContactEmail);
@@ -347,6 +522,35 @@ public sealed class UserManagementService : IUserManagementService
             }
 
             return await teacherUserQuery
+                .OrderBy(x => x.DisplayName)
+                .Select(x => new UserResponse(x.Id, x.Account.Username, x.DisplayName, x.Account.Role.ToString(), x.SchoolId, x.CreatedAt, x.IsActive, x.Account.ContactEmail))
+                .ToListAsync(cancellationToken);
+        }
+
+        if (role == UserRole.LibraryAdmin)
+        {
+            var libraryAdminQuery = _dbContext.LibraryAdminUsers.AsNoTracking().Include(x => x.Account).AsQueryable();
+            if (_currentUserContext.Role != UserRole.PlatformAdmin || resolvedSchoolId is not null)
+            {
+                libraryAdminQuery = libraryAdminQuery.Where(x => x.SchoolId == resolvedSchoolId);
+            }
+
+            return await libraryAdminQuery
+                .OrderBy(x => x.DisplayName)
+                .Select(x => new UserResponse(x.Id, x.Account.Username, x.DisplayName, x.Account.Role.ToString(), x.SchoolId, x.CreatedAt, x.IsActive, x.Account.ContactEmail))
+                .ToListAsync(cancellationToken);
+        }
+
+        if (role is UserRole.AccountantSuper or UserRole.AccountantSenior or UserRole.AccountantJunior)
+        {
+            var accountantQuery = _dbContext.AccountantUsers.AsNoTracking().Include(x => x.Account).AsQueryable();
+            if (_currentUserContext.Role != UserRole.PlatformAdmin || resolvedSchoolId is not null)
+            {
+                accountantQuery = accountantQuery.Where(x => x.SchoolId == resolvedSchoolId);
+            }
+
+            return await accountantQuery
+                .Where(x => x.Account.Role == role)
                 .OrderBy(x => x.DisplayName)
                 .Select(x => new UserResponse(x.Id, x.Account.Username, x.DisplayName, x.Account.Role.ToString(), x.SchoolId, x.CreatedAt, x.IsActive, x.Account.ContactEmail))
                 .ToListAsync(cancellationToken);
@@ -391,6 +595,32 @@ public sealed class UserManagementService : IUserManagementService
             }
         }
 
+        if (expectedRole == UserRole.LibraryAdmin)
+        {
+            var profileQuery = _currentUserContext.Role == UserRole.PlatformAdmin
+                ? _dbContext.LibraryAdminUsers.Include(x => x.Account)
+                : _dbContext.LibraryAdminUsers.Include(x => x.Account).Where(x => x.SchoolId == RequireSchoolId());
+
+            var profile = await profileQuery.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (profile is not null)
+            {
+                return profile.Account;
+            }
+        }
+
+        if (expectedRole is UserRole.AccountantSuper or UserRole.AccountantSenior or UserRole.AccountantJunior)
+        {
+            var profileQuery = _currentUserContext.Role == UserRole.PlatformAdmin
+                ? _dbContext.AccountantUsers.Include(x => x.Account)
+                : _dbContext.AccountantUsers.Include(x => x.Account).Where(x => x.SchoolId == RequireSchoolId());
+
+            var profile = await profileQuery.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+            if (profile is not null)
+            {
+                return profile.Account;
+            }
+        }
+
         var query = _currentUserContext.Role == UserRole.PlatformAdmin
             ? _dbContext.Users
             : _dbContext.Users.Where(x => x.SchoolId == RequireSchoolId());
@@ -409,9 +639,29 @@ public sealed class UserManagementService : IUserManagementService
         return RequireSchoolId();
     }
 
+    private int ResolveAccountingSchoolId(int? schoolId, bool allowPlatformDefault = true)
+    {
+        if (_currentUserContext.Role == UserRole.PlatformAdmin)
+        {
+            if (schoolId is not null)
+            {
+                return schoolId.Value;
+            }
+
+            if (allowPlatformDefault && _currentUserContext.SchoolId is int platformSchoolId)
+            {
+                return platformSchoolId;
+            }
+
+            throw new InvalidOperationException("Choose a school before creating accountants.");
+        }
+
+        return RequireSchoolId();
+    }
+
     private int RequireSchoolId()
     {
-        if (_currentUserContext.SchoolId is not int schoolId || _currentUserContext.Role is not (UserRole.Admin or UserRole.Teacher or UserRole.PlatformAdmin))
+        if (_currentUserContext.SchoolId is not int schoolId || _currentUserContext.Role is not (UserRole.Admin or UserRole.Teacher or UserRole.PlatformAdmin or UserRole.LibraryAdmin or UserRole.AccountantSuper or UserRole.AccountantSenior or UserRole.AccountantJunior))
         {
             throw new UnauthorizedAccessException("A school-scoped user is required.");
         }

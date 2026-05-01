@@ -24,7 +24,18 @@ public sealed class AuditLogService : IAuditLogService
         _logger = logger;
     }
 
-    public async Task LogAsync(int? schoolId, string action, string entityType, string entityId, string summary, CancellationToken cancellationToken = default)
+    public Task LogAsync(int? schoolId, string action, string entityType, string entityId, string summary, CancellationToken cancellationToken = default)
+        => LogAsync(schoolId, action, entityType, entityId, summary, null, null, cancellationToken);
+
+    public async Task LogAsync(
+        int? schoolId,
+        string action,
+        string entityType,
+        string entityId,
+        string summary,
+        string? oldValue = null,
+        string? newValue = null,
+        CancellationToken cancellationToken = default)
     {
         var log = new AuditLog
         {
@@ -36,6 +47,8 @@ public sealed class AuditLogService : IAuditLogService
             EntityType = entityType.Trim(),
             EntityId = entityId.Trim(),
             Summary = summary.Trim(),
+            OldValue = oldValue,
+            NewValue = newValue,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -74,6 +87,8 @@ public sealed class AuditLogService : IAuditLogService
                 x.EntityType,
                 x.EntityId,
                 x.Summary,
+                x.OldValue,
+                x.NewValue,
                 x.CreatedAt))
             .ToListAsync(cancellationToken);
     }

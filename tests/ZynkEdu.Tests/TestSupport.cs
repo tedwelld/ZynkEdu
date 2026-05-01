@@ -13,11 +13,12 @@ namespace ZynkEdu.Tests;
 internal sealed class TestCurrentUserContext : ICurrentUserContext
 {
     public bool IsAuthenticated => true;
-    public bool HasSchoolScope => Role is UserRole.Admin or UserRole.Teacher;
+    public bool HasSchoolScope => Role is UserRole.Admin or UserRole.Teacher or UserRole.LibraryAdmin or UserRole.AccountantSuper or UserRole.AccountantSenior or UserRole.AccountantJunior;
     public bool IsPlatformAdmin => Role == UserRole.PlatformAdmin;
     public int? UserId { get; init; }
     public int? SchoolId { get; init; }
     public string? UserName { get; init; }
+    public string? DisplayName { get; init; }
     public UserRole? Role { get; init; }
     public string? ParentPhone { get; init; }
     public string? ParentEmail { get; init; }
@@ -66,6 +67,9 @@ internal sealed class RecordingEmailSender : IEmailSender
 internal sealed class NoOpAuditLogService : IAuditLogService
 {
     public Task LogAsync(int? schoolId, string action, string entityType, string entityId, string summary, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task LogAsync(int? schoolId, string action, string entityType, string entityId, string summary, string? oldValue = null, string? newValue = null, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
 
     public Task<IReadOnlyList<AuditLogResponse>> GetRecentAsync(int? schoolId = null, int take = 10, CancellationToken cancellationToken = default)

@@ -368,7 +368,7 @@ public sealed class StudentService : IStudentService
             throw new UnauthorizedAccessException("A school-scoped user is required.");
         }
 
-        if (_currentUserContext.Role is not (UserRole.Admin or UserRole.Teacher or UserRole.PlatformAdmin))
+        if (_currentUserContext.Role is not (UserRole.Admin or UserRole.Teacher or UserRole.PlatformAdmin or UserRole.AccountantSuper or UserRole.AccountantSenior or UserRole.AccountantJunior))
         {
             throw new UnauthorizedAccessException("Not allowed.");
         }

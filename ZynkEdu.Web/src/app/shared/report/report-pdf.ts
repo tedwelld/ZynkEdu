@@ -1,6 +1,18 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { ParentPreviewReportResponse, ResultResponse } from '../../core/api/api.models';
+import {
+    AgingReportResponse,
+    CollectionReportResponse,
+    DefaulterReportResponse,
+    DailyCashReportResponse,
+    FeeStructureResponse,
+    LibraryBorrowerSummaryResponse,
+    LibraryLoanResponse,
+    ParentPreviewReportResponse,
+    RevenueByClassReportResponse,
+    ResultResponse,
+    StudentStatementResponse
+} from '../../core/api/api.models';
 
 export interface AdminResultsClassGroup {
     className: string;
@@ -20,6 +32,420 @@ export interface TeacherClassResultRow {
     examScore: number | null;
     finalScore: number | null;
     grade: string;
+}
+
+export function buildAccountingReportsPdf(
+    schoolName: string,
+    generatedAt: Date | string,
+    periodLabel: string,
+    collection: CollectionReportResponse | null,
+    aging: AgingReportResponse | null,
+    revenue: RevenueByClassReportResponse | null,
+    defaulters: DefaulterReportResponse | null,
+    dailyCash: DailyCashReportResponse | null,
+    fileName: string
+): jsPDF {
+    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+    const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(17, 24, 39);
+    doc.text('Accounting financial statement', margin, 46);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text(`School: ${schoolName}`, margin, 64);
+    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 78);
+    doc.text(`Period: ${periodLabel}`, margin, 92);
+
+    const totalBilled = collection?.totalBilled ?? 0;
+    const totalCollected = collection?.totalCollected ?? 0;
+    const outstanding = collection?.outstanding ?? 0;
+    const defaulterCount = defaulters?.students.length ?? 0;
+
+    drawMetricCard(doc, margin, 110, 160, 60, 'Billed', totalBilled.toFixed(2), 'Invoice total');
+    drawMetricCard(doc, margin + 170, 110, 160, 60, 'Collected', totalCollected.toFixed(2), 'Payments received');
+    drawMetricCard(doc, margin + 340, 110, 160, 60, 'Outstanding', outstanding.toFixed(2), 'Current balances');
+    drawMetricCard(doc, margin + 510, 110, 160, 60, 'Defaulters', defaulterCount.toString(), 'Students behind');
+
+    let currentY = 198;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(17, 24, 39);
+    doc.text('Aging buckets', margin, currentY);
+    autoTable(doc, {
+        startY: currentY + 10,
+        head: [['Bucket', 'Amount', 'Invoice Count']],
+        body: (aging?.buckets ?? []).map((bucket) => [bucket.bucket, bucket.amount.toFixed(2), bucket.invoiceCount.toString()]),
+        theme: 'striped',
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [37, 99, 235] },
+        margin: { left: margin, right: margin }
+    });
+
+    currentY = (doc as any).lastAutoTable?.finalY ?? currentY + 80;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('Defaulters', margin, currentY + 22);
+    autoTable(doc, {
+        startY: currentY + 32,
+        head: [['Student', 'Class', 'Grade', 'Balance', 'Last payment']],
+        body: (defaulters?.students ?? []).map((student) => [
+            student.studentName,
+            student.className,
+            student.gradeLevel,
+            student.balance.toFixed(2),
+            student.lastPaymentAt ? formatDate(student.lastPaymentAt) : '-'
+        ]),
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [30, 64, 175] },
+        margin: { left: margin, right: margin }
+    });
+
+    currentY = (doc as any).lastAutoTable?.finalY ?? currentY + 80;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('Revenue by class', margin, currentY + 22);
+    autoTable(doc, {
+        startY: currentY + 32,
+        head: [['Class', 'Grade', 'Billed', 'Collected', 'Outstanding']],
+        body: (revenue?.classes ?? []).map((row) => [
+            row.className,
+            row.gradeLevel,
+            row.billed.toFixed(2),
+            row.collected.toFixed(2),
+            row.outstanding.toFixed(2)
+        ]),
+        theme: 'striped',
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [37, 99, 235] },
+        margin: { left: margin, right: margin }
+    });
+
+    currentY = (doc as any).lastAutoTable?.finalY ?? currentY + 80;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('Daily cash', margin, currentY + 22);
+    autoTable(doc, {
+        startY: currentY + 32,
+        head: [['Method', 'Amount', 'Payments']],
+        body: (dailyCash?.methods ?? []).map((row) => [row.method, row.amount.toFixed(2), row.paymentCount.toString()]),
+        theme: 'striped',
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [16, 185, 129] },
+        margin: { left: margin, right: margin }
+    });
+
+    doc.save(fileName);
+    return doc;
+}
+
+export function buildCollectionReportPdf(
+    schoolName: string,
+    generatedAt: Date | string,
+    periodLabel: string,
+    collection: CollectionReportResponse,
+    fileName: string
+): jsPDF {
+    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+    const margin = 40;
+
+    writeReportHeading(doc, 'Collection summary', schoolName, generatedAt, periodLabel, margin);
+    drawMetricCard(doc, margin, 110, 180, 60, 'Billed', collection.totalBilled.toFixed(2), 'Invoice total');
+    drawMetricCard(doc, margin + 190, 110, 180, 60, 'Collected', collection.totalCollected.toFixed(2), 'Payments received');
+    drawMetricCard(doc, margin + 380, 110, 180, 60, 'Outstanding', collection.outstanding.toFixed(2), 'Current balances');
+    drawMetricCard(doc, margin + 570, 110, 130, 60, 'Invoices', collection.invoiceCount.toString(), 'Count');
+
+    autoTable(doc, {
+        startY: 198,
+        head: [['Metric', 'Value']],
+        body: [
+            ['Billed', collection.totalBilled.toFixed(2)],
+            ['Collected', collection.totalCollected.toFixed(2)],
+            ['Outstanding', collection.outstanding.toFixed(2)],
+            ['Invoice count', collection.invoiceCount.toString()],
+            ['Payment count', collection.paymentCount.toString()]
+        ],
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 4 },
+        headStyles: { fillColor: [37, 99, 235] },
+        margin: { left: margin, right: margin }
+    });
+
+    doc.save(fileName);
+    return doc;
+}
+
+export function buildAgingBucketsPdf(
+    schoolName: string,
+    generatedAt: Date | string,
+    periodLabel: string,
+    aging: AgingReportResponse,
+    fileName: string
+): jsPDF {
+    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+    const margin = 40;
+
+    writeReportHeading(doc, 'Aging buckets', schoolName, generatedAt, periodLabel, margin);
+    autoTable(doc, {
+        startY: 110,
+        head: [['Bucket', 'Amount', 'Invoice Count']],
+        body: aging.buckets.map((bucket) => [bucket.bucket, bucket.amount.toFixed(2), bucket.invoiceCount.toString()]),
+        theme: 'striped',
+        styles: { fontSize: 9, cellPadding: 4 },
+        headStyles: { fillColor: [37, 99, 235] },
+        margin: { left: margin, right: margin }
+    });
+
+    doc.save(fileName);
+    return doc;
+}
+
+export function buildDefaultersPdf(
+    schoolName: string,
+    generatedAt: Date | string,
+    periodLabel: string,
+    defaulters: DefaulterReportResponse,
+    fileName: string
+): jsPDF {
+    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+    const margin = 40;
+
+    writeReportHeading(doc, 'Defaulters list', schoolName, generatedAt, periodLabel, margin);
+    autoTable(doc, {
+        startY: 110,
+        head: [['Student', 'Class', 'Grade', 'Balance', 'Last payment', 'Last invoice']],
+        body: defaulters.students.map((student) => [
+            student.studentName,
+            student.className,
+            student.gradeLevel,
+            student.balance.toFixed(2),
+            student.lastPaymentAt ? formatDate(student.lastPaymentAt) : '-',
+            student.lastInvoiceAt ? formatDate(student.lastInvoiceAt) : '-'
+        ]),
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [30, 64, 175] },
+        margin: { left: margin, right: margin }
+    });
+
+    doc.save(fileName);
+    return doc;
+}
+
+export function buildRevenueByClassPdf(
+    schoolName: string,
+    generatedAt: Date | string,
+    periodLabel: string,
+    revenue: RevenueByClassReportResponse,
+    fileName: string
+): jsPDF {
+    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+    const margin = 40;
+
+    writeReportHeading(doc, 'Revenue by class', schoolName, generatedAt, periodLabel, margin);
+    autoTable(doc, {
+        startY: 110,
+        head: [['Class', 'Grade', 'Billed', 'Collected', 'Outstanding']],
+        body: revenue.classes.map((row) => [row.className, row.gradeLevel, row.billed.toFixed(2), row.collected.toFixed(2), row.outstanding.toFixed(2)]),
+        theme: 'striped',
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [37, 99, 235] },
+        margin: { left: margin, right: margin }
+    });
+
+    doc.save(fileName);
+    return doc;
+}
+
+export function buildDailyCashPdf(
+    schoolName: string,
+    generatedAt: Date | string,
+    periodLabel: string,
+    dailyCash: DailyCashReportResponse,
+    fileName: string
+): jsPDF {
+    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+    const margin = 40;
+
+    writeReportHeading(doc, 'Daily cash report', schoolName, generatedAt, periodLabel, margin);
+    autoTable(doc, {
+        startY: 110,
+        head: [['Method', 'Amount', 'Payments']],
+        body: dailyCash.methods.map((row) => [row.method, row.amount.toFixed(2), row.paymentCount.toString()]),
+        theme: 'striped',
+        styles: { fontSize: 9, cellPadding: 4 },
+        headStyles: { fillColor: [16, 185, 129] },
+        margin: { left: margin, right: margin }
+    });
+
+    doc.save(fileName);
+    return doc;
+}
+
+export function buildLibraryOverdueLoansPdf(
+    schoolName: string,
+    generatedAt: Date | string,
+    loans: LibraryLoanResponse[],
+    fileName: string
+): jsPDF {
+    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+    const margin = 40;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(17, 24, 39);
+    doc.text('Library overdue loans', margin, 44);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text(`School: ${schoolName}`, margin, 62);
+    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 76);
+    doc.text(`Records: ${loans.length}`, margin, 90);
+
+    autoTable(doc, {
+        startY: 108,
+        head: [['Book', 'Borrower', 'Due date', 'Status', 'Copy', 'Author']],
+        body: loans.map((loan) => [
+            loan.bookTitle,
+            loan.borrowerDisplayName,
+            formatDate(loan.dueAt),
+            loan.isOverdue ? 'Overdue' : 'Open',
+            loan.copyAccessionNumber || `Copy ${loan.libraryBookCopyId}`,
+            loan.bookAuthor || '-'
+        ]),
+        theme: 'striped',
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [220, 38, 38] },
+        margin: { left: margin, right: margin }
+    });
+
+    doc.save(fileName);
+    return doc;
+}
+
+export function buildLibraryBorrowersPdf(
+    schoolName: string,
+    generatedAt: Date | string,
+    borrowers: LibraryBorrowerSummaryResponse[],
+    fileName: string
+): jsPDF {
+    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+    const margin = 40;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(17, 24, 39);
+    doc.text('Library borrowers', margin, 44);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text(`School: ${schoolName}`, margin, 62);
+    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 76);
+    doc.text(`Records: ${borrowers.length}`, margin, 90);
+
+    autoTable(doc, {
+        startY: 108,
+        head: [['Name', 'Reference', 'Type', 'Open loans', 'Overdue']],
+        body: borrowers.map((borrower) => [
+            borrower.displayName,
+            borrower.reference || '-',
+            borrower.borrowerType,
+            borrower.activeLoanCount.toString(),
+            borrower.overdueLoanCount.toString()
+        ]),
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [22, 163, 74] },
+        margin: { left: margin, right: margin }
+    });
+
+    doc.save(fileName);
+    return doc;
+}
+
+export function buildFeeStructuresPdf(
+    schoolName: string,
+    generatedAt: Date | string,
+    feeStructures: FeeStructureResponse[],
+    fileName: string
+): jsPDF {
+    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+    const margin = 40;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(17, 24, 39);
+    doc.text('Fee structures', margin, 44);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text(`School: ${schoolName}`, margin, 62);
+    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 76);
+    doc.text(`Records: ${feeStructures.length}`, margin, 90);
+
+    autoTable(doc, {
+        startY: 108,
+        head: [['Grade level', 'Term', 'Amount', 'Description', 'Updated']],
+        body: feeStructures.map((fee) => [
+            fee.gradeLevel,
+            fee.term,
+            fee.amount.toFixed(2),
+            fee.description ?? '-',
+            formatDate(fee.updatedAt)
+        ]),
+        theme: 'striped',
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [37, 99, 235] },
+        margin: { left: margin, right: margin }
+    });
+
+    doc.save(fileName);
+    return doc;
+}
+
+export function buildStudentStatementPdf(statement: StudentStatementResponse, fileName: string): jsPDF {
+    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+    const margin = 40;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(17, 24, 39);
+    doc.text('Student financial statement', margin, 44);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text(`Student: ${statement.studentName}`, margin, 62);
+    doc.text(`School ID: ${statement.schoolId}`, margin, 76);
+    doc.text(`Opening balance: ${statement.openingBalance.toFixed(2)}`, margin, 90);
+    doc.text(`Closing balance: ${statement.closingBalance.toFixed(2)}`, margin, 104);
+
+    autoTable(doc, {
+        startY: 122,
+        head: [['Date', 'Type', 'Status', 'Reference', 'Debit', 'Credit', 'Running']],
+        body: statement.transactions.map((line) => [
+            formatDate(line.transactionDate),
+            line.type,
+            line.status,
+            line.reference ?? '-',
+            line.debit.toFixed(2),
+            line.credit.toFixed(2),
+            line.runningBalance.toFixed(2)
+        ]),
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [37, 99, 235] },
+        margin: { left: margin, right: margin }
+    });
+
+    doc.save(fileName);
+    return doc;
 }
 
 export function buildAdminResultsReportPdf(
@@ -281,6 +707,41 @@ export function buildTeacherClassResultsPdf(
 
 function formatDate(value: Date | string): string {
     return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function writeReportHeading(doc: jsPDF, title: string, schoolName: string, generatedAt: Date | string, periodLabel: string, margin: number): void {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(17, 24, 39);
+    doc.text(title, margin, 44);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text(`School: ${schoolName}`, margin, 62);
+    doc.text(`Period: ${periodLabel}`, margin, 76);
+    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 90);
+}
+
+function drawMetricCard(doc: jsPDF, x: number, y: number, width: number, height: number, label: string, value: string, secondary: string): void {
+    doc.setDrawColor(226, 232, 240);
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(x, y, width, height, 8, 8, 'FD');
+    doc.setFillColor(37, 99, 235);
+    doc.roundedRect(x, y, width, 7, 8, 8, 'F');
+
+    doc.setTextColor(75, 85, 99);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.text(label.toUpperCase(), x + 10, y + 22);
+
+    doc.setTextColor(17, 24, 39);
+    doc.setFontSize(13);
+    doc.text(value, x + 10, y + 40);
+
+    doc.setTextColor(75, 85, 99);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.text(secondary, x + 10, y + height - 10);
 }
 
 function drawSummaryCard(

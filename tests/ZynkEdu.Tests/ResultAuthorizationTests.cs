@@ -297,6 +297,9 @@ internal sealed class StubAuditLogService : IAuditLogService
     public Task LogAsync(int? schoolId, string action, string entityType, string entityId, string summary, CancellationToken cancellationToken = default)
         => Task.CompletedTask;
 
+    public Task LogAsync(int? schoolId, string action, string entityType, string entityId, string summary, string? oldValue = null, string? newValue = null, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
     public Task<IReadOnlyList<AuditLogResponse>> GetRecentAsync(int? schoolId = null, int take = 10, CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyList<AuditLogResponse>>(Array.Empty<AuditLogResponse>());
 }

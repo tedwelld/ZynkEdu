@@ -68,6 +68,7 @@ public sealed class ZynkEduDbContextFactory : IDesignTimeDbContextFactory<ZynkEd
         public int? UserId => null;
         public int? SchoolId => null;
         public string? UserName => "DesignTime";
+        public string? DisplayName => "DesignTime";
         public ZynkEdu.Domain.Enums.UserRole? Role => null;
         public string? ParentPhone => null;
         public string? ParentEmail => null;

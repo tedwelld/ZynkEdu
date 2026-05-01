@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using ZynkEdu.Application.Contracts;
 using ZynkEdu.Domain.Entities;
 using ZynkEdu.Domain.Enums;
 using ZynkEdu.Infrastructure.Services;
@@ -169,5 +170,48 @@ public sealed class UserManagementServiceTests
         Assert.False(await context.Results.AsNoTracking().AnyAsync(x => x.TeacherId == teacher.Id));
         Assert.False(await context.AttendanceRegisters.AsNoTracking().AnyAsync(x => x.TeacherId == teacher.Id));
         Assert.False(await context.AttendanceRegisterEntries.AsNoTracking().AnyAsync(x => x.StudentId == student.Id));
+    }
+
+    [Fact]
+    public async Task CreateAccountantAsync_WritesTheUserAndAccountingProfile_ForASchoolAdmin()
+    {
+        var currentUser = new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 25, UserId = 250, UserName = "school.admin" };
+        var databasePath = TestDatabase.CreateDatabasePath();
+        var (connection, context) = await TestDatabase.CreateContextAsync(databasePath, currentUser);
+        await using var _ = connection;
+
+        context.Schools.Add(new School
+        {
+            Id = 25,
+            SchoolCode = "HB",
+            Name = "Highlands Baptist",
+            Address = "25 Example Road",
+            CreatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+
+        var service = new UserManagementService(context, currentUser, new PasswordHasher<AppUser>(), new TeacherAssignmentService(context, currentUser));
+        var created = await service.CreateAccountantAsync(new CreateAccountantRequest(
+            Username: "acc.jane",
+            Password: "Password123!",
+            Role: UserRole.AccountantJunior,
+            DisplayName: "Jane Accountant",
+            ContactEmail: "jane@example.com"));
+
+        Assert.Equal("acc.jane", created.Username);
+        Assert.Equal(UserRole.AccountantJunior.ToString(), created.Role);
+        Assert.Equal(25, created.SchoolId);
+
+        var user = await context.Users.AsNoTracking().SingleAsync(x => x.Id == created.Id);
+        var accountantProfile = await context.AccountantUsers.AsNoTracking().SingleAsync(x => x.Id == created.Id);
+
+        Assert.Equal("acc.jane", user.Username);
+        Assert.Equal("Jane Accountant", accountantProfile.DisplayName);
+        Assert.Equal(25, accountantProfile.SchoolId);
+
+        var accountants = await service.GetAccountantsAsync(cancellationToken: default);
+        Assert.Single(accountants);
+        Assert.Equal(created.Id, accountants[0].Id);
+        Assert.Equal("Jane Accountant", accountants[0].DisplayName);
     }
 }

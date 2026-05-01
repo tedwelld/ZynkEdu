@@ -29,6 +29,20 @@ export const appRoutes: Routes = [
         loadChildren: () => import('./app/pages/teacher/teacher.routes').then((m) => m.teacherRoutes)
     },
     {
+        path: 'accountant',
+        component: AppLayout,
+        canActivate: [workspaceGuard],
+        data: { roles: ['AccountantSuper', 'AccountantSenior', 'AccountantJunior', 'PlatformAdmin'] },
+        loadChildren: () => import('./app/pages/accountant/accountant.routes').then((m) => m.accountantRoutes)
+    },
+    {
+        path: 'library',
+        component: AppLayout,
+        canActivate: [workspaceGuard],
+        data: { roles: ['Admin', 'PlatformAdmin', 'LibraryAdmin'] },
+        loadChildren: () => import('./app/pages/library/library.routes').then((m) => m.libraryRoutes)
+    },
+    {
         path: 'account',
         component: AppLayout,
         canActivate: [authGuard],

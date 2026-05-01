@@ -8,8 +8,16 @@ function mapRoleToRoot(role: WorkspaceRole | null): string {
         return '/platform/dashboard';
     }
 
+    if (role === 'LibraryAdmin') {
+        return '/library/dashboard';
+    }
+
     if (role === 'Teacher') {
         return '/teacher/dashboard';
+    }
+
+    if (role === 'AccountantSuper' || role === 'AccountantSenior' || role === 'AccountantJunior') {
+        return '/accountant/dashboard';
     }
 
     return '/admin/dashboard';

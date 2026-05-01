@@ -70,7 +70,15 @@ export class AuthService {
     }
 
     navigateAfterLogin(role: WorkspaceRole): Promise<boolean> {
-        const target = role === 'Teacher' ? '/teacher/dashboard' : role === 'PlatformAdmin' ? '/platform/dashboard' : '/admin/dashboard';
+        const target = role === 'Teacher'
+            ? '/teacher/dashboard'
+            : role === 'AccountantSuper' || role === 'AccountantSenior' || role === 'AccountantJunior'
+                ? '/accountant/dashboard'
+            : role === 'PlatformAdmin'
+                ? '/platform/dashboard'
+                : role === 'LibraryAdmin'
+                    ? '/library/dashboard'
+                    : '/admin/dashboard';
         return this.router.navigateByUrl(target);
     }
 

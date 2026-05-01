@@ -17,5 +17,6 @@ export const platformRoutes: Routes = [
     { path: 'progression', loadComponent: () => import('../admin/progression').then((m) => m.AdminProgression) },
     { path: 'results', loadComponent: () => import('../admin/results').then((m) => m.AdminResults) },
     { path: 'notifications', loadComponent: () => import('../admin/notifications').then((m) => m.AdminNotifications) },
-    { path: 'reports', loadComponent: () => import('../admin/reports').then((m) => m.AdminReports) }
+    { path: 'reports', loadComponent: () => import('../admin/reports').then((m) => m.AdminReports) },
+    { path: 'accounting', loadComponent: () => import('../admin/accounting').then((m) => m.AdminAccounting) }
 ];

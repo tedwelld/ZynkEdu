@@ -39,6 +39,13 @@ public sealed class UsersController : ControllerBase
         return Ok(await _userManagementService.CreateAdminAsync(schoolId, request, cancellationToken));
     }
 
+    [HttpPost("library-admins")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    public async Task<ActionResult<UserResponse>> CreateLibraryAdmin([FromQuery] int schoolId, [FromBody] CreateSchoolUserRequest request, CancellationToken cancellationToken)
+    {
+        return Ok(await _userManagementService.CreateLibraryAdminAsync(schoolId, request, cancellationToken));
+    }
+
     [HttpGet("teachers")]
     [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
     public async Task<ActionResult<IReadOnlyList<UserResponse>>> GetTeachers([FromQuery] int? schoolId, CancellationToken cancellationToken)
@@ -51,6 +58,13 @@ public sealed class UsersController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<UserResponse>>> GetAdmins([FromQuery] int? schoolId, CancellationToken cancellationToken)
     {
         return Ok(await _userManagementService.GetAdminsAsync(schoolId, cancellationToken));
+    }
+
+    [HttpGet("library-admins")]
+    [Authorize(Roles = RoleNames.LibraryAdminAdminOrPlatformAdmin)]
+    public async Task<ActionResult<IReadOnlyList<UserResponse>>> GetLibraryAdmins([FromQuery] int? schoolId, CancellationToken cancellationToken)
+    {
+        return Ok(await _userManagementService.GetLibraryAdminsAsync(schoolId, cancellationToken));
     }
 
     [HttpPut("teachers/{id:int}")]
@@ -80,6 +94,21 @@ public sealed class UsersController : ControllerBase
     public async Task<IActionResult> DeleteAdmin(int id, CancellationToken cancellationToken)
     {
         await _userManagementService.DeleteAdminAsync(id, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPut("library-admins/{id:int}")]
+    [Authorize(Roles = RoleNames.LibraryAdminAdminOrPlatformAdmin)]
+    public async Task<ActionResult<UserResponse>> UpdateLibraryAdmin(int id, [FromBody] UpdateSchoolUserRequest request, CancellationToken cancellationToken)
+    {
+        return Ok(await _userManagementService.UpdateLibraryAdminAsync(id, request, cancellationToken));
+    }
+
+    [HttpDelete("library-admins/{id:int}")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    public async Task<IActionResult> DeleteLibraryAdmin(int id, CancellationToken cancellationToken)
+    {
+        await _userManagementService.DeleteLibraryAdminAsync(id, cancellationToken);
         return NoContent();
     }
 }

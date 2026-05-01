@@ -1,59 +1,63 @@
-# Sakai19
+# ZynkEdu Web
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.0.5.
+This project is the Angular 20 frontend for ZynkEdu. It provides the shared shell and role-based workspaces for platform admins, school admins, accountants, teachers, and other staff users.
 
-## Development server
+The app includes:
+
+- Platform workspace navigation for cross-school administration
+- School admin workspace for operational tasks
+- Accountant workspace for dashboards, students, payments, invoices, and reports
+- Teacher workspace for classes, attendance, and results
+- Role-aware routing and guards that keep each user in the correct area
+
+## Development Server
 
 To start a local development server, run:
 
 ```bash
-ng serve
+npm start
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
+Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application reloads automatically when source files change.
 
 ## Building
 
-To build the project run:
+To build the project, run:
 
 ```bash
-ng build
+npm run build
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+The production build output is written to `dist/sakai-ng`.
 
-## Running unit tests
+## Running Tests
 
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+To run the Angular test suite, use:
 
 ```bash
-ng test
+npm test
 ```
 
-## Running end-to-end tests
+## Frontend Routes
 
-For end-to-end (e2e) testing, run:
+The key workspace routes are:
 
-```bash
-ng e2e
-```
+- `/platform/...` for platform administration
+- `/admin/...` for school administration
+- `/accountant/...` for accounting workspaces
+- `/teacher/...` for teacher workflows
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+The accounting workspace currently includes:
 
-## Additional Resources
+- `/accountant/dashboard`
+- `/accountant/students`
+- `/accountant/payments`
+- `/accountant/invoices`
+- `/accountant/reports`
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## Notes
+
+- The app uses the shared API service in `src/app/core/api`
+- Role redirects and guards live in `src/app/core/auth`
+- Workspace navigation lives in `src/app/core/navigation`
+- The shell and topbar/sidebar components adapt labels based on the active role

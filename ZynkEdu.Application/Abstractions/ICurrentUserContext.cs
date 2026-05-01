@@ -10,5 +10,6 @@ public interface ICurrentUserContext
     int? UserId { get; }
     int? SchoolId { get; }
     string? UserName { get; }
+    string? DisplayName { get; }
     UserRole? Role { get; }
 }

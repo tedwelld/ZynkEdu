@@ -1,4 +1,4 @@
-export type WorkspaceRole = 'PlatformAdmin' | 'Admin' | 'Teacher';
+export type WorkspaceRole = 'PlatformAdmin' | 'Admin' | 'Teacher' | 'LibraryAdmin' | 'AccountantSuper' | 'AccountantSenior' | 'AccountantJunior';
 export type NotificationAudience = 'All' | 'Individual' | 'Class' | 'Teachers' | 'Admins' | 'PlatformAdmins' | 'Guardians';
 
 export interface SchoolResponse {
@@ -399,6 +399,313 @@ export interface UserResponse {
     isActive: boolean;
 }
 
+export interface CreateAccountantRequest {
+    username: string;
+    password: string;
+    role: 'AccountantSuper' | 'AccountantSenior' | 'AccountantJunior';
+    displayName?: string | null;
+    contactEmail?: string | null;
+}
+
+export interface FeeStructureRequest {
+    gradeLevel: string;
+    term: string;
+    amount: number;
+    description?: string | null;
+}
+
+export interface FeeStructureResponse {
+    id: number;
+    schoolId: number;
+    gradeLevel: string;
+    term: string;
+    amount: number;
+    description?: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateInvoiceRequest {
+    studentId: number;
+    term: string;
+    totalAmount: number;
+    dueAt: string;
+    reference?: string | null;
+    description?: string | null;
+}
+
+export interface CreatePaymentRequest {
+    studentId: number;
+    amount: number;
+    method: 'Cash' | 'Bank' | 'MobileMoney';
+    reference?: string | null;
+    receivedAt?: string | null;
+    description?: string | null;
+}
+
+export interface CreateAdjustmentRequest {
+    studentId: number;
+    amount: number;
+    reference?: string | null;
+    description?: string | null;
+    transactionDate?: string | null;
+}
+
+export interface CreateRefundRequest {
+    studentId: number;
+    amount: number;
+    reference?: string | null;
+    description?: string | null;
+    transactionDate?: string | null;
+}
+
+export interface AccountingTransactionResponse {
+    id: number;
+    schoolId: number;
+    studentId: number;
+    studentAccountId: number;
+    type: 'Invoice' | 'Payment' | 'Adjustment' | 'Discount' | 'Refund';
+    status: 'Pending' | 'Approved';
+    amount: number;
+    transactionDate: string;
+    reference?: string | null;
+    description?: string | null;
+    createdByUserId: number;
+    approvedByUserId?: number | null;
+    createdAt: string;
+    approvedAt?: string | null;
+}
+
+export interface StatementLineResponse {
+    transactionId: number;
+    type: 'Invoice' | 'Payment' | 'Adjustment' | 'Discount' | 'Refund';
+    status: 'Pending' | 'Approved';
+    amount: number;
+    transactionDate: string;
+    reference?: string | null;
+    description?: string | null;
+    debit: number;
+    credit: number;
+    runningBalance: number;
+}
+
+export interface StudentStatementResponse {
+    studentId: number;
+    studentName: string;
+    schoolId: number;
+    currency: string;
+    openingBalance: number;
+    closingBalance: number;
+    transactions: StatementLineResponse[];
+}
+
+export interface CollectionReportResponse {
+    schoolId: number;
+    totalBilled: number;
+    totalCollected: number;
+    outstanding: number;
+    invoiceCount: number;
+    paymentCount: number;
+}
+
+export interface AgingBucketResponse {
+    bucket: string;
+    amount: number;
+    invoiceCount: number;
+}
+
+export interface AgingReportResponse {
+    schoolId: number;
+    asOf: string;
+    buckets: AgingBucketResponse[];
+}
+
+export interface DailyCashMethodResponse {
+    method: 'Cash' | 'Bank' | 'MobileMoney';
+    amount: number;
+    paymentCount: number;
+}
+
+export interface DailyCashReportResponse {
+    schoolId: number;
+    date: string;
+    totalAmount: number;
+    methods: DailyCashMethodResponse[];
+}
+
+export interface RevenueByClassResponse {
+    className: string;
+    gradeLevel: string;
+    billed: number;
+    collected: number;
+    outstanding: number;
+}
+
+export interface RevenueByClassReportResponse {
+    schoolId: number;
+    classes: RevenueByClassResponse[];
+}
+
+export interface DefaulterResponse {
+    studentId: number;
+    studentName: string;
+    className: string;
+    gradeLevel: string;
+    balance: number;
+    lastPaymentAt?: string | null;
+    lastInvoiceAt?: string | null;
+}
+
+export interface DefaulterReportResponse {
+    schoolId: number;
+    students: DefaulterResponse[];
+}
+
+export interface LibraryDashboardResponse {
+    schoolId: number;
+    bookCount: number;
+    copyCount: number;
+    issuedLoanCount: number;
+    overdueLoanCount: number;
+    borrowerCount: number;
+}
+
+export interface CreateLibraryBookRequest {
+    title: string;
+    author: string;
+    isbn?: string | null;
+    accessionNumber?: string | null;
+    publisher?: string | null;
+    category?: string | null;
+    subject?: string | null;
+    genre?: string | null;
+    edition?: string | null;
+    publicationYear?: number | null;
+    shelfLocation?: string | null;
+    condition?: string | null;
+    initialCopies: number;
+    isActive: boolean;
+}
+
+export interface UpdateLibraryBookRequest {
+    title: string;
+    author: string;
+    isbn?: string | null;
+    accessionNumber?: string | null;
+    publisher?: string | null;
+    category?: string | null;
+    subject?: string | null;
+    genre?: string | null;
+    edition?: string | null;
+    publicationYear?: number | null;
+    shelfLocation?: string | null;
+    condition?: string | null;
+    isActive: boolean;
+}
+
+export interface LibraryBookResponse {
+    id: number;
+    schoolId: number;
+    title: string;
+    author: string;
+    isbn?: string | null;
+    accessionNumber?: string | null;
+    publisher?: string | null;
+    category?: string | null;
+    subject?: string | null;
+    genre?: string | null;
+    edition?: string | null;
+    publicationYear?: number | null;
+    shelfLocation?: string | null;
+    condition?: string | null;
+    totalCopies: number;
+    availableCopies: number;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateLibraryBookCopyRequest {
+    accessionNumber?: string | null;
+    shelfLocation?: string | null;
+    condition?: string | null;
+    isActive: boolean;
+}
+
+export interface UpdateLibraryBookCopyRequest {
+    accessionNumber?: string | null;
+    shelfLocation?: string | null;
+    condition?: string | null;
+    isActive: boolean;
+}
+
+export interface LibraryBookCopyResponse {
+    id: number;
+    schoolId: number;
+    libraryBookId: number;
+    libraryBookTitle: string;
+    accessionNumber?: string | null;
+    shelfLocation?: string | null;
+    condition?: string | null;
+    status: 'Available' | 'Issued' | 'Lost' | 'Withdrawn';
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IssueLibraryBookRequest {
+    borrowerType: 'Student' | 'Teacher';
+    borrowerId: number;
+    bookCopyId: number;
+    dueAt: string;
+    notes?: string | null;
+}
+
+export interface ReturnLibraryBookRequest {
+    notes?: string | null;
+}
+
+export interface RenewLibraryLoanRequest {
+    dueAt: string;
+    notes?: string | null;
+}
+
+export interface LibraryLoanResponse {
+    id: number;
+    schoolId: number;
+    libraryBookId?: number | null;
+    libraryBookCopyId?: number | null;
+    borrowerType: 'Student' | 'Teacher';
+    borrowerId?: number | null;
+    borrowerDisplayName: string;
+    borrowerReference?: string | null;
+    issuedByDisplayName: string;
+    issuedByUserName: string;
+    issuedByRole: string;
+    bookTitle: string;
+    bookAuthor?: string | null;
+    bookIsbn?: string | null;
+    copyAccessionNumber?: string | null;
+    copyShelfLocation?: string | null;
+    copyCondition?: string | null;
+    issuedAt: string;
+    dueAt: string;
+    returnedAt?: string | null;
+    returnedByDisplayName?: string | null;
+    returnedByUserName?: string | null;
+    returnNotes?: string | null;
+    isOverdue: boolean;
+}
+
+export interface LibraryBorrowerSummaryResponse {
+    borrowerType: 'Student' | 'Teacher';
+    borrowerId: number;
+    displayName: string;
+    reference?: string | null;
+    activeLoanCount: number;
+    overdueLoanCount: number;
+}
+
 export interface ResultResponse {
     id: number;
     schoolId: number;
@@ -654,7 +961,7 @@ export interface CreateSchoolCalendarEventRequest {
 export interface SearchHit {
     id: string;
     label: string;
-    type: 'Student' | 'Teacher' | 'Subject' | 'Assignment' | 'Notification' | 'School' | 'Admin' | 'Page' | 'Result';
+    type: 'Student' | 'Teacher' | 'Subject' | 'Assignment' | 'Notification' | 'School' | 'Admin' | 'Page' | 'Result' | 'Book' | 'Loan' | 'Copy' | 'LibraryAdmin';
     description: string;
     route: string;
 }
