@@ -48,138 +48,124 @@ interface FallingLetterStream {
             </div>
             <div class="auth-login-shell">
                 <section class="workspace-card auth-login-card">
-                    <div class="auth-login-brand-row">
-                        <div class="auth-login-brand">
-                            <div class="auth-login-mark" aria-hidden="true"></div>
-                            <div>
+                    <div class="auth-login-card-content">
+                        <div class="auth-login-brand-row">
+                            <div class="auth-login-brand">
+                                <div class="auth-login-mark" aria-hidden="true"></div>
                                 <p class="auth-login-brand-name">ZynkEdu</p>
-                                <p class="auth-login-brand-subtitle">Secure access for your workspace</p>
-                            </div>
-                        </div>
-                        <button type="button" class="auth-login-help" (click)="showHelp()">
-                            Need help?
-                        </button>
-                    </div>
-
-                    <div class="auth-login-badge-row">
-                        <span class="auth-login-badge">School</span>
-                        <span class="auth-login-badge">Platform</span>
-                    </div>
-
-                    <div class="auth-login-copy">
-                        <h1>Welcome Back</h1>
-                        <p>Enter your account details to access your school or platform workspace.</p>
-                    </div>
-
-                    <div class="auth-login-mode-switch" role="tablist" aria-label="Login type">
-                        <button
-                            type="button"
-                            class="auth-login-mode-button"
-                            [ngClass]="mode === 'staff' ? 'is-active' : ''"
-                            (click)="mode = 'staff'"
-                        >
-                            School staff
-                        </button>
-                        <button
-                            type="button"
-                            class="auth-login-mode-button"
-                            [ngClass]="mode === 'platform' ? 'is-active' : ''"
-                            (click)="mode = 'platform'"
-                        >
-                            Platform admin
-                        </button>
-                    </div>
-
-                    <form class="auth-login-form" (ngSubmit)="signIn()">
-                        <div *ngIf="mode === 'staff'" class="space-y-4">
-                            <div>
-                                <label class="auth-login-label">School</label>
-                                <p-autoComplete
-                                    [(ngModel)]="schoolQuery"
-                                    [suggestions]="schoolSuggestions"
-                                    (completeMethod)="filterSchools($event)"
-                                    (onSelect)="selectSchool($event.value)"
-                                    (ngModelChange)="onSchoolQueryChange($event)"
-                                    optionLabel="name"
-                                    placeholder="Find your school"
-                                    [dropdown]="false"
-                                    [forceSelection]="true"
-                                    class="w-full auth-login-control"
-                                    styleClass="w-full auth-login-control"
-                                    name="schoolQuery"
-                                >
-                                    <ng-template let-school pTemplate="item">
-                                        <div class="auth-login-suggestion">
-                                            <span class="auth-login-suggestion-name">{{ school.name }}</span>
-                                            <span class="auth-login-suggestion-meta">{{ school.address }}</span>
-                                        </div>
-                                    </ng-template>
-                                </p-autoComplete>
-                                <p class="auth-login-hint">Select your registered school before signing in.</p>
-                            </div>
-
-                            <div>
-                                <label class="auth-login-label">Username</label>
-                                <input pInputText [(ngModel)]="username" name="username" class="w-full auth-login-control" placeholder="Staff username" autocomplete="username" />
-                            </div>
-
-                            <div>
-                                <label class="auth-login-label">Password</label>
-                                <p-password
-                                    [(ngModel)]="password"
-                                    name="password"
-                                    [toggleMask]="true"
-                                    [feedback]="false"
-                                    styleClass="w-full auth-login-control"
-                                    inputStyleClass="w-full auth-login-input"
-                                    autocomplete="current-password"
-                                ></p-password>
                             </div>
                         </div>
 
-                        <div *ngIf="mode === 'platform'" class="space-y-4">
-                            <div>
-                                <label class="auth-login-label">Username</label>
-                                <input pInputText [(ngModel)]="username" name="username" class="w-full auth-login-control" placeholder="Platform admin username" autocomplete="username" />
-                            </div>
-
-                            <div>
-                                <label class="auth-login-label">Password</label>
-                                <p-password
-                                    [(ngModel)]="password"
-                                    name="password"
-                                    [toggleMask]="true"
-                                    [feedback]="false"
-                                    styleClass="w-full auth-login-control"
-                                    inputStyleClass="w-full auth-login-input"
-                                    autocomplete="current-password"
-                                ></p-password>
-                            </div>
+                        <div class="auth-login-mode-switch" role="tablist" aria-label="Login type">
+                            <button
+                                type="button"
+                                class="auth-login-mode-button"
+                                [ngClass]="mode === 'staff' ? 'is-active' : ''"
+                                (click)="mode = 'staff'"
+                            >
+                                School staff
+                            </button>
+                            <button
+                                type="button"
+                                class="auth-login-mode-button"
+                                [ngClass]="mode === 'platform' ? 'is-active' : ''"
+                                (click)="mode = 'platform'"
+                            >
+                                Platform admin
+                            </button>
                         </div>
 
-                        <div class="auth-login-footer-row">
-                            <label class="auth-login-remember">
-                                <input type="checkbox" />
-                                <span>Remember me</span>
-                            </label>
-                            <button type="button" class="auth-login-link" (click)="showHelp()">Forgot password?</button>
-                        </div>
+                        <form class="auth-login-form" (ngSubmit)="signIn()">
+                            <div *ngIf="mode === 'staff'" class="auth-login-fields">
+                                <div class="auth-login-field">
+                                    <label class="auth-login-label">School</label>
+                                    <p-autoComplete
+                                        [(ngModel)]="schoolQuery"
+                                        [suggestions]="schoolSuggestions"
+                                        (completeMethod)="filterSchools($event)"
+                                        (onSelect)="selectSchool($event.value)"
+                                        (ngModelChange)="onSchoolQueryChange($event)"
+                                        optionLabel="name"
+                                        placeholder="Find your school"
+                                        [dropdown]="false"
+                                        [forceSelection]="true"
+                                        class="w-full auth-login-control"
+                                        styleClass="w-full auth-login-control"
+                                        name="schoolQuery"
+                                    >
+                                        <ng-template let-school pTemplate="item">
+                                            <div class="auth-login-suggestion">
+                                                <span class="auth-login-suggestion-name">{{ school.name }}</span>
+                                                <span class="auth-login-suggestion-meta">{{ school.address }}</span>
+                                            </div>
+                                        </ng-template>
+                                    </p-autoComplete>
+                                    <p class="auth-login-hint">Select your registered school before signing in.</p>
+                                </div>
 
-                        <button
-                            pButton
-                            type="submit"
-                            label="Sign In"
-                            icon="pi pi-arrow-right"
-                            iconPos="right"
-                            class="w-full auth-login-submit"
-                            [loading]="loading"
-                            [disabled]="loading"
-                        ></button>
+                                <div class="auth-login-field">
+                                    <label class="auth-login-label">Username</label>
+                                    <input pInputText [(ngModel)]="username" name="username" class="w-full auth-login-control" placeholder="Staff username" autocomplete="username" />
+                                </div>
 
-                        <p class="auth-login-bottom-note">
-                            Need access to a new workspace? Contact your school administrator or platform admin.
-                        </p>
-                    </form>
+                                <div class="auth-login-field">
+                                    <label class="auth-login-label">Password</label>
+                                    <p-password
+                                        [(ngModel)]="password"
+                                        name="password"
+                                        [toggleMask]="true"
+                                        [feedback]="false"
+                                        styleClass="w-full auth-login-control"
+                                        inputStyleClass="w-full auth-login-input"
+                                        autocomplete="current-password"
+                                    ></p-password>
+                                </div>
+                            </div>
+
+                            <div *ngIf="mode === 'platform'" class="auth-login-fields">
+                                <div class="auth-login-field">
+                                    <label class="auth-login-label">Username</label>
+                                    <input pInputText [(ngModel)]="username" name="username" class="w-full auth-login-control" placeholder="Platform admin username" autocomplete="username" />
+                                </div>
+
+                                <div class="auth-login-field">
+                                    <label class="auth-login-label">Password</label>
+                                    <p-password
+                                        [(ngModel)]="password"
+                                        name="password"
+                                        [toggleMask]="true"
+                                        [feedback]="false"
+                                        styleClass="w-full auth-login-control"
+                                        inputStyleClass="w-full auth-login-input"
+                                        autocomplete="current-password"
+                                    ></p-password>
+                                </div>
+                            </div>
+
+                            <div class="auth-login-footer-row">
+                                <label class="auth-login-remember">
+                                    <input type="checkbox" />
+                                    <span>Remember me</span>
+                                </label>
+                                <button type="button" class="auth-login-link" (click)="showHelp()">Forgot password?</button>
+                            </div>
+
+                            <button
+                                pButton
+                                type="submit"
+                                label="Sign In"
+                                icon="pi pi-arrow-right"
+                                iconPos="right"
+                                class="w-full auth-login-submit"
+                                [loading]="loading"
+                                [disabled]="loading"
+                            ></button>
+
+                            <p class="auth-login-bottom-note">
+                                Need access to a new workspace? Contact your school administrator or platform admin.
+                            </p>
+                        </form>
+                    </div>
                 </section>
             </div>
         </div>
@@ -285,15 +271,15 @@ export class Login implements OnInit {
 function createFallingLetterStreams(): FallingLetterStream[] {
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
-    return Array.from({ length: 18 }, (_, index) => {
-        const left = 3 + ((index * 5.3) % 92);
-        const duration = `${12 + (index % 6) * 1.7}s`;
-        const delay = `-${(index % 7) * 1.4}s`;
-        const opacity = 0.14 + (index % 5) * 0.035;
-        const length = 14 + (index % 5);
+    return Array.from({ length: 20 }, (_, index) => {
+        const left = 2 + ((index * 4.95) % 94);
+        const duration = `${11 + (index % 6) * 1.5}s`;
+        const delay = `-${(index % 8) * 1.25}s`;
+        const opacity = 0.12 + (index % 6) * 0.03;
+        const length = 13 + (index % 6);
         const letters = Array.from({ length }, (_, letterIndex) => ({
             char: alphabet[(index * 7 + letterIndex * 11) % alphabet.length],
-            size: 0.8 + ((letterIndex + index) % 5) * 0.22
+            size: 0.78 + ((letterIndex + index) % 5) * 0.18
         }));
 
         return {

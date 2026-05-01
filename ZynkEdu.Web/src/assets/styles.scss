@@ -25,11 +25,58 @@ body {
     font-family: var(--zynkedu-body-font);
 }
 
-body.app-dark {
+html.app-dark,
+html.app-dark body {
     background:
-        radial-gradient(circle at top left, rgba(29, 78, 216, 0.2), transparent 30%),
-        radial-gradient(circle at top right, rgba(124, 58, 237, 0.18), transparent 26%),
-        linear-gradient(180deg, #020617 0%, #07111f 50%, #0b1324 100%);
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 30%),
+        radial-gradient(circle at top right, rgba(124, 58, 237, 0.1), transparent 26%),
+        linear-gradient(180deg, #0b1220 0%, #111a2a 50%, #0f1724 100%);
+    background-color: var(--surface-ground);
+}
+
+html.app-dark .card,
+html.app-dark .workspace-card,
+html.app-dark .glass-panel {
+    border-color: color-mix(in srgb, var(--surface-border), transparent 8%);
+    background: color-mix(in srgb, var(--surface-card), #0f1724 18%);
+    box-shadow: 0 18px 40px rgba(2, 6, 23, 0.34);
+}
+
+html.app-dark .auth-login-page {
+    background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 26%),
+        radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.12), transparent 28%),
+        linear-gradient(180deg, #0b1220 0%, #111a2a 100%);
+}
+
+html.app-dark .auth-login-page::after {
+    opacity: 0.6;
+}
+
+html.app-dark .auth-login-card {
+    background: color-mix(in srgb, var(--surface-card), #101827 18%);
+    border-color: color-mix(in srgb, var(--surface-border), transparent 10%);
+}
+
+html.app-dark .auth-login-badge {
+    background: color-mix(in srgb, var(--surface-card), #101827 24%);
+    border-color: color-mix(in srgb, var(--surface-border), transparent 10%);
+}
+
+html.app-dark .auth-login-mode-switch {
+    background: color-mix(in srgb, var(--surface-card), #101827 24%);
+    border-color: color-mix(in srgb, var(--surface-border), transparent 10%);
+}
+
+html.app-dark .auth-login-mode-button.is-active {
+    background: color-mix(in srgb, var(--surface-card), #182334 26%);
+    box-shadow: 0 10px 24px rgba(2, 6, 23, 0.24);
+}
+
+html.app-dark .auth-login-control .p-inputtext,
+html.app-dark .auth-login-control .p-password-input {
+    background: color-mix(in srgb, var(--surface-card), #0f1724 14%);
+    color: var(--text-color);
 }
 
 h1,
@@ -67,14 +114,14 @@ h6,
     position: relative;
     min-height: 100vh;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    padding: clamp(1rem, 2.5vw, 2rem);
+    padding: clamp(0.75rem, 2vw, 1.5rem);
     overflow: hidden;
     background:
-        radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 26%),
-        radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.14), transparent 28%),
-        linear-gradient(180deg, #030712 0%, #0f172a 100%);
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 26%),
+        radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.08), transparent 28%),
+        linear-gradient(180deg, #eef4fa 0%, #e6edf6 100%);
 }
 
 .auth-login-page::before {
@@ -82,10 +129,10 @@ h6,
     position: absolute;
     inset: 0;
     background:
-        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.08), transparent 28%),
-        radial-gradient(circle at 80% 30%, rgba(59, 130, 246, 0.1), transparent 22%),
-        radial-gradient(circle at 50% 80%, rgba(236, 72, 153, 0.08), transparent 24%);
-    opacity: 0.55;
+        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.55), transparent 28%),
+        radial-gradient(circle at 80% 30%, rgba(59, 130, 246, 0.08), transparent 22%),
+        radial-gradient(circle at 50% 80%, rgba(236, 72, 153, 0.05), transparent 24%);
+    opacity: 0.45;
     pointer-events: none;
 }
 
@@ -93,8 +140,8 @@ h6,
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, rgba(3, 7, 18, 0.18), rgba(3, 7, 18, 0.42));
-    opacity: 0.85;
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.15), rgba(226, 232, 240, 0.32));
+    opacity: 0.72;
     pointer-events: none;
 }
 
@@ -116,12 +163,12 @@ h6,
     font-family: var(--zynkedu-heading-font);
     font-weight: 700;
     letter-spacing: 0.08em;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(59, 130, 246, 0.14);
     text-shadow:
-        0 0 12px rgba(59, 130, 246, 0.32),
-        0 0 28px rgba(236, 72, 153, 0.18);
-    filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.08));
-    mix-blend-mode: screen;
+        0 0 10px rgba(59, 130, 246, 0.09),
+        0 0 18px rgba(15, 23, 42, 0.08);
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.08));
+    mix-blend-mode: soft-light;
     animation-name: auth-login-letter-fall;
     animation-timing-function: linear;
     animation-iteration-count: infinite;
@@ -134,17 +181,30 @@ h6,
     opacity: 0.9;
 }
 
+.auth-login-card-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
 .auth-login-shell {
     position: relative;
     z-index: 1;
-    width: min(100%, 720px);
+    width: min(100%, 560px);
     display: flex;
     justify-content: center;
+    align-self: flex-start;
+    margin-top: clamp(0.25rem, 1vw, 0.75rem);
 }
 
 .auth-login-card {
-    padding: clamp(1.5rem, 3vw, 3rem);
-    background: rgba(255, 255, 255, 0.94);
+    padding: clamp(0.95rem, 1.8vw, 1.65rem);
+    background: rgba(238, 244, 250, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -216,15 +276,18 @@ h6,
 .auth-login-brand-row {
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
+    justify-content: center;
     gap: 1rem;
-    margin-bottom: 1.75rem;
+    margin-bottom: 1rem;
+    width: 100%;
 }
 
 .auth-login-brand {
     display: flex;
     align-items: center;
     gap: 0.9rem;
+    text-align: center;
+    margin-inline: auto;
 }
 
 .auth-login-brand-name {
@@ -240,7 +303,6 @@ h6,
     font-size: 0.88rem;
 }
 
-.auth-login-help,
 .auth-login-link {
     border: 0;
     background: transparent;
@@ -251,38 +313,21 @@ h6,
     cursor: pointer;
 }
 
-.auth-login-help:hover,
 .auth-login-link:hover {
     text-decoration: underline;
-}
-
-.auth-login-copy {
-    margin-bottom: 1.4rem;
-}
-
-.auth-login-copy h1 {
-    margin: 0;
-    font-size: clamp(2.3rem, 3.4vw, 3.45rem);
-    line-height: 0.96;
-    color: var(--text-color);
-}
-
-.auth-login-copy p {
-    margin: 0.9rem 0 0;
-    max-width: 30rem;
-    color: var(--text-color-secondary);
-    line-height: 1.6;
 }
 
 .auth-login-mode-switch {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.5rem;
-    padding: 0.35rem;
+    padding: 0.3rem;
     border-radius: 1.1rem;
-    background: color-mix(in srgb, var(--surface-100), white 30%);
-    border: 1px solid color-mix(in srgb, var(--surface-border), transparent 30%);
-    margin-bottom: 1.35rem;
+    background: color-mix(in srgb, var(--surface-100), white 18%);
+    border: 1px solid color-mix(in srgb, var(--surface-border), transparent 45%);
+    margin-bottom: 1rem;
+    width: 100%;
+    max-width: 380px;
 }
 
 .auth-login-mode-button {
@@ -307,7 +352,7 @@ h6,
 }
 
 .auth-login-mode-button.is-active {
-    background: var(--surface-card);
+    background: rgba(255, 255, 255, 0.9);
     color: var(--text-color);
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
@@ -315,15 +360,30 @@ h6,
 .auth-login-form {
     display: flex;
     flex-direction: column;
+    gap: 0.85rem;
+    width: min(100%, 380px);
+    align-self: center;
+    text-align: left;
+}
+
+.auth-login-fields {
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
+}
+
+.auth-login-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
 }
 
 .auth-login-label {
     display: block;
-    margin-bottom: 0.45rem;
     font-size: 0.9rem;
     font-weight: 700;
     color: var(--text-color);
+    text-align: left;
 }
 
 .auth-login-control,
@@ -335,9 +395,9 @@ h6,
 .auth-login-control .p-inputtext,
 .auth-login-control .p-password-input {
     border-radius: 1rem;
-    padding-block: 0.95rem;
-    border-color: color-mix(in srgb, var(--surface-border), transparent 12%);
-    background: rgba(255, 255, 255, 0.92);
+    padding-block: 0.72rem;
+    border-color: color-mix(in srgb, var(--surface-border), transparent 22%);
+    background: rgba(255, 255, 255, 0.78);
     box-shadow: none;
 }
 
@@ -367,7 +427,7 @@ h6,
 }
 
 .auth-login-hint {
-    margin: 0.45rem 0 0;
+    margin: 0.3rem 0 0;
     font-size: 0.78rem;
     color: var(--text-color-secondary);
 }
@@ -377,8 +437,9 @@ h6,
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    margin-top: -0.15rem;
+    margin-top: -0.1rem;
     color: var(--text-color-secondary);
+    text-align: left;
 }
 
 .auth-login-remember {
@@ -397,17 +458,18 @@ h6,
 }
 
 .auth-login-submit {
-    margin-top: 0.35rem;
-    min-height: 3.2rem;
+    margin-top: 0.2rem;
+    min-height: 2.75rem;
     border-radius: 0.95rem;
 }
 
 .auth-login-bottom-note {
-    margin: 0.35rem 0 0;
+    margin: 0.2rem 0 0;
     text-align: center;
     color: var(--text-color-secondary);
     font-size: 0.85rem;
-    line-height: 1.55;
+    line-height: 1.45;
+    max-width: 32rem;
 }
 
 @media (max-width: 1100px) {
@@ -418,11 +480,12 @@ h6,
 
 @media (max-width: 720px) {
     .auth-login-page {
-        padding: 0.75rem;
+        padding: 0.65rem;
     }
 
     .auth-login-shell {
         border-radius: 1.5rem;
+        margin-top: 0;
     }
 
     .auth-login-mode-switch {
@@ -431,11 +494,16 @@ h6,
 
     .auth-login-brand-row {
         flex-direction: column;
+        align-items: center;
     }
 
     .auth-login-footer-row {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .auth-login-form {
+        width: 100%;
     }
 
     .auth-login-letter-stream {
