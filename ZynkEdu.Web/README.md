@@ -28,7 +28,7 @@ To build the project, run:
 npm run build
 ```
 
-The production build output is written to `dist/sakai-ng`.
+The production build output is written to `dist/sakai-ng/browser`, which is the folder Vercel should serve for this Angular 20 application.
 
 ## Running Tests
 
