@@ -89,7 +89,15 @@ public interface IResultService
     Task<IReadOnlyList<ResultResponse>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ResultResponse>> GetStudentResultsAsync(int studentId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ResultResponse>> GetClassResultsAsync(string className, CancellationToken cancellationToken = default);
-    Task<ResultSlipSendResponse> SendSlipAsync(int studentId, SendResultSlipRequest request, byte[] slipPdf, string slipFileName, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<ResultSlipSendResponse> SendSlipAsync(
+        int studentId,
+        SendResultSlipRequest request,
+        byte[] slipPdf,
+        string slipFileName,
+        byte[]? newsletterPdf = null,
+        string? newsletterFileName = null,
+        int? schoolId = null,
+        CancellationToken cancellationToken = default);
     Task<ResultResponse> ApproveAsync(int id, CancellationToken cancellationToken = default);
     Task<ResultResponse> RejectAsync(int id, CancellationToken cancellationToken = default);
     Task<ResultResponse> ReopenAsync(int id, CancellationToken cancellationToken = default);

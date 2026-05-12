@@ -38,6 +38,7 @@ internal sealed class RecordingSmsSender : ISmsSender
 internal sealed class RecordingEmailSender : IEmailSender
 {
     public List<(string Destination, string Subject, string Message, string? HtmlMessage, string? AttachmentFileName, byte[]? AttachmentBytes)> Messages { get; } = new();
+    public List<IReadOnlyList<EmailAttachment>> MultiAttachmentMessages { get; } = new();
 
     public Task SendAsync(string destination, string subject, string message, CancellationToken cancellationToken = default)
     {
@@ -62,6 +63,17 @@ internal sealed class RecordingEmailSender : IEmailSender
         Messages.Add((destination, subject, message, htmlMessage, attachmentFileName, attachmentBytes));
         return Task.CompletedTask;
     }
+
+    public Task SendAsync(string destination, string subject, string message, string htmlMessage, IReadOnlyList<EmailAttachment> attachments, CancellationToken cancellationToken = default)
+    {
+        MultiAttachmentMessages.Add(attachments);
+        var first = attachments.FirstOrDefault();
+        Messages.Add((destination, subject, message, htmlMessage, first?.FileName, first?.Content));
+        return Task.CompletedTask;
+    }
+
+    public Task SendAsync(string destination, string subject, string message, IReadOnlyList<EmailAttachment> attachments, CancellationToken cancellationToken = default)
+        => SendAsync(destination, subject, message, string.Empty, attachments, cancellationToken);
 }
 
 internal sealed class NoOpAuditLogService : IAuditLogService

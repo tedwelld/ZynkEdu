@@ -174,7 +174,7 @@ public sealed class NotificationService : INotificationService
             throw new UnauthorizedAccessException("A school-scoped user is required.");
         }
 
-        if (_currentUserContext.Role is not (UserRole.Admin or UserRole.Teacher))
+        if (!_currentUserContext.HasSchoolScope)
         {
             throw new UnauthorizedAccessException("Not allowed.");
         }

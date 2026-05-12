@@ -1,6 +1,7 @@
 using System.Text;
 using ZynkEdu.Application.Abstractions;
 using ZynkEdu.Application.Contracts;
+using ZynkEdu.Domain.Enums;
 
 namespace ZynkEdu.Infrastructure.Services;
 
@@ -83,6 +84,77 @@ public sealed class ReportEmailTemplateService : IReportEmailTemplateService
         }
 
         htmlBuilder.AppendLine("</tbody></table>");
+        htmlBuilder.AppendLine("<p style=\"margin-top:16px\">Thank you.</p>");
+        htmlBuilder.AppendLine("</div>");
+
+        return new ReportEmailTemplate(emailSubject, text.Trim(), htmlBuilder.ToString());
+    }
+
+    public ReportEmailTemplate BuildFeeStructureNewsletter(string schoolName, IReadOnlyList<FeeStructureResponse> feeStructures, string? note = null)
+    {
+        var emailSubject = $"Fee structure newsletter - {schoolName}";
+
+        var text = new StringBuilder()
+            .AppendLine("Hello admin,")
+            .AppendLine()
+            .AppendLine($"The current fee structure newsletter for {schoolName} is attached.")
+            .AppendLine()
+            .AppendLine("Fee structures:")
+            .ToString();
+
+        foreach (var fee in feeStructures.OrderBy(x => x.GradeLevel).ThenBy(x => x.Term))
+        {
+            text += $"{fee.GradeLevel} - {fee.Term}: {fee.Amount.ToString("0.00")}";
+            if (!string.IsNullOrWhiteSpace(fee.Description))
+            {
+                text += $" ({fee.Description})";
+            }
+
+            text += Environment.NewLine;
+        }
+
+        text += Environment.NewLine + "Accepted payment methods: ";
+        text += string.Join(", ", Enum.GetNames<PaymentMethod>());
+
+        if (!string.IsNullOrWhiteSpace(note))
+        {
+            text += Environment.NewLine + Environment.NewLine + note.Trim();
+        }
+
+        text += Environment.NewLine + Environment.NewLine + "Thank you.";
+
+        var htmlBuilder = new StringBuilder();
+        htmlBuilder.AppendLine("<div style=\"font-family:Arial,sans-serif;color:#0f172a;line-height:1.6\">");
+        htmlBuilder.AppendLine($"<h2 style=\"margin:0 0 12px\">Fee structure newsletter for {Escape(schoolName)}</h2>");
+        htmlBuilder.AppendLine($"<p>The current fee structure newsletter for <strong>{Escape(schoolName)}</strong> is attached.</p>");
+
+        if (!string.IsNullOrWhiteSpace(note))
+        {
+            htmlBuilder.AppendLine($"<p style=\"padding:12px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px\">{Escape(note.Trim())}</p>");
+        }
+
+        htmlBuilder.AppendLine("<h3 style=\"margin:20px 0 8px\">Fee structures</h3>");
+        htmlBuilder.AppendLine("<table style=\"border-collapse:collapse;width:100%;border:1px solid #e2e8f0\">");
+        htmlBuilder.AppendLine("<thead><tr style=\"background:#2563eb;color:#fff;text-align:left\">");
+        htmlBuilder.AppendLine("<th style=\"padding:10px;border:1px solid #2563eb\">Grade level</th>");
+        htmlBuilder.AppendLine("<th style=\"padding:10px;border:1px solid #2563eb\">Term</th>");
+        htmlBuilder.AppendLine("<th style=\"padding:10px;border:1px solid #2563eb\">Amount</th>");
+        htmlBuilder.AppendLine("<th style=\"padding:10px;border:1px solid #2563eb\">Description</th>");
+        htmlBuilder.AppendLine("</tr></thead><tbody>");
+
+        foreach (var fee in feeStructures.OrderBy(x => x.GradeLevel).ThenBy(x => x.Term))
+        {
+            htmlBuilder.AppendLine("<tr>");
+            htmlBuilder.AppendLine($"<td style=\"padding:10px;border:1px solid #e2e8f0\">{Escape(fee.GradeLevel)}</td>");
+            htmlBuilder.AppendLine($"<td style=\"padding:10px;border:1px solid #e2e8f0\">{Escape(fee.Term)}</td>");
+            htmlBuilder.AppendLine($"<td style=\"padding:10px;border:1px solid #e2e8f0\">{Escape(fee.Amount.ToString("0.00"))}</td>");
+            htmlBuilder.AppendLine($"<td style=\"padding:10px;border:1px solid #e2e8f0\">{Escape(fee.Description ?? "No description provided")}</td>");
+            htmlBuilder.AppendLine("</tr>");
+        }
+
+        htmlBuilder.AppendLine("</tbody></table>");
+        htmlBuilder.AppendLine("<h3 style=\"margin:20px 0 8px\">Accepted payment methods</h3>");
+        htmlBuilder.AppendLine("<p>Cash, Bank, Mobile Money</p>");
         htmlBuilder.AppendLine("<p style=\"margin-top:16px\">Thank you.</p>");
         htmlBuilder.AppendLine("</div>");
 

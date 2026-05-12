@@ -223,7 +223,7 @@ public sealed class SmtpEmailSender : IEmailSender
 
                 throw new InvalidOperationException(
                     $"Failed to send email to {destination} via {_options.EmailHost}:{_options.EmailPort}.",
-                    ex);
+                ex);
             }
         }
     }
@@ -237,19 +237,29 @@ public sealed class SmtpEmailSender : IEmailSender
         string attachmentFileName,
         string attachmentContentType = "application/pdf",
         CancellationToken cancellationToken = default)
+        => await SendAsync(destination, subject, message, htmlMessage, new[]
+        {
+            new EmailAttachment(attachmentBytes, attachmentFileName, attachmentContentType)
+        }, cancellationToken);
+
+    public async Task SendAsync(
+        string destination,
+        string subject,
+        string message,
+        string htmlMessage,
+        IReadOnlyList<EmailAttachment> attachments,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_options.EmailHost) || string.IsNullOrWhiteSpace(_options.EmailUsername))
         {
             _logger.LogWarning("SMTP configuration is incomplete. Email to {Destination} was not sent and will be logged instead.", destination);
             _logger.LogInformation(
-                "EMAIL to {Destination}: {Subject} {Message} [HTML length: {HtmlLength}] [{AttachmentFileName} {AttachmentContentType} {AttachmentSize} bytes]",
+                "EMAIL to {Destination}: {Subject} {Message} [HTML length: {HtmlLength}] [{AttachmentCount} attachment(s)]",
                 destination,
                 subject,
                 message,
                 htmlMessage.Length,
-                attachmentFileName,
-                attachmentContentType,
-                attachmentBytes.Length);
+                attachments.Count);
             return;
         }
 
@@ -262,20 +272,19 @@ public sealed class SmtpEmailSender : IEmailSender
         mimeMessage.To.Add(MailboxAddress.Parse(destination));
         mimeMessage.Subject = subject;
 
-        var bodyBuilder = new BodyBuilder
-        {
-            TextBody = string.IsNullOrWhiteSpace(_options.RefLink)
-                ? message
-                : $"{message}{Environment.NewLine}{Environment.NewLine}View the portal: {_options.RefLink}",
-            HtmlBody = string.IsNullOrWhiteSpace(htmlMessage)
-                ? null
-                : htmlMessage
-        };
-        bodyBuilder.Attachments.Add(attachmentFileName, attachmentBytes, ContentType.Parse(attachmentContentType));
+        var bodyBuilder = BuildBodyBuilder(message, htmlMessage, attachments);
         mimeMessage.Body = bodyBuilder.ToMessageBody();
 
         await SendWithRetriesAsync(destination, mimeMessage, cancellationToken);
     }
+
+    public async Task SendAsync(
+        string destination,
+        string subject,
+        string message,
+        IReadOnlyList<EmailAttachment> attachments,
+        CancellationToken cancellationToken = default)
+        => await SendAsync(destination, subject, message, string.Empty, attachments, cancellationToken);
 
     private async Task SendWithRetriesAsync(string destination, MimeMessage mimeMessage, CancellationToken cancellationToken)
     {
@@ -331,5 +340,25 @@ public sealed class SmtpEmailSender : IEmailSender
                     ex);
             }
         }
+    }
+
+    private BodyBuilder BuildBodyBuilder(string message, string htmlMessage, IReadOnlyList<EmailAttachment> attachments)
+    {
+        var bodyBuilder = new BodyBuilder
+        {
+            TextBody = string.IsNullOrWhiteSpace(_options.RefLink)
+                ? message
+                : $"{message}{Environment.NewLine}{Environment.NewLine}View the portal: {_options.RefLink}",
+            HtmlBody = string.IsNullOrWhiteSpace(htmlMessage)
+                ? null
+                : htmlMessage
+        };
+
+        foreach (var attachment in attachments)
+        {
+            bodyBuilder.Attachments.Add(attachment.FileName, attachment.Content, ContentType.Parse(attachment.ContentType));
+        }
+
+        return bodyBuilder;
     }
 }

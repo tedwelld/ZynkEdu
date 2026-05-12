@@ -159,10 +159,256 @@ public sealed class AccountingService : IAccountingService
             student.Id,
             student.FullName,
             student.SchoolId,
+            null,
             account?.Currency ?? "USD",
             0m,
             runningBalance,
             lines);
+    }
+
+    public async Task<StudentStatementResponse> GetStudentStatementByTermAsync(int studentId, string term, int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        var student = await ResolveStudentAsync(studentId, schoolId, cancellationToken);
+        var account = await EnsureStudentAccountAsync(student, cancellationToken, createIfMissing: false);
+
+        IQueryable<AccountingTransaction> transactionQuery = _dbContext.AccountingTransactions.AsNoTracking()
+            .Where(x => x.StudentId == student.Id && x.SchoolId == student.SchoolId);
+
+        decimal openingBalance = 0m;
+        if (!string.IsNullOrEmpty(term))
+        {
+            var termInvoices = await _dbContext.Invoices
+                .Where(i => i.StudentId == student.Id && i.SchoolId == student.SchoolId && i.Term == term)
+                .Select(i => i.AccountingTransactionId)
+                .ToListAsync(cancellationToken);
+
+            var termTransactionIds = termInvoices.Where(id => id.HasValue).Select(id => id!.Value).ToHashSet();
+
+            openingBalance = await _dbContext.AccountingTransactions
+                .Where(t => t.StudentId == student.Id && t.SchoolId == student.SchoolId && t.Status == AccountingTransactionStatus.Approved)
+                .SumAsync(t => GetBalanceDelta(t.Type, t.Amount), cancellationToken);
+
+            transactionQuery = _dbContext.AccountingTransactions.AsNoTracking()
+                .Where(t => termTransactionIds.Contains(t.Id) ||
+                    (t.StudentId == student.Id && t.SchoolId == student.SchoolId && t.Status == AccountingTransactionStatus.Approved));
+        }
+
+        var transactions = await transactionQuery
+            .OrderBy(x => x.TransactionDate)
+            .ThenBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        var runningBalance = openingBalance;
+        var lines = new List<StatementLineResponse>(transactions.Count);
+        foreach (var transaction in transactions)
+        {
+            var delta = GetBalanceDelta(transaction.Type, transaction.Amount);
+            if (transaction.Status == AccountingTransactionStatus.Pending)
+            {
+                delta = 0m;
+            }
+
+            runningBalance += delta;
+            var debit = transaction.Type is AccountingTransactionType.Payment or AccountingTransactionType.Discount ? 0m : transaction.Amount;
+            var credit = transaction.Type is AccountingTransactionType.Payment or AccountingTransactionType.Discount ? transaction.Amount : 0m;
+
+            lines.Add(new StatementLineResponse(
+                transaction.Id,
+                transaction.Type,
+                transaction.Status,
+                transaction.Amount,
+                transaction.TransactionDate,
+                transaction.Reference,
+                transaction.Description,
+                debit,
+                credit,
+                runningBalance));
+        }
+
+        return new StudentStatementResponse(
+            student.Id,
+            student.FullName,
+            student.SchoolId,
+            term,
+            account?.Currency ?? "USD",
+            openingBalance,
+            runningBalance,
+            lines);
+    }
+
+    public async Task<IReadOnlyList<InvoiceResponse>> GetStudentInvoicesAsync(int studentId, int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        var student = await ResolveStudentAsync(studentId, schoolId, cancellationToken);
+
+        var invoices = await _dbContext.Invoices.AsNoTracking()
+            .Where(x => x.StudentId == student.Id && x.SchoolId == student.SchoolId)
+            .OrderByDescending(x => x.IssuedAt)
+            .ToListAsync(cancellationToken);
+
+        var transactionIds = invoices.Where(x => x.AccountingTransactionId.HasValue).Select(x => x.AccountingTransactionId!.Value).ToHashSet();
+        var transactions = await _dbContext.AccountingTransactions.AsNoTracking()
+            .Where(x => transactionIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        return invoices.Select(invoice =>
+        {
+            transactions.TryGetValue(invoice.AccountingTransactionId ?? 0, out var transaction);
+            return MapInvoiceResponse(invoice, student, transaction);
+        }).ToList();
+    }
+
+    public async Task<FinancialStatementResponse> GetFinancialStatementAsync(int? schoolId, FinancialStatementRequest request, CancellationToken cancellationToken = default)
+    {
+        var resolvedSchoolId = ResolveReportSchoolId(schoolId);
+        var asOf = request.Date ?? DateTime.UtcNow;
+
+        var columns = new[]
+        {
+            new FinancialStatementColumnResponse("actual", "Actual", FinancialStatementColumnKind.Actual)
+        }.ToList();
+
+        var transactions = await _dbContext.AccountingTransactions.AsNoTracking()
+            .Where(x => x.SchoolId == resolvedSchoolId && x.Status == AccountingTransactionStatus.Approved)
+            .ToListAsync(cancellationToken);
+
+        var totalRevenue = transactions.Where(x => x.Type == AccountingTransactionType.Invoice).Sum(x => x.Amount);
+        var totalPayments = transactions.Where(x => x.Type == AccountingTransactionType.Payment).Sum(x => x.Amount);
+
+        var rows = new[]
+        {
+            new FinancialStatementRowResponse("revenue", "Revenue", 0, FinancialStatementRowKind.LineItem, totalRevenue, null, null, null, null),
+            new FinancialStatementRowResponse("payments", "Payments", 0, FinancialStatementRowKind.LineItem, totalPayments, null, null, null, null),
+            new FinancialStatementRowResponse("net", "Net Income", 0, FinancialStatementRowKind.Total, totalRevenue - totalPayments, null, null, null, null)
+        }.ToList();
+
+        return new FinancialStatementResponse(
+            resolvedSchoolId,
+            request.StatementType,
+            request.StatementType.ToString(),
+            "USD",
+            asOf,
+            asOf.ToString("yyyy-MM-dd"),
+            "N/A",
+            columns,
+            rows);
+    }
+
+    public async Task<InvoiceResponse> UpdateInvoiceAsync(int invoiceId, UpdateInvoiceRequest request, int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        var invoice = await LoadInvoiceForMutationAsync(invoiceId, schoolId, cancellationToken);
+        var student = await _dbContext.Students.FirstAsync(x => x.Id == invoice.StudentId, cancellationToken);
+
+        var before = new { invoice.TotalAmount, invoice.Term, invoice.DueAt };
+
+        invoice.TotalAmount = request.TotalAmount;
+        invoice.Term = request.Term.Trim();
+        invoice.DueAt = request.DueAt;
+
+        if (invoice.AccountingTransactionId.HasValue)
+        {
+            var transaction = await _dbContext.AccountingTransactions.FirstAsync(x => x.Id == invoice.AccountingTransactionId, cancellationToken);
+            var beforeAmount = transaction.Amount;
+            transaction.Amount = request.TotalAmount;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            await _auditLogService.LogAsync(
+                invoice.SchoolId,
+                "Updated",
+                "Invoice",
+                invoice.Id.ToString(),
+                $"Invoice for student {student.FullName} was updated.",
+                JsonSerializer.Serialize(new { before.TotalAmount, before.Term, before.DueAt }, JsonOptions),
+                JsonSerializer.Serialize(new { invoice.TotalAmount, invoice.Term, invoice.DueAt }, JsonOptions),
+                cancellationToken);
+        }
+
+        return MapInvoiceResponse(invoice, student);
+    }
+
+    public async Task DeleteInvoiceAsync(int invoiceId, int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        var invoice = await LoadInvoiceForMutationAsync(invoiceId, schoolId, cancellationToken);
+        var student = await _dbContext.Students.FirstAsync(x => x.Id == invoice.StudentId, cancellationToken);
+
+        if (invoice.AccountingTransactionId.HasValue)
+        {
+            var transaction = await _dbContext.AccountingTransactions.FirstOrDefaultAsync(x => x.Id == invoice.AccountingTransactionId, cancellationToken);
+            if (transaction is not null)
+            {
+                _dbContext.AccountingTransactions.Remove(transaction);
+            }
+        }
+
+        _dbContext.Invoices.Remove(invoice);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await _auditLogService.LogAsync(
+            invoice.SchoolId,
+            "Deleted",
+            "Invoice",
+            invoice.Id.ToString(),
+            $"Invoice for student {student.FullName} was deleted.",
+            JsonSerializer.Serialize(new { invoice.TotalAmount, invoice.Term }, JsonOptions),
+            null,
+            cancellationToken);
+    }
+
+    public async Task SendFeeStructureNewsletterAsync(
+        int? schoolId,
+        SendFeeStructureNewsletterRequest request,
+        byte[]? newsletterPdf = null,
+        string? newsletterFileName = null,
+        CancellationToken cancellationToken = default)
+    {
+        var resolvedSchoolId = ResolveReportSchoolId(schoolId);
+        var students = await _dbContext.Students.AsNoTracking()
+            .Where(x => x.SchoolId == resolvedSchoolId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var student in students)
+        {
+            var subject = "Fee Structure Update";
+            var body = $"Dear {student.FullName}, please find the updated fee structure attached.";
+
+            await _notificationService.SendAsync(
+                new SendNotificationRequest(
+                    subject,
+                    body,
+                    NotificationType.Email,
+                    [student.Id],
+                    NotificationAudience.Individual,
+                    resolvedSchoolId),
+                cancellationToken);
+        }
+    }
+
+    private async Task<Invoice> LoadInvoiceForMutationAsync(int invoiceId, int? schoolId, CancellationToken cancellationToken)
+    {
+        var resolvedSchoolId = ResolveReportSchoolId(schoolId);
+        return await _dbContext.Invoices
+            .FirstOrDefaultAsync(x => x.Id == invoiceId && x.SchoolId == resolvedSchoolId, cancellationToken)
+            ?? throw new InvalidOperationException("Invoice was not found.");
+    }
+
+    private static InvoiceResponse MapInvoiceResponse(Invoice invoice, Student student, AccountingTransaction? transaction = null)
+    {
+        return new InvoiceResponse(
+            invoice.Id,
+            invoice.SchoolId,
+            invoice.StudentId,
+            student.FullName,
+            student.StudentNumber,
+            student.Class,
+            invoice.StudentAccountId,
+            invoice.Term,
+            invoice.TotalAmount,
+            invoice.Status,
+            invoice.IssuedAt,
+            invoice.DueAt,
+            invoice.CreatedByUserId,
+            invoice.AccountingTransactionId,
+            transaction?.Reference,
+            transaction?.Description);
     }
 
     public async Task<AccountingTransactionResponse> PostInvoiceAsync(CreateInvoiceRequest request, int? schoolId = null, CancellationToken cancellationToken = default)

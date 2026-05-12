@@ -30,10 +30,51 @@ public sealed class AccountingController : ControllerBase
         return Ok(await _accountingService.SaveFeeStructureAsync(schoolId, request, cancellationToken));
     }
 
-    [HttpGet("students/{id:int}/statement")]
-    public async Task<ActionResult<StudentStatementResponse>> GetStudentStatement(int id, [FromQuery] int? schoolId, CancellationToken cancellationToken)
+    [HttpPost("fee-structures/newsletter")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> SendFeeStructureNewsletter(
+        [FromQuery] int? schoolId,
+        [FromForm] SendFeeStructureNewsletterRequest request,
+        [FromForm] IFormFile? newsletterPdf,
+        CancellationToken cancellationToken)
     {
+        byte[]? pdfBytes = null;
+        string? fileName = null;
+        if (newsletterPdf is not null)
+        {
+            await using var stream = new MemoryStream();
+            await newsletterPdf.CopyToAsync(stream, cancellationToken);
+            pdfBytes = stream.ToArray();
+            fileName = newsletterPdf.FileName;
+        }
+
+        await _accountingService.SendFeeStructureNewsletterAsync(schoolId, request, pdfBytes, fileName, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpGet("students/{id:int}/statement")]
+    public async Task<ActionResult<StudentStatementResponse>> GetStudentStatement(int id, [FromQuery] int? schoolId, [FromQuery] string? term, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrEmpty(term))
+        {
+            return Ok(await _accountingService.GetStudentStatementByTermAsync(id, term, schoolId, cancellationToken));
+        }
         return Ok(await _accountingService.GetStudentStatementAsync(id, schoolId, cancellationToken));
+    }
+
+    [HttpGet("students/{id:int}/invoices")]
+    public async Task<ActionResult<IReadOnlyList<InvoiceResponse>>> GetStudentInvoices(int id, [FromQuery] int? schoolId, CancellationToken cancellationToken)
+    {
+        return Ok(await _accountingService.GetStudentInvoicesAsync(id, schoolId, cancellationToken));
+    }
+
+    [HttpGet("reports/statement")]
+    public async Task<ActionResult<FinancialStatementResponse>> GetFinancialStatement(
+        [FromQuery] int? schoolId,
+        [FromQuery] FinancialStatementRequest request,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await _accountingService.GetFinancialStatementAsync(schoolId, request, cancellationToken));
     }
 
     [HttpPost("payments")]
@@ -46,6 +87,19 @@ public sealed class AccountingController : ControllerBase
     public async Task<ActionResult<AccountingTransactionResponse>> PostInvoice([FromQuery] int? schoolId, [FromBody] CreateInvoiceRequest request, CancellationToken cancellationToken)
     {
         return Ok(await _accountingService.PostInvoiceAsync(request, schoolId, cancellationToken));
+    }
+
+    [HttpPut("invoices/{invoiceId:int}")]
+    public async Task<ActionResult<InvoiceResponse>> UpdateInvoice(int invoiceId, [FromQuery] int? schoolId, [FromBody] UpdateInvoiceRequest request, CancellationToken cancellationToken)
+    {
+        return Ok(await _accountingService.UpdateInvoiceAsync(invoiceId, request, schoolId, cancellationToken));
+    }
+
+    [HttpDelete("invoices/{invoiceId:int}")]
+    public async Task<IActionResult> DeleteInvoice(int invoiceId, [FromQuery] int? schoolId, CancellationToken cancellationToken)
+    {
+        await _accountingService.DeleteInvoiceAsync(invoiceId, schoolId, cancellationToken);
+        return NoContent();
     }
 
     [HttpPost("adjustments")]

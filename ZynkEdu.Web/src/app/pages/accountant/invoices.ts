@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MessageService } from 'primeng/api';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { FeeStructureResponse, StudentResponse } from '../../core/api/api.models';
@@ -87,9 +88,14 @@ type TermOption = {
                                 placeholder="Grade, term, amount, or description"
                             />
                         </label>
-                        <button class="rounded-xl bg-primary text-white px-4 py-3 font-semibold" type="button" (click)="exportFeeStructuresPdf()" [disabled]="filteredFeeStructures.length === 0">
-                            Export filtered PDF
-                        </button>
+                        <div class="flex flex-col gap-2">
+                            <button class="rounded-xl bg-primary text-white px-4 py-3 font-semibold" type="button" (click)="exportFeeStructuresPdf()" [disabled]="filteredFeeStructures.length === 0">
+                                Export filtered PDF
+                            </button>
+                            <button class="rounded-xl border border-surface-300 px-4 py-3 font-semibold" type="button" (click)="sendFeeNewsletterToAdmin()" [disabled]="filteredFeeStructures.length === 0 || sendingNewsletter">
+                                Send newsletter to admin
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -111,10 +117,12 @@ type TermOption = {
 export class AccountantInvoices implements OnInit {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
+    private readonly messages = inject(MessageService);
 
     students: StudentResponse[] = [];
     feeStructures: FeeStructureResponse[] = [];
     feeSearch = '';
+    sendingNewsletter = false;
     draft = {
         studentId: null as number | null,
         term: '',
@@ -168,6 +176,35 @@ export class AccountantInvoices implements OnInit {
 
     exportFeeStructuresPdf(): void {
         buildFeeStructuresPdf(this.schoolLabel, new Date(), this.filteredFeeStructures, `fee-structures-${this.fileStamp()}.pdf`);
+    }
+
+    sendFeeNewsletterToAdmin(): void {
+        if (this.filteredFeeStructures.length === 0) {
+            return;
+        }
+
+        this.sendingNewsletter = true;
+        try {
+            const pdf = buildFeeStructuresPdf(this.schoolLabel, new Date(), this.filteredFeeStructures, undefined, false);
+            const blob = pdf.output('blob');
+            this.api.sendFeeStructureNewsletter(
+                { note: 'Attached is the current fee structure newsletter and payment method guide.' },
+                blob,
+                this.auth.schoolId()
+            ).subscribe({
+                next: () => {
+                    this.messages.add({ severity: 'success', summary: 'Newsletter sent', detail: 'The fee structure newsletter was sent to the school admin.' });
+                    this.sendingNewsletter = false;
+                },
+                error: () => {
+                    this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The fee structure newsletter could not be sent.' });
+                    this.sendingNewsletter = false;
+                }
+            });
+        } catch {
+            this.sendingNewsletter = false;
+            this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The fee structure newsletter could not be created.' });
+        }
     }
 
     submitInvoice(): void {

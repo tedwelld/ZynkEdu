@@ -205,6 +205,10 @@ interface PreviewRow {
                     </ng-container>
 
                     <div class="flex flex-wrap gap-3 pt-4">
+                        <label class="block w-full lg:w-auto">
+                            <span class="text-sm text-muted-color">Accounts newsletter PDF</span>
+                            <input class="mt-2 block w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="file" accept="application/pdf" (change)="onNewsletterFileSelected($event)" />
+                        </label>
                         <button pButton type="button" label="Send guardian reports" icon="pi pi-send" severity="info" (click)="sendGroupedGuardianReports()" [disabled]="loading || filteredResults.length === 0 || sendingGuardianReports"></button>
                     </div>
                 </article>
@@ -247,6 +251,7 @@ export class AdminReports implements OnInit {
 
     loading = true;
     sendingGuardianReports = false;
+    accountsNewsletterFile: File | null = null;
     schools: SchoolResponse[] = [];
     results: ResultResponse[] = [];
     selectedSchoolId: number | null = null;
@@ -462,7 +467,8 @@ export class AdminReports implements OnInit {
                             studentId,
                             { sendEmail: true, sendSms: true },
                             blob,
-                            student.schoolId
+                            student.schoolId,
+                            this.accountsNewsletterFile
                         )
                     );
 
@@ -639,6 +645,11 @@ export class AdminReports implements OnInit {
 
     private fileNameForExcel(): string {
         return `results-report-${this.selectedYear ?? 'all'}-${this.selectedClass || 'all'}.xlsx`;
+    }
+
+    onNewsletterFileSelected(event: Event): void {
+        const input = event.target as HTMLInputElement | null;
+        this.accountsNewsletterFile = input?.files?.[0] ?? null;
     }
 
     private formatDate(value: string | Date): string {

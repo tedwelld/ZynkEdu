@@ -10,22 +10,26 @@ import {
     CollectionReportResponse,
     DailyCashReportResponse,
     DefaulterReportResponse,
+    FinancialStatementPeriodMode,
+    FinancialStatementResponse,
+    FinancialStatementRowResponse,
+    FinancialStatementType,
     RevenueByClassReportResponse
 } from '../../core/api/api.models';
 import {
-    buildAccountingReportsPdf,
     buildAgingBucketsPdf,
     buildCollectionReportPdf,
     buildDailyCashPdf,
     buildDefaultersPdf,
+    buildFinancialStatementPdf,
     buildRevenueByClassPdf
 } from '../../shared/report/report-pdf';
 import { AuthService } from '../../core/auth/auth.service';
 
 type ReportFilterMode = 'none' | 'date' | 'range' | 'month' | 'year';
-type ReportExportType = 'combined' | 'collection' | 'aging' | 'defaulters' | 'revenue' | 'dailyCash';
 type AgingSearchField = 'bucket' | 'amount' | 'invoiceCount';
 type DefaulterSearchField = 'student' | 'class' | 'grade' | 'balance';
+type StatementField = FinancialStatementType;
 
 @Component({
     standalone: true,
@@ -36,7 +40,6 @@ type DefaulterSearchField = 'student' | 'class' | 'grade' | 'balance';
                 <p class="text-xs uppercase tracking-[0.28em] text-muted-color font-semibold">Reporting</p>
                 <h1 class="text-3xl md:text-4xl font-display font-bold mt-3">Accounting reports</h1>
                 <p class="text-muted-color mt-2">Collection, aging, defaulter, revenue, and daily cash views for the current school scope.</p>
-
                 <div class="mt-5 grid gap-4 md:grid-cols-2">
                     <button
                         class="rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-blue-900/40 dark:from-blue-950/40 dark:via-surface-900 dark:to-cyan-950/40"
@@ -75,68 +78,126 @@ type DefaulterSearchField = 'student' | 'class' | 'grade' | 'balance';
             </header>
 
             <section class="workspace-card p-6">
-                <div class="flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-start justify-between gap-4 flex-wrap">
                     <div>
-                        <h2 class="text-xl font-semibold">PDF exports</h2>
-                        <p class="text-sm text-muted-color mt-1">Choose an optional period filter, select the report type, then export it as a PDF.</p>
+                        <p class="text-xs uppercase tracking-[0.28em] text-muted-color font-semibold">Financial statements</p>
+                        <h2 class="text-2xl font-semibold mt-2">{{ statement?.title || 'Statement grid' }}</h2>
+                        <p class="text-sm text-muted-color mt-1">Structured rows with period comparisons, subtotals, and bracketed negatives.</p>
+                    </div>
+                    <div class="flex gap-3 flex-wrap">
+                        <button class="rounded-xl border border-surface-300 px-4 py-2 font-semibold" type="button" (click)="refreshStatement()">Refresh statement</button>
+                        <button class="rounded-xl bg-primary text-white px-4 py-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed" type="button" (click)="exportStatementPdf()" [disabled]="!statement">
+                            Export PDF
+                        </button>
                     </div>
                 </div>
 
-                <form class="grid gap-4 md:grid-cols-2 xl:grid-cols-5 mt-5 items-end" (ngSubmit)="noop()">
-                    <label class="block">
-                        <span class="text-sm text-muted-color">Filter mode</span>
-                        <select class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="filter.mode" name="mode">
-                            <option value="none">Current snapshot</option>
-                            <option value="date">Single date</option>
-                            <option value="range">Date range</option>
-                            <option value="month">Month</option>
-                            <option value="year">Year</option>
-                        </select>
-                    </label>
+                <div class="mt-5 grid gap-4 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
+                    <div class="space-y-4">
+                        <label class="block">
+                            <span class="text-sm text-muted-color">Statement type</span>
+                            <select class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="selectedStatementType" name="statementType" (ngModelChange)="loadStatement()">
+                                <option *ngFor="let option of statementTypeOptions" [ngValue]="option.value">{{ option.label }}</option>
+                            </select>
+                        </label>
 
-                    <label class="block" *ngIf="filter.mode === 'date' || filter.mode === 'range'">
-                        <span class="text-sm text-muted-color">Start date</span>
-                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="filter.startDate" name="startDate" />
-                    </label>
+                        <div class="rounded-2xl border border-surface-200 dark:border-surface-700 p-4">
+                            <div class="text-xs uppercase tracking-[0.22em] text-muted-color">Report basis</div>
+                            <div class="mt-2 text-sm text-color">
+                                <div><span class="font-semibold">Period:</span> {{ statement?.periodLabel || 'Current snapshot' }}</div>
+                                <div class="mt-1"><span class="font-semibold">Comparison:</span> {{ statement?.comparisonLabel || 'Prior period' }}</div>
+                            </div>
+                        </div>
+                    </div>
 
-                    <label class="block" *ngIf="filter.mode === 'range'">
-                        <span class="text-sm text-muted-color">End date</span>
-                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="filter.endDate" name="endDate" />
-                    </label>
+                    <form class="grid gap-4 md:grid-cols-2 xl:grid-cols-5 items-end" (ngSubmit)="refreshStatement()">
+                        <label class="block">
+                            <span class="text-sm text-muted-color">Filter mode</span>
+                            <select class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="filter.mode" name="mode">
+                                <option value="none">Current snapshot</option>
+                                <option value="date">Single date</option>
+                                <option value="range">Date range</option>
+                                <option value="month">Month</option>
+                                <option value="year">Year</option>
+                            </select>
+                        </label>
 
-                    <label class="block" *ngIf="filter.mode === 'date'">
-                        <span class="text-sm text-muted-color">Date</span>
-                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="filter.date" name="date" />
-                    </label>
+                        <label class="block" *ngIf="filter.mode === 'date' || filter.mode === 'range'">
+                            <span class="text-sm text-muted-color">Start date</span>
+                            <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="filter.startDate" name="startDate" />
+                        </label>
 
-                    <label class="block" *ngIf="filter.mode === 'month'">
-                        <span class="text-sm text-muted-color">Month</span>
-                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="month" [(ngModel)]="filter.month" name="month" />
-                    </label>
+                        <label class="block" *ngIf="filter.mode === 'range'">
+                            <span class="text-sm text-muted-color">End date</span>
+                            <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="filter.endDate" name="endDate" />
+                        </label>
 
-                    <label class="block" *ngIf="filter.mode === 'year'">
-                        <span class="text-sm text-muted-color">Year</span>
-                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="number" min="2000" max="2100" [(ngModel)]="filter.year" name="year" />
-                    </label>
+                        <label class="block" *ngIf="filter.mode === 'date'">
+                            <span class="text-sm text-muted-color">Date</span>
+                            <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="filter.date" name="date" />
+                        </label>
 
-                    <button class="rounded-xl border border-surface-300 px-4 py-3 font-semibold" type="button" (click)="clearFilters()">Clear filters</button>
-                </form>
+                        <label class="block" *ngIf="filter.mode === 'month'">
+                            <span class="text-sm text-muted-color">Month</span>
+                            <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="month" [(ngModel)]="filter.month" name="month" />
+                        </label>
 
-                <div class="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] items-end">
-                    <label class="block">
-                        <span class="text-sm text-muted-color">Report type</span>
-                        <select class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="selectedReportType" name="reportType">
-                            <option value="combined">Financial statement</option>
-                            <option value="collection">Collection summary</option>
-                            <option value="aging">Aging buckets</option>
-                            <option value="defaulters">Defaulters list</option>
-                            <option value="revenue">Revenue by class</option>
-                            <option value="dailyCash">Daily cash report</option>
-                        </select>
-                    </label>
+                        <label class="block" *ngIf="filter.mode === 'year'">
+                            <span class="text-sm text-muted-color">Year</span>
+                            <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="number" min="2000" max="2100" [(ngModel)]="filter.year" name="year" />
+                        </label>
 
-                    <button class="rounded-xl bg-primary text-white px-4 py-3 font-semibold" type="button" (click)="exportSelectedPdf()">Export PDF</button>
+                        <div class="flex gap-3 xl:col-span-5">
+                            <button class="rounded-xl border border-surface-300 px-4 py-3 font-semibold" type="button" (click)="clearFilters()">Clear filters</button>
+                            <button class="rounded-xl bg-surface-900 text-white px-4 py-3 font-semibold" type="submit">Apply filters</button>
+                        </div>
+                    </form>
                 </div>
+
+                <div class="grid gap-4 md:grid-cols-4 mt-6" *ngIf="statementSummaryRow as summary">
+                    <article class="rounded-2xl border border-surface-200 dark:border-surface-700 p-4">
+                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Actual</div>
+                        <div class="text-2xl font-bold mt-2">{{ formatStatementValue(summary.actual) }}</div>
+                    </article>
+                    <article class="rounded-2xl border border-surface-200 dark:border-surface-700 p-4">
+                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Prior period</div>
+                        <div class="text-2xl font-bold mt-2">{{ formatStatementValue(summary.priorPeriod) }}</div>
+                    </article>
+                    <article class="rounded-2xl border border-surface-200 dark:border-surface-700 p-4">
+                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Variance</div>
+                        <div class="text-2xl font-bold mt-2">{{ formatStatementValue(summary.variance) }}</div>
+                    </article>
+                    <article class="rounded-2xl border border-surface-200 dark:border-surface-700 p-4">
+                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Variance %</div>
+                        <div class="text-2xl font-bold mt-2">{{ formatStatementPercent(summary.variancePct) }}</div>
+                    </article>
+                </div>
+
+                <div class="mt-6 overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-left text-muted-color uppercase tracking-[0.18em] text-xs">
+                            <tr>
+                                <th class="py-3 pr-4">Line item</th>
+                                <th *ngFor="let column of (statement?.columns || [])" class="py-3 pr-4">{{ column.label }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                *ngFor="let row of (statement?.rows || [])"
+                                class="border-t border-surface-200 dark:border-surface-700"
+                                [ngClass]="statementRowClass(row)"
+                            >
+                                <td class="py-3 pr-4" [style.paddingLeft.px]="row.level * 18">
+                                    <span [class.font-semibold]="row.kind !== 'LineItem'">{{ row.label }}</span>
+                                </td>
+                                <td class="py-3 pr-4" *ngFor="let column of (statement?.columns || [])">
+                                    {{ formatStatementCell(row, column.key) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div *ngIf="!statement" class="mt-4 text-sm text-muted-color">Load a statement to see the grid.</div>
             </section>
 
             <div class="grid md:grid-cols-3 gap-4">
@@ -300,12 +361,19 @@ export class AccountantReports implements OnInit {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
 
+    readonly statementTypeOptions: { label: string; value: StatementField }[] = [
+        { label: 'Income Statement', value: 'IncomeStatement' },
+        { label: 'Balance Sheet', value: 'BalanceSheet' },
+        { label: 'Cash Flow Statement', value: 'CashFlowStatement' }
+    ];
+
     collection: CollectionReportResponse | null = null;
     aging: AgingReportResponse | null = null;
     dailyCash: DailyCashReportResponse | null = null;
     revenue: RevenueByClassReportResponse | null = null;
     defaulters: DefaulterReportResponse | null = null;
-    selectedReportType: ReportExportType = 'combined';
+    statement: FinancialStatementResponse | null = null;
+    selectedStatementType: StatementField = 'IncomeStatement';
     agingModalVisible = false;
     defaultersModalVisible = false;
     agingSearch: { field: AgingSearchField; term: string } = {
@@ -335,10 +403,7 @@ export class AccountantReports implements OnInit {
 
     ngOnInit(): void {
         this.loadReports();
-    }
-
-    noop(): void {
-        // Intentionally empty. The filter form is used by the PDF exports.
+        this.loadStatement();
     }
 
     clearFilters(): void {
@@ -350,6 +415,7 @@ export class AccountantReports implements OnInit {
             month: '',
             year: new Date().getFullYear()
         };
+        this.loadStatement();
     }
 
     openAgingModal(): void {
@@ -368,42 +434,23 @@ export class AccountantReports implements OnInit {
         this.defaultersModalVisible = false;
     }
 
-    exportCombinedPdf(): void {
-        this.fetchExportData().subscribe(({ collection, aging, revenue, defaulters, dailyCash }) => {
-            buildAccountingReportsPdf(
-                this.schoolLabel,
-                new Date(),
-                this.periodLabel,
-                collection,
-                aging,
-                revenue,
-                defaulters,
-                dailyCash,
-                `financial-statement-${this.fileStamp()}.pdf`
-            );
+    refreshStatement(): void {
+        this.loadStatement();
+    }
+
+    loadStatement(): void {
+        const schoolId = this.auth.schoolId();
+        this.api.getFinancialStatement(this.selectedStatementType, schoolId, this.buildStatementRequest()).subscribe((statement) => {
+            this.statement = statement;
         });
     }
 
-    exportSelectedPdf(): void {
-        switch (this.selectedReportType) {
-            case 'collection':
-                this.exportCollectionPdf();
-                return;
-            case 'aging':
-                this.exportAgingPdf();
-                return;
-            case 'defaulters':
-                this.exportDefaultersPdf();
-                return;
-            case 'revenue':
-                this.exportRevenuePdf();
-                return;
-            case 'dailyCash':
-                this.exportDailyCashPdf();
-                return;
-            default:
-                this.exportCombinedPdf();
+    exportStatementPdf(): void {
+        if (!this.statement) {
+            return;
         }
+
+        buildFinancialStatementPdf(this.schoolLabel, new Date(), this.statement, `financial-statement-${this.fileStamp()}.pdf`);
     }
 
     exportCollectionPdf(): void {
@@ -436,24 +483,118 @@ export class AccountantReports implements OnInit {
         });
     }
 
-    private loadReports(): void {
-        const schoolId = this.auth.schoolId();
-        this.api.getCollectionReport(schoolId).subscribe((response) => (this.collection = response));
-        this.api.getAgingReport(schoolId, this.resolveAsOfDate()).subscribe((response) => (this.aging = response));
-        this.api.getDailyCashReport(schoolId, this.resolveDailyCashDate()).subscribe((response) => (this.dailyCash = response));
-        this.api.getRevenueByClassReport(schoolId).subscribe((response) => (this.revenue = response));
-        this.api.getDefaulters(schoolId).subscribe((response) => (this.defaulters = response));
+    formatStatementValue(value?: number | null): string {
+        if (value == null) {
+            return '-';
+        }
+
+        const formatted = new Intl.NumberFormat('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(Math.abs(value));
+
+        return value < 0 ? `(${formatted})` : formatted;
     }
 
-    private fetchExportData() {
+    formatStatementPercent(value?: number | null): string {
+        if (value == null) {
+            return '-';
+        }
+
+        const formatted = new Intl.NumberFormat('en-US', {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1
+        }).format(Math.abs(value * 100));
+
+        return value < 0 ? `(${formatted}%)` : `${formatted}%`;
+    }
+
+    formatStatementCell(row: FinancialStatementRowResponse, columnKey: string): string {
+        switch (columnKey) {
+            case 'priorPeriod':
+                return this.formatStatementValue(row.priorPeriod);
+            case 'variance':
+                return this.formatStatementValue(row.variance);
+            case 'variancePct':
+                return this.formatStatementPercent(row.variancePct);
+            case 'budget':
+                return this.formatStatementValue(row.budget);
+            default:
+                return this.formatStatementValue(row.actual);
+        }
+    }
+
+    statementRowClass(row: FinancialStatementRowResponse): string {
+        if (row.kind === 'Total') {
+            return 'bg-surface-100/70 dark:bg-surface-800/70';
+        }
+
+        if (row.kind === 'Subtotal') {
+            return 'bg-surface-50/70 dark:bg-surface-900/40';
+        }
+
+        return '';
+    }
+
+    private loadReports(): void {
         const schoolId = this.auth.schoolId();
-        return forkJoin({
+        forkJoin({
             collection: this.api.getCollectionReport(schoolId),
             aging: this.api.getAgingReport(schoolId, this.resolveAsOfDate()),
             dailyCash: this.api.getDailyCashReport(schoolId, this.resolveDailyCashDate()),
             revenue: this.api.getRevenueByClassReport(schoolId),
             defaulters: this.api.getDefaulters(schoolId)
+        }).subscribe(({ collection, aging, dailyCash, revenue, defaulters }) => {
+            this.collection = collection;
+            this.aging = aging;
+            this.dailyCash = dailyCash;
+            this.revenue = revenue;
+            this.defaulters = defaulters;
         });
+    }
+
+    private buildStatementRequest(): {
+        statementType: StatementField;
+        periodMode: FinancialStatementPeriodMode;
+        startDate?: string | null;
+        endDate?: string | null;
+        date?: string | null;
+        month?: string | null;
+        year?: number | null;
+    } {
+        switch (this.filter.mode) {
+            case 'date':
+                return {
+                    statementType: this.selectedStatementType,
+                    periodMode: 'Date',
+                    date: this.filter.date || this.todayIsoDate()
+                };
+            case 'range':
+                return {
+                    statementType: this.selectedStatementType,
+                    periodMode: 'Range',
+                    startDate: this.filter.startDate || this.todayIsoDate(),
+                    endDate: this.filter.endDate || this.filter.startDate || this.todayIsoDate()
+                };
+            case 'month':
+                return {
+                    statementType: this.selectedStatementType,
+                    periodMode: 'Month',
+                    month: this.filter.month || this.currentMonthValue(),
+                    year: this.filter.year
+                };
+            case 'year':
+                return {
+                    statementType: this.selectedStatementType,
+                    periodMode: 'Year',
+                    year: this.filter.year
+                };
+            default:
+                return {
+                    statementType: this.selectedStatementType,
+                    periodMode: 'None'
+                };
+        }
     }
 
     get filteredAgingBuckets() {
@@ -473,6 +614,14 @@ export class AccountantReports implements OnInit {
                     return bucket.bucket.toLowerCase().includes(term);
             }
         });
+    }
+
+    get statementSummaryRow(): FinancialStatementRowResponse | null {
+        if (!this.statement?.rows.length) {
+            return null;
+        }
+
+        return this.statement.rows[this.statement.rows.length - 1] ?? null;
     }
 
     get filteredDefaulters() {
@@ -509,6 +658,14 @@ export class AccountantReports implements OnInit {
             default:
                 return null;
         }
+    }
+
+    private todayIsoDate(): string {
+        return new Date().toISOString().slice(0, 10);
+    }
+
+    private currentMonthValue(): string {
+        return new Date().toISOString().slice(0, 7);
     }
 
     private resolveDailyCashDate(): string | null {

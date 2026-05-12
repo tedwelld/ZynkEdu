@@ -157,4 +157,55 @@ public sealed class NotificationServiceTests
         Assert.Equal(studentB.Id, response.Recipients[0].StudentId);
         Assert.Equal("delta@example.com", response.Recipients[0].Destination);
     }
+
+    [Fact]
+    public async Task SendAsync_AllowsSchoolScopedAccountantsToNotifyWithinTheirSchool()
+    {
+        var currentUser = new TestCurrentUserContext { Role = UserRole.AccountantJunior, SchoolId = 12, UserId = 120 };
+        var databasePath = TestDatabase.CreateDatabasePath();
+        var (connection, context) = await TestDatabase.CreateContextAsync(databasePath, currentUser);
+        await using var _ = connection;
+
+        var student = new Student
+        {
+            SchoolId = 12,
+            StudentNumber = "SCH012-0001",
+            FullName = "Invoice Student",
+            Class = "Form 3A",
+            Level = "Form 3",
+            ParentEmail = "invoice@example.com",
+            ParentPhone = "2777000012",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        context.Students.Add(student);
+        await context.SaveChangesAsync();
+
+        context.Guardians.Add(new Guardian
+        {
+            SchoolId = 12,
+            StudentId = student.Id,
+            DisplayName = "Invoice Guardian",
+            Relationship = "Mother",
+            ParentEmail = "invoice@example.com",
+            ParentPhone = "2777000012",
+            IsPrimary = true,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+
+        var service = new NotificationService(context, currentUser);
+        var response = await service.SendAsync(new SendNotificationRequest(
+            "Invoice generated",
+            "Your invoice is ready.",
+            NotificationType.Email,
+            [student.Id],
+            NotificationAudience.Individual,
+            12));
+
+        Assert.Single(response.Recipients);
+        Assert.Equal(student.Id, response.Recipients[0].StudentId);
+        Assert.Equal("invoice@example.com", response.Recipients[0].Destination);
+    }
 }

@@ -434,6 +434,14 @@ export interface CreateInvoiceRequest {
     description?: string | null;
 }
 
+export interface UpdateInvoiceRequest {
+    term: string;
+    totalAmount: number;
+    dueAt: string;
+    reference?: string | null;
+    description?: string | null;
+}
+
 export interface CreatePaymentRequest {
     studentId: number;
     amount: number;
@@ -476,6 +484,27 @@ export interface AccountingTransactionResponse {
     approvedAt?: string | null;
 }
 
+export type InvoiceStatus = 'Draft' | 'Issued' | 'Partial' | 'Paid';
+
+export interface InvoiceResponse {
+    id: number;
+    schoolId: number;
+    studentId: number;
+    studentName: string;
+    studentNumber: string;
+    studentClass: string;
+    studentAccountId: number;
+    term: string;
+    totalAmount: number;
+    status: InvoiceStatus;
+    issuedAt: string;
+    dueAt: string;
+    createdByUserId: number;
+    accountingTransactionId?: number | null;
+    reference?: string | null;
+    description?: string | null;
+}
+
 export interface StatementLineResponse {
     transactionId: number;
     type: 'Invoice' | 'Payment' | 'Adjustment' | 'Discount' | 'Refund';
@@ -497,6 +526,51 @@ export interface StudentStatementResponse {
     openingBalance: number;
     closingBalance: number;
     transactions: StatementLineResponse[];
+}
+
+export type FinancialStatementType = 'IncomeStatement' | 'BalanceSheet' | 'CashFlowStatement';
+export type FinancialStatementPeriodMode = 'None' | 'Date' | 'Range' | 'Month' | 'Year';
+export type FinancialStatementRowKind = 'LineItem' | 'Subtotal' | 'Total';
+export type FinancialStatementColumnKind = 'Actual' | 'PriorPeriod' | 'Variance' | 'VariancePct' | 'Budget';
+
+export interface FinancialStatementRequest {
+    statementType: FinancialStatementType;
+    periodMode: FinancialStatementPeriodMode;
+    startDate?: string | null;
+    endDate?: string | null;
+    date?: string | null;
+    month?: string | null;
+    year?: number | null;
+}
+
+export interface FinancialStatementColumnResponse {
+    key: string;
+    label: string;
+    kind: FinancialStatementColumnKind;
+}
+
+export interface FinancialStatementRowResponse {
+    key: string;
+    label: string;
+    level: number;
+    kind: FinancialStatementRowKind;
+    actual?: number | null;
+    priorPeriod?: number | null;
+    variance?: number | null;
+    variancePct?: number | null;
+    budget?: number | null;
+}
+
+export interface FinancialStatementResponse {
+    schoolId: number;
+    statementType: FinancialStatementType;
+    title: string;
+    currency: string;
+    asOf: string;
+    periodLabel: string;
+    comparisonLabel: string;
+    columns: FinancialStatementColumnResponse[];
+    rows: FinancialStatementRowResponse[];
 }
 
 export interface CollectionReportResponse {

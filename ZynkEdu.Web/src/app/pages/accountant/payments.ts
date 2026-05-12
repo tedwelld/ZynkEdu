@@ -5,8 +5,8 @@ import { ButtonModule } from 'primeng/button';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { ApiService } from '../../core/api/api.service';
+import { SchoolResponse, StudentResponse } from '../../core/api/api.models';
 import { AuthService } from '../../core/auth/auth.service';
-import { StudentResponse } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 
 @Component({
@@ -22,11 +22,30 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 
             <section class="workspace-card p-6">
                 <form class="grid gap-4 md:grid-cols-4 items-end" (ngSubmit)="submitPayment()">
+                    <label *ngIf="isPlatformAdmin" class="block">
+                        <span class="text-sm text-muted-color">School</span>
+                        <app-dropdown
+                            [options]="schoolOptions"
+                            [(ngModel)]="selectedSchoolId"
+                            name="schoolId"
+                            optionLabel="label"
+                            optionValue="value"
+                            class="w-full mt-2"
+                            appendTo="body"
+                            [filter]="true"
+                            filterBy="label"
+                            filterPlaceholder="Search schools"
+                            [showClear]="false"
+                            (ngModelChange)="loadStudents()"
+                        ></app-dropdown>
+                    </label>
+
                     <label class="block">
                         <span class="text-sm text-muted-color">Student</span>
                         <app-dropdown
                             [options]="studentOptions"
                             [(ngModel)]="draft.studentId"
+                            name="studentId"
                             optionLabel="label"
                             optionValue="value"
                             class="w-full mt-2"
@@ -96,18 +115,22 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
                                 </td>
                                 <td>{{ student.enrollmentYear }}</td>
                                 <td>
-                                    <div class="max-w-xs truncate" [title]="student.subjects.join(', ') || 'No subjects assigned'">
-                                        {{ student.subjects.join(', ') || 'No subjects assigned' }}
+                                    <div class="max-w-xs truncate" [title]="subjectSummary(student)">
+                                        {{ subjectSummary(student) }}
                                     </div>
                                 </td>
-                                <td>{{ student.guardians.length }}</td>
+                                <td>{{ guardianCount(student) }}</td>
                                 <td>
-                                    <div>{{ student.parentEmail || 'No email' }}</div>
-                                    <div class="text-xs text-muted-color">{{ student.parentPhone || 'No phone' }}</div>
+                                    <div>{{ contactEmail(student) }}</div>
+                                    <div class="text-xs text-muted-color">{{ contactPhone(student) }}</div>
                                 </td>
                             </tr>
                         </ng-template>
                     </p-table>
+                </div>
+
+                <div *ngIf="currentStudents.length === 0" class="mt-4 rounded-2xl border border-dashed border-surface-300 px-4 py-6 text-sm text-muted-color">
+                    {{ emptyStateMessage }}
                 </div>
             </section>
         </section>
@@ -117,7 +140,9 @@ export class AccountantPayments implements OnInit {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
 
+    schools: SchoolResponse[] = [];
     students: StudentResponse[] = [];
+    selectedSchoolId: number | null = this.auth.schoolId();
     draft = {
         studentId: null as number | null,
         amount: 0,
@@ -126,9 +151,20 @@ export class AccountantPayments implements OnInit {
         description: ''
     };
 
+    get isPlatformAdmin(): boolean {
+        return this.auth.role() === 'PlatformAdmin';
+    }
+
+    get schoolOptions(): { label: string; value: number }[] {
+        return this.schools.map((school) => ({
+            label: school.name,
+            value: school.id
+        }));
+    }
+
     get studentOptions(): { label: string; value: number }[] {
         return this.currentStudents.map((student) => ({
-            label: `${student.fullName} · ${student.studentNumber} · ${student.class} · ${student.level}`,
+            label: `${student.fullName} - ${student.studentNumber} - ${student.class} - ${student.level}`,
             value: student.id
         }));
     }
@@ -137,15 +173,43 @@ export class AccountantPayments implements OnInit {
         return this.students.filter((student) => this.isCurrentEnrollment(student));
     }
 
+    get emptyStateMessage(): string {
+        if (this.isPlatformAdmin && !this.selectedSchoolId) {
+            return 'Choose a school to load enrolled students for payment capture.';
+        }
+
+        return 'No current enrolled students were found for the active school.';
+    }
+
     ngOnInit(): void {
-        this.api.getStudents(undefined, this.auth.schoolId()).subscribe((students) => {
+        if (this.isPlatformAdmin) {
+            this.api.getPlatformSchools().subscribe((schools) => {
+                this.schools = schools;
+                this.selectedSchoolId = this.selectedSchoolId ?? schools[0]?.id ?? null;
+                this.loadStudents();
+            });
+            return;
+        }
+
+        this.loadStudents();
+    }
+
+    loadStudents(): void {
+        const schoolId = this.resolveSchoolId();
+        if (this.isPlatformAdmin && !schoolId) {
+            this.students = [];
+            this.draft.studentId = null;
+            return;
+        }
+
+        this.api.getStudents(undefined, schoolId ?? undefined).subscribe((students) => {
             this.students = students;
             this.draft.studentId = this.currentStudents[0]?.id ?? null;
         });
     }
 
     statusSeverity(status: string): 'success' | 'warning' | 'danger' | 'info' {
-        const normalized = status.trim().toLowerCase();
+        const normalized = (status ?? '').trim().toLowerCase();
         if (normalized === 'active') {
             return 'success';
         }
@@ -159,7 +223,8 @@ export class AccountantPayments implements OnInit {
     }
 
     submitPayment(): void {
-        if (!this.draft.studentId) {
+        const schoolId = this.resolveSchoolId();
+        if (!this.draft.studentId || (this.isPlatformAdmin && !schoolId)) {
             return;
         }
 
@@ -172,7 +237,7 @@ export class AccountantPayments implements OnInit {
                 description: this.draft.description || null,
                 receivedAt: new Date().toISOString()
             },
-            this.auth.schoolId()
+            schoolId
         ).subscribe(() => {
             this.draft.amount = 0;
             this.draft.reference = '';
@@ -180,8 +245,29 @@ export class AccountantPayments implements OnInit {
         });
     }
 
+    subjectSummary(student: StudentResponse): string {
+        const subjects = Array.isArray(student.subjects) ? student.subjects.filter((subject) => !!subject) : [];
+        return subjects.length > 0 ? subjects.join(', ') : 'No subjects assigned';
+    }
+
+    guardianCount(student: StudentResponse): number {
+        return Array.isArray(student.guardians) ? student.guardians.length : 0;
+    }
+
+    contactEmail(student: StudentResponse): string {
+        return student.parentEmail || 'No email';
+    }
+
+    contactPhone(student: StudentResponse): string {
+        return student.parentPhone || 'No phone';
+    }
+
     private isCurrentEnrollment(student: StudentResponse): boolean {
-        const status = student.status.trim().toLowerCase();
+        const status = (student.status ?? '').trim().toLowerCase();
         return status === 'active' || status === 'suspended';
+    }
+
+    private resolveSchoolId(): number | null {
+        return this.isPlatformAdmin ? this.selectedSchoolId : this.auth.schoolId();
     }
 }

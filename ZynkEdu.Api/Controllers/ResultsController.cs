@@ -50,12 +50,24 @@ public sealed class ResultsController : ControllerBase
         int id,
         [FromForm] SendResultSlipRequest request,
         [FromForm] IFormFile slipPdf,
+        [FromForm] IFormFile? newsletterPdf,
         [FromQuery] int? schoolId,
         CancellationToken cancellationToken)
     {
         await using var stream = new MemoryStream();
         await slipPdf.CopyToAsync(stream, cancellationToken);
-        return Ok(await _resultService.SendSlipAsync(id, request, stream.ToArray(), slipPdf.FileName, schoolId, cancellationToken));
+
+        byte[]? newsletterBytes = null;
+        string? newsletterFileName = null;
+        if (newsletterPdf is not null)
+        {
+            await using var newsletterStream = new MemoryStream();
+            await newsletterPdf.CopyToAsync(newsletterStream, cancellationToken);
+            newsletterBytes = newsletterStream.ToArray();
+            newsletterFileName = newsletterPdf.FileName;
+        }
+
+        return Ok(await _resultService.SendSlipAsync(id, request, stream.ToArray(), slipPdf.FileName, newsletterBytes, newsletterFileName, schoolId, cancellationToken));
     }
 
     [HttpPost("{id:int}/approve")]

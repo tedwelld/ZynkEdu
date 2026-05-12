@@ -3,6 +3,38 @@ using ZynkEdu.Domain.Enums;
 
 namespace ZynkEdu.Application.Contracts;
 
+public enum FinancialStatementType
+{
+    IncomeStatement = 0,
+    BalanceSheet = 1,
+    CashFlowStatement = 2
+}
+
+public enum FinancialStatementPeriodMode
+{
+    None = 0,
+    Date = 1,
+    Range = 2,
+    Month = 3,
+    Year = 4
+}
+
+public enum FinancialStatementRowKind
+{
+    LineItem = 0,
+    Subtotal = 1,
+    Total = 2
+}
+
+public enum FinancialStatementColumnKind
+{
+    Actual = 0,
+    PriorPeriod = 1,
+    Variance = 2,
+    VariancePct = 3,
+    Budget = 4
+}
+
 public sealed record CreateAccountantRequest(
     [Required, MinLength(3)] string Username,
     [Required, MinLength(8)] string Password,
@@ -26,8 +58,18 @@ public sealed record FeeStructureResponse(
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
+public sealed record SendFeeStructureNewsletterRequest(
+    string? Note = null);
+
 public sealed record CreateInvoiceRequest(
     int StudentId,
+    [Required, MinLength(1)] string Term,
+    [Range(0, double.MaxValue)] decimal TotalAmount,
+    DateTime DueAt,
+    string? Reference = null,
+    string? Description = null);
+
+public sealed record UpdateInvoiceRequest(
     [Required, MinLength(1)] string Term,
     [Range(0, double.MaxValue)] decimal TotalAmount,
     DateTime DueAt,
@@ -72,6 +114,24 @@ public sealed record AccountingTransactionResponse(
     DateTime CreatedAt,
     DateTime? ApprovedAt);
 
+public sealed record InvoiceResponse(
+    int Id,
+    int SchoolId,
+    int StudentId,
+    string StudentName,
+    string StudentNumber,
+    string StudentClass,
+    int StudentAccountId,
+    string Term,
+    decimal TotalAmount,
+    InvoiceStatus Status,
+    DateTime IssuedAt,
+    DateTime DueAt,
+    int CreatedByUserId,
+    int? AccountingTransactionId,
+    string? Reference,
+    string? Description);
+
 public sealed record StatementLineResponse(
     int TransactionId,
     AccountingTransactionType Type,
@@ -88,10 +148,47 @@ public sealed record StudentStatementResponse(
     int StudentId,
     string StudentName,
     int SchoolId,
+    string? StatementTerm,
     string Currency,
     decimal OpeningBalance,
     decimal ClosingBalance,
     IReadOnlyList<StatementLineResponse> Transactions);
+
+public sealed record FinancialStatementRequest(
+    FinancialStatementType StatementType,
+    FinancialStatementPeriodMode PeriodMode,
+    DateTime? StartDate = null,
+    DateTime? EndDate = null,
+    DateTime? Date = null,
+    string? Month = null,
+    int? Year = null);
+
+public sealed record FinancialStatementColumnResponse(
+    string Key,
+    string Label,
+    FinancialStatementColumnKind Kind);
+
+public sealed record FinancialStatementRowResponse(
+    string Key,
+    string Label,
+    int Level,
+    FinancialStatementRowKind Kind,
+    decimal? Actual,
+    decimal? PriorPeriod,
+    decimal? Variance,
+    decimal? VariancePct,
+    decimal? Budget);
+
+public sealed record FinancialStatementResponse(
+    int SchoolId,
+    FinancialStatementType StatementType,
+    string Title,
+    string Currency,
+    DateTime AsOf,
+    string PeriodLabel,
+    string ComparisonLabel,
+    IReadOnlyList<FinancialStatementColumnResponse> Columns,
+    IReadOnlyList<FinancialStatementRowResponse> Rows);
 
 public sealed record CollectionReportResponse(
     int SchoolId,

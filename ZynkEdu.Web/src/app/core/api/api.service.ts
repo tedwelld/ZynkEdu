@@ -31,9 +31,13 @@ import {
     DashboardResponse,
     DailyCashReportResponse,
     DefaulterReportResponse,
+    FinancialStatementRequest,
+    FinancialStatementResponse,
+    FinancialStatementType,
     FeeStructureRequest,
     FeeStructureResponse,
     AgingReportResponse,
+    InvoiceResponse,
     RevenueByClassReportResponse,
     StudentStatementResponse,
     LoginRequest,
@@ -74,6 +78,7 @@ import {
     TeacherAssignmentBatchResponse,
     UpdateSchoolRequest,
     UpdateSchoolUserRequest,
+    UpdateInvoiceRequest,
     UpdateLibraryBookCopyRequest,
     UpdateLibraryBookRequest,
     UpdateSubjectRequest,
@@ -366,9 +371,60 @@ export class ApiService {
         return this.http.post<FeeStructureResponse>(`${API_BASE_URL}/accounting/fee-structures${query}`, request);
     }
 
+    sendFeeStructureNewsletter(
+        request: { note?: string | null },
+        newsletterPdf?: Blob | null,
+        schoolId?: number | null
+    ): Observable<void> {
+        const formData = new FormData();
+        formData.append('note', request.note ?? '');
+        if (newsletterPdf) {
+            formData.append('newsletterPdf', newsletterPdf, 'fee-structure-newsletter.pdf');
+        }
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<void>(`${API_BASE_URL}/accounting/fee-structures/newsletter${query}`, formData);
+    }
+
     getStudentStatement(studentId: number, schoolId?: number | null): Observable<StudentStatementResponse> {
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.get<StudentStatementResponse>(`${API_BASE_URL}/accounting/students/${studentId}/statement${query}`);
+    }
+
+    getStudentInvoices(studentId: number, schoolId?: number | null): Observable<InvoiceResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<InvoiceResponse[]>(`${API_BASE_URL}/accounting/students/${studentId}/invoices${query}`);
+    }
+
+    getFinancialStatement(
+        statementType: FinancialStatementType,
+        schoolId?: number | null,
+        filter?: FinancialStatementRequest | null
+    ): Observable<FinancialStatementResponse> {
+        const params = new URLSearchParams();
+        params.set('statementType', statementType);
+        if (schoolId) {
+            params.set('schoolId', String(schoolId));
+        }
+        if (filter) {
+            params.set('periodMode', filter.periodMode);
+            if (filter.startDate) {
+                params.set('startDate', filter.startDate);
+            }
+            if (filter.endDate) {
+                params.set('endDate', filter.endDate);
+            }
+            if (filter.date) {
+                params.set('date', filter.date);
+            }
+            if (filter.month) {
+                params.set('month', filter.month);
+            }
+            if (filter.year) {
+                params.set('year', String(filter.year));
+            }
+        }
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return this.http.get<FinancialStatementResponse>(`${API_BASE_URL}/accounting/reports/statement${query}`);
     }
 
     postPayment(request: CreatePaymentRequest, schoolId?: number | null): Observable<AccountingTransactionResponse> {
@@ -379,6 +435,16 @@ export class ApiService {
     postInvoice(request: CreateInvoiceRequest, schoolId?: number | null): Observable<AccountingTransactionResponse> {
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.post<AccountingTransactionResponse>(`${API_BASE_URL}/accounting/invoices${query}`, request);
+    }
+
+    updateInvoice(invoiceId: number, request: UpdateInvoiceRequest, schoolId?: number | null): Observable<InvoiceResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.put<InvoiceResponse>(`${API_BASE_URL}/accounting/invoices/${invoiceId}${query}`, request);
+    }
+
+    deleteInvoice(invoiceId: number, schoolId?: number | null): Observable<void> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.delete<void>(`${API_BASE_URL}/accounting/invoices/${invoiceId}${query}`);
     }
 
     postAdjustment(request: CreateAdjustmentRequest, schoolId?: number | null): Observable<AccountingTransactionResponse> {
@@ -686,11 +752,20 @@ export class ApiService {
         return this.http.post<NotificationResponse>(`${API_BASE_URL}/notifications/send`, request);
     }
 
-    sendResultSlip(studentId: number, request: SendResultSlipRequest, slipPdf: Blob, schoolId?: number | null): Observable<ResultSlipSendResponse> {
+    sendResultSlip(
+        studentId: number,
+        request: SendResultSlipRequest,
+        slipPdf: Blob,
+        schoolId?: number | null,
+        newsletterPdf?: Blob | null
+    ): Observable<ResultSlipSendResponse> {
         const formData = new FormData();
         formData.append('sendEmail', String(request.sendEmail));
         formData.append('sendSms', String(request.sendSms));
         formData.append('slipPdf', slipPdf, `result-slip-${studentId}.pdf`);
+        if (newsletterPdf) {
+            formData.append('newsletterPdf', newsletterPdf, 'accounts-newsletter.pdf');
+        }
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.post<ResultSlipSendResponse>(`${API_BASE_URL}/results/${studentId}/send-slip${query}`, formData);
     }

@@ -5,6 +5,7 @@ import {
     CollectionReportResponse,
     DefaulterReportResponse,
     DailyCashReportResponse,
+    FinancialStatementResponse,
     FeeStructureResponse,
     LibraryBorrowerSummaryResponse,
     LibraryLoanResponse,
@@ -139,6 +140,82 @@ export function buildAccountingReportsPdf(
         theme: 'striped',
         styles: { fontSize: 8, cellPadding: 4 },
         headStyles: { fillColor: [16, 185, 129] },
+        margin: { left: margin, right: margin }
+    });
+
+    doc.save(fileName);
+    return doc;
+}
+
+export function buildFinancialStatementPdf(
+    schoolName: string,
+    generatedAt: Date | string,
+    statement: FinancialStatementResponse,
+    fileName: string
+): jsPDF {
+    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
+    const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.setTextColor(17, 24, 39);
+    doc.text(statement.title, margin, 44);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text(`School: ${schoolName}`, margin, 62);
+    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 76);
+    doc.text(`As of: ${formatDate(statement.asOf)}`, margin, 90);
+    doc.text(`Period: ${statement.periodLabel}`, margin, 104, { maxWidth: pageWidth - margin * 2 });
+    doc.text(`Comparison: ${statement.comparisonLabel}`, margin, 118, { maxWidth: pageWidth - margin * 2 });
+
+    const tableRows = statement.rows.map((row) => ({
+        label: `${'  '.repeat(row.level)}${row.label}`,
+        actual: formatStatementAmount(row.actual),
+        priorPeriod: formatStatementAmount(row.priorPeriod),
+        variance: formatStatementAmount(row.variance),
+        variancePct: formatStatementPercent(row.variancePct),
+        budget: formatStatementAmount(row.budget),
+        kind: row.kind
+    }));
+
+    autoTable(doc, {
+        startY: 136,
+        head: [[
+            'Line item',
+            ...statement.columns.map((column) => column.label)
+        ]],
+        columns: [
+            { header: 'Line item', dataKey: 'label' },
+            { header: 'Actual', dataKey: 'actual' },
+            { header: 'Prior period', dataKey: 'priorPeriod' },
+            { header: 'Variance', dataKey: 'variance' },
+            { header: 'Variance %', dataKey: 'variancePct' },
+            { header: 'Budget', dataKey: 'budget' }
+        ],
+        body: tableRows as Array<Record<string, string> & { kind: string }>,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
+        headStyles: { fillColor: [37, 99, 235] },
+        didParseCell: (data) => {
+            const row = data.row.raw as { kind?: string };
+            if (data.section !== 'body') {
+                return;
+            }
+
+            if (row.kind === 'Total') {
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fillColor = [226, 232, 240];
+            } else if (row.kind === 'Subtotal') {
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fillColor = [241, 245, 249];
+            }
+
+            if (data.column.dataKey === 'label') {
+                data.cell.styles.fontStyle = 'bold';
+            }
+        },
         margin: { left: margin, right: margin }
     });
 
@@ -374,7 +451,8 @@ export function buildFeeStructuresPdf(
     schoolName: string,
     generatedAt: Date | string,
     feeStructures: FeeStructureResponse[],
-    fileName: string
+    fileName?: string,
+    save = true
 ): jsPDF {
     const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
     const margin = 40;
@@ -406,7 +484,9 @@ export function buildFeeStructuresPdf(
         margin: { left: margin, right: margin }
     });
 
-    doc.save(fileName);
+    if (save && fileName) {
+        doc.save(fileName);
+    }
     return doc;
 }
 
@@ -707,6 +787,30 @@ export function buildTeacherClassResultsPdf(
 
 function formatDate(value: Date | string): string {
     return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function formatStatementAmount(value?: number | null): string {
+    if (value == null) {
+        return '-';
+    }
+
+    const formatted = new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(Math.abs(value));
+    return value < 0 ? `(${formatted})` : formatted;
+}
+
+function formatStatementPercent(value?: number | null): string {
+    if (value == null) {
+        return '-';
+    }
+
+    const formatted = new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+    }).format(Math.abs(value * 100));
+    return value < 0 ? `(${formatted}%)` : `${formatted}%`;
 }
 
 function writeReportHeading(doc: jsPDF, title: string, schoolName: string, generatedAt: Date | string, periodLabel: string, margin: number): void {

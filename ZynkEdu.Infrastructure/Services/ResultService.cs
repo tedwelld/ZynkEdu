@@ -212,6 +212,8 @@ public sealed class ResultService : IResultService
         SendResultSlipRequest request,
         byte[] slipPdf,
         string slipFileName,
+        byte[]? newsletterPdf = null,
+        string? newsletterFileName = null,
         int? schoolId = null,
         CancellationToken cancellationToken = default)
     {
@@ -252,14 +254,28 @@ public sealed class ResultService : IResultService
 
             foreach (var destination in emailRecipients)
             {
+                var attachments = new List<EmailAttachment>
+                {
+                    new(
+                        slipPdf,
+                        string.IsNullOrWhiteSpace(slipFileName) ? $"result-slip-{student.StudentNumber}.pdf" : slipFileName,
+                        "application/pdf")
+                };
+
+                if (newsletterPdf is { Length: > 0 })
+                {
+                    attachments.Add(new EmailAttachment(
+                        newsletterPdf,
+                        string.IsNullOrWhiteSpace(newsletterFileName) ? $"accounts-newsletter-{student.StudentNumber}.pdf" : newsletterFileName,
+                        "application/pdf"));
+                }
+
                 await _emailSender.SendAsync(
                     destination,
                     emailTemplate.Subject,
                     emailTemplate.TextBody,
                     emailTemplate.HtmlBody,
-                    slipPdf,
-                    string.IsNullOrWhiteSpace(slipFileName) ? $"result-slip-{student.StudentNumber}.pdf" : slipFileName,
-                    "application/pdf",
+                    attachments,
                     cancellationToken);
             }
             emailSent = true;
