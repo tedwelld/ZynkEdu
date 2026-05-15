@@ -727,6 +727,106 @@ public sealed class AccountingService : IAccountingService
         return new DefaulterReportResponse(ResolveReportSchoolId(schoolId), items);
     }
 
+    public async Task<AccountingTransactionResponse> PostFineAsync(CreateFineRequest request, int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        if (_currentUserContext.Role is not (UserRole.AccountantSenior or UserRole.AccountantSuper or UserRole.Admin or UserRole.PlatformAdmin or UserRole.LibraryAdmin))
+        {
+            throw new UnauthorizedAccessException("Not allowed.");
+        }
+
+        var student = await ResolveStudentAsync(request.StudentId, schoolId, cancellationToken);
+        var account = await EnsureStudentAccountAsync(student, cancellationToken);
+        var approved = CanAutoApprove(request.Amount);
+
+        return await PersistTransactionAsync(
+            student,
+            account,
+            AccountingTransactionType.Fine,
+            request.Amount,
+            request.Reference,
+            request.Description,
+            request.TransactionDate ?? DateTime.UtcNow,
+            approved,
+            async _ => await Task.CompletedTask,
+            cancellationToken);
+    }
+
+    public async Task<StudentFinancialFlagResponse> GetStudentFinancialFlagAsync(int studentId, int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        var student = await ResolveStudentAsync(studentId, schoolId, cancellationToken);
+
+        var balance = await _dbContext.StudentAccounts
+            .Where(x => x.StudentId == student.Id && x.SchoolId == student.SchoolId)
+            .Select(x => x.Balance)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var oldestOverdue = await _dbContext.Invoices
+            .Where(x => x.StudentId == student.Id && x.SchoolId == student.SchoolId
+                     && x.Status != InvoiceStatus.Paid && x.DueAt < DateTime.UtcNow)
+            .OrderBy(x => x.DueAt)
+            .Select(x => (DateTime?)x.DueAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new StudentFinancialFlagResponse(
+            student.Id,
+            student.FullName,
+            balance,
+            oldestOverdue.HasValue,
+            oldestOverdue);
+    }
+
+    public async Task<IReadOnlyList<StudentFinancialFlagResponse>> GetStudentsWithOverdueInvoicesAsync(int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        var resolvedSchoolId = ResolveReportSchoolId(schoolId);
+
+        var overdueStudentIds = await _dbContext.Invoices
+            .Where(x => x.SchoolId == resolvedSchoolId
+                     && x.Status != InvoiceStatus.Paid
+                     && x.DueAt < DateTime.UtcNow)
+            .Select(x => x.StudentId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        if (overdueStudentIds.Count == 0)
+        {
+            return [];
+        }
+
+        var students = await _dbContext.Students.AsNoTracking()
+            .Where(x => overdueStudentIds.Contains(x.Id) && x.SchoolId == resolvedSchoolId)
+            .ToListAsync(cancellationToken);
+
+        var accounts = await _dbContext.StudentAccounts.AsNoTracking()
+            .Where(x => overdueStudentIds.Contains(x.StudentId) && x.SchoolId == resolvedSchoolId)
+            .ToDictionaryAsync(x => x.StudentId, cancellationToken);
+
+        var oldestOverdueDates = await _dbContext.Invoices.AsNoTracking()
+            .Where(x => x.SchoolId == resolvedSchoolId
+                     && overdueStudentIds.Contains(x.StudentId)
+                     && x.Status != InvoiceStatus.Paid
+                     && x.DueAt < DateTime.UtcNow)
+            .GroupBy(x => x.StudentId)
+            .Select(g => new { StudentId = g.Key, OldestDueAt = g.Min(x => x.DueAt) })
+            .ToListAsync(cancellationToken);
+
+        var oldestMap = oldestOverdueDates.ToDictionary(x => x.StudentId, x => x.OldestDueAt);
+
+        return students.Select(student =>
+        {
+            accounts.TryGetValue(student.Id, out var account);
+            oldestMap.TryGetValue(student.Id, out var oldest);
+            return new StudentFinancialFlagResponse(
+                student.Id,
+                student.FullName,
+                account?.Balance ?? 0m,
+                true,
+                oldest);
+        })
+        .OrderBy(x => x.OldestOverdueSince)
+        .ThenBy(x => x.StudentName)
+        .ToList();
+    }
+
     private async Task<AccountingTransactionResponse> PersistTransactionAsync(
         Student student,
         StudentAccount account,
@@ -989,6 +1089,7 @@ public sealed class AccountingService : IAccountingService
             AccountingTransactionType.Refund => "Refund processed",
             AccountingTransactionType.Adjustment => "Account updated",
             AccountingTransactionType.Discount => "Discount applied",
+            AccountingTransactionType.Fine => "Library fine charged",
             _ => "Account updated"
         };
 
@@ -998,6 +1099,7 @@ public sealed class AccountingService : IAccountingService
             AccountingTransactionType.Payment => $"A payment of {transaction.Amount.ToString("F2", CultureInfo.InvariantCulture)} has been received for {student.FullName}.",
             AccountingTransactionType.Refund => $"A refund of {transaction.Amount.ToString("F2", CultureInfo.InvariantCulture)} has been recorded for {student.FullName}.",
             AccountingTransactionType.Adjustment => $"An account adjustment of {transaction.Amount.ToString("F2", CultureInfo.InvariantCulture)} has been recorded for {student.FullName}.",
+            AccountingTransactionType.Fine => $"A library fine of {transaction.Amount.ToString("F2", CultureInfo.InvariantCulture)} has been charged for {student.FullName}.",
             _ => $"The account for {student.FullName} has been updated."
         };
 
@@ -1096,6 +1198,7 @@ public sealed class AccountingService : IAccountingService
             AccountingTransactionType.Discount => -amount,
             AccountingTransactionType.Adjustment => amount,
             AccountingTransactionType.Refund => amount,
+            AccountingTransactionType.Fine => amount,
             _ => 0m
         };
     }
@@ -1109,6 +1212,7 @@ public sealed class AccountingService : IAccountingService
             AccountingTransactionType.Discount => "DISCOUNT_EXPENSE",
             AccountingTransactionType.Adjustment => "ACCOUNTS_RECEIVABLE",
             AccountingTransactionType.Refund => "REFUNDS",
+            AccountingTransactionType.Fine => "ACCOUNTS_RECEIVABLE",
             _ => "UNKNOWN"
         };
     }
@@ -1122,6 +1226,7 @@ public sealed class AccountingService : IAccountingService
             AccountingTransactionType.Discount => "ACCOUNTS_RECEIVABLE",
             AccountingTransactionType.Adjustment => "ADJUSTMENT_REVENUE",
             AccountingTransactionType.Refund => "CASH",
+            AccountingTransactionType.Fine => "FINE_REVENUE",
             _ => "UNKNOWN"
         };
     }
@@ -1154,6 +1259,20 @@ public sealed class AccountingService : IAccountingService
         }
 
         return false;
+    }
+
+    public async Task DeleteFeeStructureAsync(int id, CancellationToken cancellationToken = default)
+    {
+        if (_currentUserContext.Role is not (UserRole.Admin or UserRole.PlatformAdmin))
+        {
+            throw new UnauthorizedAccessException("Only school and platform admins can delete fee structures.");
+        }
+
+        var fee = await _dbContext.FeeStructures.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException("Fee structure not found.");
+
+        _dbContext.FeeStructures.Remove(fee);
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private int RequireSchoolId()

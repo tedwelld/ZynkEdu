@@ -12,6 +12,8 @@ import { ApiService } from '../../core/api/api.service';
 import { extractApiErrorMessage } from '../../core/api/api-error';
 import { AuthService } from '../../core/auth/auth.service';
 import {
+    BorrowingEligibilityResponse,
+    CreateFineRequest,
     IssueLibraryBookRequest,
     LibraryBookCopyResponse,
     LibraryBookResponse,
@@ -121,6 +123,7 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                                     <th>Copy</th>
                                     <th>Author</th>
                                     <th>Status</th>
+                                    <th>Fine</th>
                                 </tr>
                             </ng-template>
                             <ng-template pTemplate="body" let-loan>
@@ -131,6 +134,27 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                                     <td>{{ loan.copyAccessionNumber || 'Copy ' + loan.libraryBookCopyId }}</td>
                                     <td>{{ loan.bookAuthor || 'Unknown author' }}</td>
                                     <td><p-tag value="Overdue" severity="danger"></p-tag></td>
+                                    <td>
+                                        <ng-container *ngIf="loan.borrowerType === 'Student' && loan.borrowerId">
+                                            <ng-container *ngIf="activeFineTargetId === loan.id; else fineBtn">
+                                                <div class="flex items-center gap-2">
+                                                    <input
+                                                        class="w-20 rounded-lg border border-surface-300 bg-surface-0 px-2 py-1 text-sm"
+                                                        type="number"
+                                                        [(ngModel)]="inlineFineAmount"
+                                                        name="inlineFineAmount"
+                                                        min="0.01"
+                                                        step="0.01" />
+                                                    <button pButton type="button" icon="pi pi-check" class="p-button-sm p-button-success" (click)="submitLibraryFine(loan)"></button>
+                                                    <button pButton type="button" icon="pi pi-times" class="p-button-sm p-button-text" (click)="activeFineTargetId = null"></button>
+                                                </div>
+                                            </ng-container>
+                                            <ng-template #fineBtn>
+                                                <button pButton type="button" icon="pi pi-exclamation-circle" label="Charge fine" class="p-button-sm p-button-warning p-button-text" (click)="openFineForm(loan)"></button>
+                                            </ng-template>
+                                        </ng-container>
+                                        <span *ngIf="loan.borrowerType !== 'Student' || !loan.borrowerId" class="text-muted-color text-sm">—</span>
+                                    </td>
                                 </tr>
                             </ng-template>
                         </p-table>
@@ -164,7 +188,9 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                                     <th>Reference</th>
                                     <th>Type</th>
                                     <th>Open loans</th>
-                                    <th>Overdue</th>
+                                    <th>Overdue loans</th>
+                                    <th>Outstanding balance</th>
+                                    <th>Fees</th>
                                 </tr>
                             </ng-template>
                             <ng-template pTemplate="body" let-borrower>
@@ -174,6 +200,11 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                                     <td><p-tag [value]="borrower.borrowerType" severity="info"></p-tag></td>
                                     <td>{{ borrower.activeLoanCount }}</td>
                                     <td>{{ borrower.overdueLoanCount }}</td>
+                                    <td>{{ borrower.borrowerType === 'Student' ? (borrower.outstandingBalance | number:'1.2-2') : '—' }}</td>
+                                    <td>
+                                        <p-tag *ngIf="borrower.borrowerType === 'Student' && borrower.hasOverdueInvoice" value="Overdue fees" severity="danger"></p-tag>
+                                        <span *ngIf="borrower.borrowerType !== 'Student' || !borrower.hasOverdueInvoice" class="text-muted-color text-sm">—</span>
+                                    </td>
                                 </tr>
                             </ng-template>
                         </p-table>
@@ -211,11 +242,11 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
                             <label class="block text-sm font-semibold mb-2">Borrower type</label>
-                            <app-dropdown [options]="borrowerTypeOptions" [(ngModel)]="issueDraft.borrowerType" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (ngModelChange)="issueDraft.borrowerId = null"></app-dropdown>
+                            <app-dropdown [options]="borrowerTypeOptions" [(ngModel)]="issueDraft.borrowerType" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (ngModelChange)="issueDraft.borrowerId = null; borrowingEligibility = null"></app-dropdown>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold mb-2">Borrower</label>
-                            <app-dropdown [options]="borrowerOptions" [(ngModel)]="issueDraft.borrowerId" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search borrower"></app-dropdown>
+                            <app-dropdown [options]="borrowerOptions" [(ngModel)]="issueDraft.borrowerId" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search borrower" (ngModelChange)="onBorrowerSelected()"></app-dropdown>
                         </div>
                     </div>
 
@@ -225,6 +256,23 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                         <div class="mt-1 text-sm text-muted-color">{{ borrowerSummary }}</div>
                         <div class="mt-1 text-sm text-muted-color">
                             Open loans {{ borrowerLoanSummary.open }} - Overdue {{ borrowerLoanSummary.overdue }}
+                        </div>
+                    </div>
+
+                    <div *ngIf="borrowingEligibility && !borrowingEligibility.canBorrow" class="rounded-2xl border border-red-300 bg-red-50 dark:bg-red-950/30 p-4 flex gap-3 items-start">
+                        <i class="pi pi-ban text-red-600 mt-0.5"></i>
+                        <div>
+                            <div class="font-semibold text-red-700 dark:text-red-400">Borrowing blocked</div>
+                            <div class="text-sm text-red-600 dark:text-red-300 mt-1">{{ borrowingEligibility.blockReason }}</div>
+                            <div class="text-sm text-red-600 dark:text-red-300 mt-1">Outstanding balance: {{ borrowingEligibility.outstandingBalance | number:'1.2-2' }}</div>
+                        </div>
+                    </div>
+
+                    <div *ngIf="borrowingEligibility && borrowingEligibility.canBorrow && borrowingEligibility.outstandingBalance > 0" class="rounded-2xl border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 p-4 flex gap-3 items-start">
+                        <i class="pi pi-exclamation-triangle text-yellow-600 mt-0.5"></i>
+                        <div>
+                            <div class="font-semibold text-yellow-700 dark:text-yellow-400">Outstanding fees</div>
+                            <div class="text-sm text-yellow-600 dark:text-yellow-300 mt-1">This student has an outstanding balance of {{ borrowingEligibility.outstandingBalance | number:'1.2-2' }} but no overdue invoices. Borrowing is permitted.</div>
                         </div>
                     </div>
 
@@ -238,7 +286,7 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                     </div>
                     <div class="flex justify-end gap-3 pt-3">
                         <button pButton type="button" label="Cancel" severity="secondary" (click)="issueVisible = false"></button>
-                        <button pButton type="button" label="Issue" icon="pi pi-check" (click)="saveIssue()"></button>
+                        <button pButton type="button" label="Issue" icon="pi pi-check" [disabled]="issueBlocked" (click)="saveIssue()"></button>
                     </div>
                 </div>
             </p-dialog>
@@ -297,11 +345,14 @@ export class LibraryLoans implements OnInit {
     renewVisible = false;
     overdueModalVisible = false;
     borrowersModalVisible = false;
+    activeFineTargetId: number | null = null;
+    inlineFineAmount = 1.00;
     selectedLoan: LibraryLoanResponse | null = null;
     returnNotes = '';
     renewDueAt = '';
     renewNotes = '';
     issueDraft: IssueDraft = this.blankIssueDraft();
+    borrowingEligibility: BorrowingEligibilityResponse | null = null;
     overdueSearch = { term: '', appliedTerm: '' };
     borrowerSearch = { term: '', appliedTerm: '' };
 
@@ -519,8 +570,27 @@ export class LibraryLoans implements OnInit {
         });
     }
 
+    get issueBlocked(): boolean {
+        return this.borrowingEligibility !== null && !this.borrowingEligibility.canBorrow;
+    }
+
+    onBorrowerSelected(): void {
+        this.borrowingEligibility = null;
+        if (this.issueDraft.borrowerType !== 'Student' || !this.issueDraft.borrowerId) {
+            return;
+        }
+
+        const schoolId = this.isPlatformAdmin ? this.selectedSchoolId : this.auth.schoolId();
+        this.api.getBorrowingEligibility('Student', this.issueDraft.borrowerId, schoolId).subscribe({
+            next: (eligibility) => {
+                this.borrowingEligibility = eligibility;
+            }
+        });
+    }
+
     openIssue(): void {
         this.issueDraft = this.blankIssueDraft();
+        this.borrowingEligibility = null;
         this.issueVisible = true;
     }
 
@@ -531,6 +601,34 @@ export class LibraryLoans implements OnInit {
 
     closeOverdueModal(): void {
         this.overdueModalVisible = false;
+        this.activeFineTargetId = null;
+    }
+
+    openFineForm(loan: LibraryLoanResponse): void {
+        this.activeFineTargetId = loan.id;
+        this.inlineFineAmount = 1.00;
+    }
+
+    submitLibraryFine(loan: LibraryLoanResponse): void {
+        if (!loan.borrowerId || this.inlineFineAmount <= 0) {
+            return;
+        }
+        const schoolId = this.selectedSchoolId ?? this.auth.schoolId();
+        const request: CreateFineRequest = {
+            studentId: loan.borrowerId,
+            amount: this.inlineFineAmount,
+            reference: `Library Fine — ${loan.bookTitle}`,
+            description: 'Overdue book fine'
+        };
+        this.api.postFine(request, schoolId).subscribe({
+            next: () => {
+                this.activeFineTargetId = null;
+                this.inlineFineAmount = 1.00;
+            },
+            error: (err) => {
+                this.messages.add({ severity: 'error', summary: 'Fine failed', detail: extractApiErrorMessage(err, 'Could not charge the fine.') });
+            }
+        });
     }
 
     openBorrowersModal(): void {

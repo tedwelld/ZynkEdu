@@ -30,6 +30,14 @@ public sealed class AccountingController : ControllerBase
         return Ok(await _accountingService.SaveFeeStructureAsync(schoolId, request, cancellationToken));
     }
 
+    [HttpDelete("fee-structures/{id:int}")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    public async Task<IActionResult> DeleteFeeStructure(int id, CancellationToken cancellationToken)
+    {
+        await _accountingService.DeleteFeeStructureAsync(id, cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("fee-structures/newsletter")]
     [Consumes("multipart/form-data")]
     public async Task<IActionResult> SendFeeStructureNewsletter(
@@ -148,5 +156,23 @@ public sealed class AccountingController : ControllerBase
     public async Task<ActionResult<DefaulterReportResponse>> GetDefaulters([FromQuery] int? schoolId, CancellationToken cancellationToken)
     {
         return Ok(await _accountingService.GetDefaultersAsync(schoolId, cancellationToken));
+    }
+
+    [HttpPost("fines")]
+    public async Task<ActionResult<AccountingTransactionResponse>> PostFine([FromQuery] int? schoolId, [FromBody] CreateFineRequest request, CancellationToken cancellationToken)
+    {
+        return Ok(await _accountingService.PostFineAsync(request, schoolId, cancellationToken));
+    }
+
+    [HttpGet("students/{id:int}/financial-flag")]
+    public async Task<ActionResult<StudentFinancialFlagResponse>> GetStudentFinancialFlag(int id, [FromQuery] int? schoolId, CancellationToken cancellationToken)
+    {
+        return Ok(await _accountingService.GetStudentFinancialFlagAsync(id, schoolId, cancellationToken));
+    }
+
+    [HttpGet("students/overdue-invoices")]
+    public async Task<ActionResult<IReadOnlyList<StudentFinancialFlagResponse>>> GetStudentsWithOverdueInvoices([FromQuery] int? schoolId, CancellationToken cancellationToken)
+    {
+        return Ok(await _accountingService.GetStudentsWithOverdueInvoicesAsync(schoolId, cancellationToken));
     }
 }

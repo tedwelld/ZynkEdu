@@ -29,8 +29,6 @@ public sealed class AccountingInvoiceManagementTests
                 queryContext,
                 currentUser,
                 new StubAuditLogService(),
-                new RecordingEmailSender(),
-                new ReportEmailTemplateService(),
                 new StubNotificationService());
 
             var created = await service.PostInvoiceAsync(new CreateInvoiceRequest(

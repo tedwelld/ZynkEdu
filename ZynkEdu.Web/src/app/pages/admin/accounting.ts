@@ -4,10 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { AcademicTermResponse, FeeStructureRequest, FeeStructureResponse, SchoolClassResponse, SchoolResponse, UserResponse } from '../../core/api/api.models';
+import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 
 @Component({
     standalone: true,
-    imports: [CommonModule, FormsModule],
+    imports: [CommonModule, FormsModule, AppDropdownComponent],
     template: `
         <section class="grid gap-6">
             <header class="workspace-card p-6 md:p-8">
@@ -19,10 +20,18 @@ import { AcademicTermResponse, FeeStructureRequest, FeeStructureResponse, School
             <section class="workspace-card p-6">
                 <div class="flex items-center justify-between gap-4 flex-wrap">
                     <h2 class="text-xl font-semibold">Accountants</h2>
-                    <select *ngIf="isPlatformAdmin" class="rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="selectedSchoolId" (ngModelChange)="refresh()">
-                        <option [ngValue]="null">All schools</option>
-                        <option *ngFor="let school of schools" [ngValue]="school.id">{{ school.name }}</option>
-                    </select>
+                    <app-dropdown *ngIf="isPlatformAdmin"
+                        [options]="schoolOptions"
+                        [(ngModel)]="selectedSchoolId"
+                        optionLabel="label"
+                        optionValue="value"
+                        [filter]="true"
+                        filterBy="label"
+                        filterPlaceholder="Search schools"
+                        (ngModelChange)="refresh()"
+                        appendTo="body"
+                        class="w-64">
+                    </app-dropdown>
                 </div>
 
                 <div class="grid lg:grid-cols-2 gap-6 mt-5">
@@ -33,23 +42,35 @@ import { AcademicTermResponse, FeeStructureRequest, FeeStructureResponse, School
                         </div>
                         <div class="grid gap-3 md:grid-cols-2">
                             <input class="w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" placeholder="Password" type="password" [(ngModel)]="accountantDraft.password" name="password" />
-                            <select class="w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="accountantDraft.role" name="role">
-                                <option value="AccountantJunior">AccountantJunior</option>
-                                <option value="AccountantSenior">AccountantSenior</option>
-                                <option value="AccountantSuper">AccountantSuper</option>
-                            </select>
+                            <app-dropdown
+                                [options]="roleOptions"
+                                [(ngModel)]="accountantDraft.role"
+                                optionLabel="label"
+                                optionValue="value"
+                                name="role"
+                                appendTo="body">
+                            </app-dropdown>
                         </div>
                         <input class="w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" placeholder="Email" [(ngModel)]="accountantDraft.contactEmail" name="contactEmail" />
                         <button class="rounded-xl bg-primary text-white px-4 py-2 font-semibold" type="submit">Create accountant</button>
                     </form>
 
                     <div class="space-y-3">
-                        <div *ngFor="let accountant of accountants" class="rounded-xl border border-surface-200 dark:border-surface-700 px-4 py-3 flex items-center justify-between">
+                        <div *ngFor="let accountant of accountants" class="rounded-xl border border-surface-200 dark:border-surface-700 px-4 py-3 flex items-center justify-between gap-3">
                             <div>
                                 <div class="font-semibold">{{ accountant.displayName }}</div>
-                                <div class="text-sm text-muted-color">{{ accountant.username }} &middot; {{ accountant.role }}</div>
+                                <div class="text-sm text-muted-color">{{ accountant.username }} &middot; {{ friendlyRole(accountant.role) }}</div>
                             </div>
-                            <span class="text-xs uppercase tracking-[0.2em] text-muted-color">School {{ accountant.schoolId }}</span>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs uppercase tracking-[0.2em] text-muted-color">School {{ accountant.schoolId }}</span>
+                                <button
+                                    type="button"
+                                    class="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                    title="Delete accountant"
+                                    (click)="deleteAccountant(accountant)">
+                                    <i class="pi pi-trash text-sm"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -64,17 +85,31 @@ import { AcademicTermResponse, FeeStructureRequest, FeeStructureResponse, School
                 <form class="grid gap-3 md:grid-cols-4 mt-5 items-end" (ngSubmit)="saveFeeStructure()">
                     <label class="block">
                         <span class="text-sm text-muted-color">Grade level</span>
-                        <select class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="feeDraft.gradeLevel" name="gradeLevel" required>
-                            <option [ngValue]="''" disabled>Select grade level</option>
-                            <option *ngFor="let level of gradeLevelOptions" [ngValue]="level">{{ level }}</option>
-                        </select>
+                        <div class="mt-2">
+                            <app-dropdown
+                                [options]="gradeLevelSelectOptions"
+                                [(ngModel)]="feeDraft.gradeLevel"
+                                optionLabel="label"
+                                optionValue="value"
+                                name="gradeLevel"
+                                appendTo="body"
+                                class="w-full">
+                            </app-dropdown>
+                        </div>
                     </label>
                     <label class="block">
                         <span class="text-sm text-muted-color">Term</span>
-                        <select class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="feeDraft.term" name="term" required>
-                            <option [ngValue]="''" disabled>Select term</option>
-                            <option *ngFor="let term of termOptions" [ngValue]="term">{{ term }}</option>
-                        </select>
+                        <div class="mt-2">
+                            <app-dropdown
+                                [options]="termSelectOptions"
+                                [(ngModel)]="feeDraft.term"
+                                optionLabel="label"
+                                optionValue="value"
+                                name="term"
+                                appendTo="body"
+                                class="w-full">
+                            </app-dropdown>
+                        </div>
                     </label>
                     <input class="rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" placeholder="Amount" type="number" [(ngModel)]="feeDraft.amount" name="amount" />
                     <button class="rounded-xl bg-primary text-white px-4 py-2 font-semibold" type="submit">Save fee structure</button>
@@ -88,7 +123,8 @@ import { AcademicTermResponse, FeeStructureRequest, FeeStructureResponse, School
                                 <th class="py-3 pr-4">Term</th>
                                 <th class="py-3 pr-4">Amount</th>
                                 <th class="py-3 pr-4">Description</th>
-                                <th class="py-3">School</th>
+                                <th class="py-3 pr-4">School</th>
+                                <th class="py-3"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -97,7 +133,16 @@ import { AcademicTermResponse, FeeStructureRequest, FeeStructureResponse, School
                                 <td class="py-3 pr-4">{{ fee.term }}</td>
                                 <td class="py-3 pr-4">{{ fee.amount | number:'1.0-2' }}</td>
                                 <td class="py-3 pr-4">{{ fee.description || '-' }}</td>
-                                <td class="py-3">#{{ fee.schoolId }}</td>
+                                <td class="py-3 pr-4">#{{ fee.schoolId }}</td>
+                                <td class="py-3">
+                                    <button
+                                        type="button"
+                                        class="rounded-lg p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                        title="Delete fee structure"
+                                        (click)="deleteFeeStructure(fee)">
+                                        <i class="pi pi-trash text-sm"></i>
+                                    </button>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
@@ -109,6 +154,12 @@ import { AcademicTermResponse, FeeStructureRequest, FeeStructureResponse, School
 export class AdminAccounting implements OnInit {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
+
+    readonly roleOptions = [
+        { label: 'Junior Accountant', value: 'AccountantJunior' },
+        { label: 'Senior Accountant', value: 'AccountantSenior' },
+        { label: 'Super Accountant',  value: 'AccountantSuper'  }
+    ];
 
     schools: SchoolResponse[] = [];
     accountants: UserResponse[] = [];
@@ -134,6 +185,27 @@ export class AdminAccounting implements OnInit {
 
     get isPlatformAdmin(): boolean {
         return this.auth.role() === 'PlatformAdmin';
+    }
+
+    get schoolOptions(): { label: string; value: number }[] {
+        return this.schools.map((s) => ({ label: s.name, value: s.id }));
+    }
+
+    get gradeLevelSelectOptions(): { label: string; value: string }[] {
+        return this.gradeLevelOptions.map((v) => ({ label: v, value: v }));
+    }
+
+    get termSelectOptions(): { label: string; value: string }[] {
+        return this.termOptions.map((v) => ({ label: v, value: v }));
+    }
+
+    friendlyRole(role: string): string {
+        const map: Record<string, string> = {
+            AccountantJunior: 'Junior',
+            AccountantSenior: 'Senior',
+            AccountantSuper:  'Super'
+        };
+        return map[role] ?? role;
     }
 
     ngOnInit(): void {
@@ -194,6 +266,13 @@ export class AdminAccounting implements OnInit {
         });
     }
 
+    deleteAccountant(accountant: UserResponse): void {
+        if (!confirm(`Delete accountant "${accountant.displayName}"? This cannot be undone.`)) {
+            return;
+        }
+        this.api.deleteAccountant(accountant.id).subscribe(() => this.refresh());
+    }
+
     saveFeeStructure(): void {
         const schoolId = this.isPlatformAdmin ? this.selectedSchoolId : this.auth.schoolId();
         if (this.isPlatformAdmin && !schoolId) {
@@ -204,6 +283,13 @@ export class AdminAccounting implements OnInit {
             this.feeDraft = { gradeLevel: '', term: '', amount: 0, description: '' };
             this.refresh();
         });
+    }
+
+    deleteFeeStructure(fee: FeeStructureResponse): void {
+        if (!confirm(`Delete fee structure for "${fee.gradeLevel} — ${fee.term}"?`)) {
+            return;
+        }
+        this.api.deleteFeeStructure(fee.id).subscribe(() => this.refresh());
     }
 
     private normalizeTermOptions(terms: AcademicTermResponse[]): string[] {

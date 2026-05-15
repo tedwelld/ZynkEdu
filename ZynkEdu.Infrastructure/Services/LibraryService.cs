@@ -329,6 +329,15 @@ public sealed class LibraryService : ILibraryService
             throw new InvalidOperationException("The due date must be in the future.");
         }
 
+        if (request.BorrowerType == LibraryBorrowerType.Student)
+        {
+            var eligibility = await GetBorrowingEligibilityAsync(request.BorrowerType, request.BorrowerId, schoolId, cancellationToken);
+            if (!eligibility.CanBorrow)
+            {
+                throw new InvalidOperationException(eligibility.BlockReason ?? "This student is not eligible to borrow books.");
+            }
+        }
+
         var borrower = await ResolveBorrowerAsync(request.BorrowerType, request.BorrowerId, targetSchoolId, cancellationToken);
         var now = DateTime.UtcNow;
         var currentUserDisplayName = _currentUserContext.DisplayName ?? _currentUserContext.UserName ?? "System";
@@ -437,22 +446,144 @@ public sealed class LibraryService : ILibraryService
     public async Task<IReadOnlyList<LibraryBorrowerSummaryResponse>> GetBorrowerSummariesAsync(int? schoolId = null, CancellationToken cancellationToken = default)
     {
         EnsureLibraryAccess();
+        var now = DateTime.UtcNow;
         var loans = await Scope(_dbContext.LibraryLoans.AsNoTracking(), schoolId)
             .Where(x => x.ReturnedAt == null)
             .OrderByDescending(x => x.DueAt)
             .ToListAsync(cancellationToken);
 
+        var studentBorrowerIds = loans
+            .Where(x => x.BorrowerType == LibraryBorrowerType.Student && x.StudentId.HasValue)
+            .Select(x => x.StudentId!.Value)
+            .Distinct()
+            .ToList();
+
+        var resolvedSchoolId = ResolveDashboardSchoolId(schoolId);
+
+        var accountBalances = studentBorrowerIds.Count > 0
+            ? await _dbContext.StudentAccounts.AsNoTracking()
+                .Where(x => studentBorrowerIds.Contains(x.StudentId) && x.SchoolId == resolvedSchoolId)
+                .ToDictionaryAsync(x => x.StudentId, x => x.Balance, cancellationToken)
+            : new Dictionary<int, decimal>();
+
+        var overdueStudentIds = studentBorrowerIds.Count > 0
+            ? (await _dbContext.Invoices.AsNoTracking()
+                .Where(x => studentBorrowerIds.Contains(x.StudentId) && x.SchoolId == resolvedSchoolId
+                         && x.Status != InvoiceStatus.Paid && x.DueAt < now)
+                .Select(x => x.StudentId)
+                .Distinct()
+                .ToListAsync(cancellationToken))
+                .ToHashSet()
+            : new HashSet<int>();
+
         return loans
             .GroupBy(x => new { x.BorrowerType, BorrowerId = x.BorrowerType == LibraryBorrowerType.Student ? x.StudentId : x.TeacherId, x.BorrowerDisplayNameSnapshot, x.BorrowerReferenceSnapshot })
-            .Select(group => new LibraryBorrowerSummaryResponse(
-                group.Key.BorrowerType,
-                group.Key.BorrowerId ?? 0,
-                group.Key.BorrowerDisplayNameSnapshot,
-                group.Key.BorrowerReferenceSnapshot,
-                group.Count(),
-                group.Count(x => x.DueAt < DateTime.UtcNow)))
+            .Select(group =>
+            {
+                var borrowerId = group.Key.BorrowerId ?? 0;
+                var isStudent = group.Key.BorrowerType == LibraryBorrowerType.Student;
+                var balance = isStudent && accountBalances.TryGetValue(borrowerId, out var b) ? b : 0m;
+                var hasOverdue = isStudent && overdueStudentIds.Contains(borrowerId);
+                return new LibraryBorrowerSummaryResponse(
+                    group.Key.BorrowerType,
+                    borrowerId,
+                    group.Key.BorrowerDisplayNameSnapshot,
+                    group.Key.BorrowerReferenceSnapshot,
+                    group.Count(),
+                    group.Count(x => x.DueAt < now),
+                    balance,
+                    hasOverdue);
+            })
             .OrderByDescending(x => x.OverdueLoanCount)
             .ThenByDescending(x => x.ActiveLoanCount)
+            .ThenBy(x => x.DisplayName)
+            .ToList();
+    }
+
+    public async Task<BorrowingEligibilityResponse> GetBorrowingEligibilityAsync(LibraryBorrowerType borrowerType, int borrowerId, int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        EnsureLibraryAccess();
+
+        if (borrowerType != LibraryBorrowerType.Student)
+        {
+            return new BorrowingEligibilityResponse(true, false, 0m, null);
+        }
+
+        var resolvedSchoolId = ResolveDashboardSchoolId(schoolId);
+
+        var hasOverdueInvoice = await _dbContext.Invoices
+            .AnyAsync(x => x.StudentId == borrowerId && x.SchoolId == resolvedSchoolId
+                        && x.Status != InvoiceStatus.Paid && x.DueAt < DateTime.UtcNow,
+                cancellationToken);
+
+        var balance = await _dbContext.StudentAccounts
+            .Where(x => x.StudentId == borrowerId && x.SchoolId == resolvedSchoolId)
+            .Select(x => x.Balance)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (hasOverdueInvoice)
+        {
+            return new BorrowingEligibilityResponse(
+                false,
+                true,
+                balance,
+                "This student has overdue fees and is not eligible to borrow books until the outstanding invoices are settled.");
+        }
+
+        return new BorrowingEligibilityResponse(true, false, balance, null);
+    }
+
+    public async Task<IReadOnlyList<LibraryBorrowerSummaryResponse>> GetBorrowersWithOverdueLoansAsync(int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        EnsureLibraryAccess();
+        var now = DateTime.UtcNow;
+        var resolvedSchoolId = ResolveDashboardSchoolId(schoolId);
+
+        var overdueLoans = await Scope(_dbContext.LibraryLoans.AsNoTracking(), schoolId)
+            .Where(x => x.ReturnedAt == null && x.DueAt < now)
+            .ToListAsync(cancellationToken);
+
+        var studentBorrowerIds = overdueLoans
+            .Where(x => x.BorrowerType == LibraryBorrowerType.Student && x.StudentId.HasValue)
+            .Select(x => x.StudentId!.Value)
+            .Distinct()
+            .ToList();
+
+        var accountBalances = studentBorrowerIds.Count > 0
+            ? await _dbContext.StudentAccounts.AsNoTracking()
+                .Where(x => studentBorrowerIds.Contains(x.StudentId) && x.SchoolId == resolvedSchoolId)
+                .ToDictionaryAsync(x => x.StudentId, x => x.Balance, cancellationToken)
+            : new Dictionary<int, decimal>();
+
+        var overdueInvoiceStudentIds = studentBorrowerIds.Count > 0
+            ? (await _dbContext.Invoices.AsNoTracking()
+                .Where(x => studentBorrowerIds.Contains(x.StudentId) && x.SchoolId == resolvedSchoolId
+                         && x.Status != InvoiceStatus.Paid && x.DueAt < now)
+                .Select(x => x.StudentId)
+                .Distinct()
+                .ToListAsync(cancellationToken))
+                .ToHashSet()
+            : new HashSet<int>();
+
+        return overdueLoans
+            .GroupBy(x => new { x.BorrowerType, BorrowerId = x.BorrowerType == LibraryBorrowerType.Student ? x.StudentId : x.TeacherId, x.BorrowerDisplayNameSnapshot, x.BorrowerReferenceSnapshot })
+            .Select(group =>
+            {
+                var borrowerId = group.Key.BorrowerId ?? 0;
+                var isStudent = group.Key.BorrowerType == LibraryBorrowerType.Student;
+                var balance = isStudent && accountBalances.TryGetValue(borrowerId, out var b) ? b : 0m;
+                var hasOverdue = isStudent && overdueInvoiceStudentIds.Contains(borrowerId);
+                return new LibraryBorrowerSummaryResponse(
+                    group.Key.BorrowerType,
+                    borrowerId,
+                    group.Key.BorrowerDisplayNameSnapshot,
+                    group.Key.BorrowerReferenceSnapshot,
+                    group.Count(),
+                    group.Count(),
+                    balance,
+                    hasOverdue);
+            })
+            .OrderByDescending(x => x.OverdueLoanCount)
             .ThenBy(x => x.DisplayName)
             .ToList();
     }

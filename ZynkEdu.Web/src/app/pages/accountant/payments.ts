@@ -64,11 +64,16 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 
                     <label class="block">
                         <span class="text-sm text-muted-color">Method</span>
-                        <select class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="draft.method" name="method">
-                            <option value="Cash">Cash</option>
-                            <option value="Bank">Bank</option>
-                            <option value="MobileMoney">MobileMoney</option>
-                        </select>
+                        <app-dropdown
+                            [options]="methodOptions"
+                            [(ngModel)]="draft.method"
+                            name="method"
+                            optionLabel="label"
+                            optionValue="value"
+                            class="w-full mt-2"
+                            appendTo="body"
+                            [filter]="false">
+                        </app-dropdown>
                     </label>
 
                     <button pButton class="rounded-xl bg-primary text-white px-4 py-3 font-semibold" type="submit" label="Record payment"></button>
@@ -139,6 +144,12 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 export class AccountantPayments implements OnInit {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
+
+    readonly methodOptions = [
+        { label: 'Cash',         value: 'Cash' },
+        { label: 'Bank',         value: 'Bank' },
+        { label: 'Mobile Money', value: 'MobileMoney' }
+    ];
 
     schools: SchoolResponse[] = [];
     students: StudentResponse[] = [];

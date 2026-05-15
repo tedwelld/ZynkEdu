@@ -472,7 +472,7 @@ export interface AccountingTransactionResponse {
     schoolId: number;
     studentId: number;
     studentAccountId: number;
-    type: 'Invoice' | 'Payment' | 'Adjustment' | 'Discount' | 'Refund';
+    type: 'Invoice' | 'Payment' | 'Adjustment' | 'Discount' | 'Refund' | 'Fine';
     status: 'Pending' | 'Approved';
     amount: number;
     transactionDate: string;
@@ -507,7 +507,7 @@ export interface InvoiceResponse {
 
 export interface StatementLineResponse {
     transactionId: number;
-    type: 'Invoice' | 'Payment' | 'Adjustment' | 'Discount' | 'Refund';
+    type: 'Invoice' | 'Payment' | 'Adjustment' | 'Discount' | 'Refund' | 'Fine';
     status: 'Pending' | 'Approved';
     amount: number;
     transactionDate: string;
@@ -778,6 +778,31 @@ export interface LibraryBorrowerSummaryResponse {
     reference?: string | null;
     activeLoanCount: number;
     overdueLoanCount: number;
+    outstandingBalance: number;
+    hasOverdueInvoice: boolean;
+}
+
+export interface BorrowingEligibilityResponse {
+    canBorrow: boolean;
+    hasOverdueInvoice: boolean;
+    outstandingBalance: number;
+    blockReason?: string | null;
+}
+
+export interface StudentFinancialFlagResponse {
+    studentId: number;
+    studentName: string;
+    balance: number;
+    hasOverdueInvoice: boolean;
+    oldestOverdueSince?: string | null;
+}
+
+export interface CreateFineRequest {
+    studentId: number;
+    amount: number;
+    reference?: string | null;
+    description?: string | null;
+    transactionDate?: string | null;
 }
 
 export interface ResultResponse {

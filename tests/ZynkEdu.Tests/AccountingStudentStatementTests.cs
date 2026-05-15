@@ -26,25 +26,26 @@ public class AccountingStudentStatementTests
     public async Task GetStudentStatementByTermAsync_FiltersTermTransactionsAndComputesOpeningBalance()
     {
         // Create in-memory context
-        await using var context = await TestDatabase.CreateContextAsync(TestDatabase.CreateDatabasePath(), new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 99, UserId = 1 });
-        
+        var (connection, dbContext) = await TestDatabase.CreateContextAsync(TestDatabase.CreateDatabasePath(), new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 99, UserId = 1 });
+        await using var _conn = connection;
+        await using var _ctx = dbContext;
+
         var serviceProvider = new ServiceCollection()
-            .AddScoped(_ => context.Item2)
-            .AddScoped(_ => new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 99, UserId = 1 })
+            .AddScoped<ZynkEduDbContext>(_ => dbContext)
+            .AddScoped<ICurrentUserContext>(_ => new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 99, UserId = 1 })
             .AddScoped<IAuditLogService, NoOpAuditLogService>()
-            .AddScoped<IEmailSender, RecordingEmailSender>()
-            .AddScoped<IReportEmailTemplateService, Mock<IReportEmailTemplateService>().Object>()
-            .AddScoped<INotificationService, Mock<INotificationService>().Object>()
+            .AddScoped<INotificationService>(_ => new Mock<INotificationService>().Object)
+            .AddScoped<IAccountingService, AccountingService>()
             .BuildServiceProvider();
 
         var service = serviceProvider.GetRequiredService<IAccountingService>() as AccountingService;
 
         // Seed school, student, account
         var schoolId = 99;
-        var studentId = await SeedTestDataAsync(context.Item2, schoolId);
+        var studentId = await SeedTestDataAsync(dbContext, schoolId);
 
         // Prior transaction (before term)
-        context.Item2.AccountingTransactions.Add(new Domain.Entities.Accounting.AccountingTransaction
+        dbContext.AccountingTransactions.Add(new Domain.Entities.Accounting.AccountingTransaction
         {
             Id = 1,
             SchoolId = schoolId,
@@ -54,10 +55,10 @@ public class AccountingStudentStatementTests
             Amount = 100m,
             TransactionDate = DateTime.UtcNow.AddMonths(-2)
         });
-        await context.Item2.SaveChangesAsync();
+        await dbContext.SaveChangesAsync();
 
         // Term invoice
-        var account = await context.Item2.StudentAccounts.FirstAsync(x => x.StudentId == studentId);
+        var account = await dbContext.StudentAccounts.FirstAsync(x => x.StudentId == studentId);
         var termTransaction = new Domain.Entities.Accounting.AccountingTransaction
         {
             Id = 2,
@@ -68,7 +69,7 @@ public class AccountingStudentStatementTests
             Amount = 500m,
             TransactionDate = DateTime.UtcNow.AddDays(-10)
         };
-        context.Item2.AccountingTransactions.Add(termTransaction);
+        dbContext.AccountingTransactions.Add(termTransaction);
 
         var invoice = new Invoice
         {
@@ -83,7 +84,7 @@ public class AccountingStudentStatementTests
             CreatedByUserId = 1,
             AccountingTransactionId = termTransaction.Id
         };
-        context.Item2.Invoices.Add(invoice);
+        dbContext.Invoices.Add(invoice);
 
         // Term payment
         var paymentTransaction = new Domain.Entities.Accounting.AccountingTransaction
@@ -96,10 +97,10 @@ public class AccountingStudentStatementTests
             Amount = 200m,
             TransactionDate = DateTime.UtcNow.AddDays(-5)
         };
-        context.Item2.AccountingTransactions.Add(paymentTransaction);
-        await context.Item2.SaveChangesAsync();
+        dbContext.AccountingTransactions.Add(paymentTransaction);
+        await dbContext.SaveChangesAsync();
 
-        var response = await service.GetStudentStatementByTermAsync(studentId, "Term1");
+        var response = await service!.GetStudentStatementByTermAsync(studentId, "Term1");
 
         Assert.NotNull(response);
         Assert.Equal("Term1", response.StatementTerm);
@@ -142,4 +143,3 @@ public class AccountingStudentStatementTests
         return student.Id;
     }
 }
-

@@ -92,6 +92,9 @@ import {
     TimetablePublicationResponse,
     UpsertTimetableSlotRequest,
     UserResponse,
+    BorrowingEligibilityResponse,
+    StudentFinancialFlagResponse,
+    CreateFineRequest,
 } from './api.models';
 import { API_BASE_URL } from './api.constants';
 import { Observable } from 'rxjs';
@@ -361,6 +364,10 @@ export class ApiService {
         return this.createSchoolAccountant(request);
     }
 
+    deleteAccountant(id: number): Observable<void> {
+        return this.http.delete<void>(`${API_BASE_URL}/admin/accountants/${id}`);
+    }
+
     getFeeStructures(schoolId?: number | null): Observable<FeeStructureResponse[]> {
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.get<FeeStructureResponse[]>(`${API_BASE_URL}/accounting/fee-structures${query}`);
@@ -369,6 +376,10 @@ export class ApiService {
     saveFeeStructure(request: FeeStructureRequest, schoolId?: number | null): Observable<FeeStructureResponse> {
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.post<FeeStructureResponse>(`${API_BASE_URL}/accounting/fee-structures${query}`, request);
+    }
+
+    deleteFeeStructure(id: number): Observable<void> {
+        return this.http.delete<void>(`${API_BASE_URL}/accounting/fee-structures/${id}`);
     }
 
     sendFeeStructureNewsletter(
@@ -501,6 +512,21 @@ export class ApiService {
         return this.http.get<DefaulterReportResponse>(`${API_BASE_URL}/accounting/reports/defaulters${query}`);
     }
 
+    postFine(request: CreateFineRequest, schoolId?: number | null): Observable<AccountingTransactionResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<AccountingTransactionResponse>(`${API_BASE_URL}/accounting/fines${query}`, request);
+    }
+
+    getStudentFinancialFlag(studentId: number, schoolId?: number | null): Observable<StudentFinancialFlagResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<StudentFinancialFlagResponse>(`${API_BASE_URL}/accounting/students/${studentId}/financial-flag${query}`);
+    }
+
+    getStudentsWithOverdueInvoices(schoolId?: number | null): Observable<StudentFinancialFlagResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<StudentFinancialFlagResponse[]>(`${API_BASE_URL}/library/students/overdue-invoices${query}`);
+    }
+
     createTeacher(request: CreateSchoolUserRequest, schoolId?: number | null): Observable<UserResponse> {
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.post<UserResponse>(`${API_BASE_URL}/users/teachers${query}`, request);
@@ -606,6 +632,16 @@ export class ApiService {
 
     renewLibraryLoan(id: number, request: RenewLibraryLoanRequest): Observable<LibraryLoanResponse> {
         return this.http.post<LibraryLoanResponse>(`${API_BASE_URL}/library/loans/${id}/renew`, request);
+    }
+
+    getBorrowingEligibility(borrowerType: 'Student' | 'Teacher', borrowerId: number, schoolId?: number | null): Observable<BorrowingEligibilityResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<BorrowingEligibilityResponse>(`${API_BASE_URL}/library/borrowers/${borrowerType}/${borrowerId}/eligibility${query}`);
+    }
+
+    getLibraryBorrowersWithOverdueLoans(schoolId?: number | null): Observable<LibraryBorrowerSummaryResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<LibraryBorrowerSummaryResponse[]>(`${API_BASE_URL}/library/borrowers/overdue-loans${query}`);
     }
 
     getAssignments(schoolId?: number | null): Observable<TeacherAssignmentResponse[]> {

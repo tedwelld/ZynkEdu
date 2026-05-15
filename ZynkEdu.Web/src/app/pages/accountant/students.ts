@@ -10,12 +10,18 @@ import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { buildStudentStatementPdf } from '../../shared/report/report-pdf';
-import { InvoiceResponse, StudentResponse, StudentStatementResponse, UpdateInvoiceRequest } from '../../core/api/api.models';
+import { CreateAdjustmentRequest, CreateFineRequest, CreateRefundRequest, InvoiceResponse, LibraryBorrowerSummaryResponse, StatementLineResponse, StudentResponse, StudentStatementResponse, UpdateInvoiceRequest } from '../../core/api/api.models';
 
 interface InvoiceDraft {
     term: string;
     totalAmount: number;
     dueAt: string;
+    reference: string;
+    description: string;
+}
+
+interface TxActionDraft {
+    amount: number;
     reference: string;
     description: string;
 }
@@ -78,6 +84,7 @@ interface InvoiceDraft {
                                 <th>Enrollment Year</th>
                                 <th>Subjects</th>
                                 <th>Guardians</th>
+                                <th>Overdue library loans</th>
                                 <th>Parent Contact</th>
                                 <th>Actions</th>
                             </tr>
@@ -101,6 +108,15 @@ interface InvoiceDraft {
                                     </div>
                                 </td>
                                 <td>{{ student.guardians.length }}</td>
+                                <td>
+                                    <ng-container *ngIf="overdueLibraryBorrowers.length > 0">
+                                        <ng-container *ngIf="getStudentOverdueLoanCount(student.id) as count; else noLoans">
+                                            <span class="inline-flex items-center gap-1 text-red-600 dark:text-red-400 font-semibold text-sm"><i class="pi pi-book text-xs"></i> {{ count }}</span>
+                                        </ng-container>
+                                        <ng-template #noLoans><span class="text-muted-color text-sm">—</span></ng-template>
+                                    </ng-container>
+                                    <span *ngIf="overdueLibraryBorrowers.length === 0" class="text-muted-color text-sm">—</span>
+                                </td>
                                 <td>
                                     <div>{{ student.parentEmail || 'No email' }}</div>
                                     <div class="text-xs text-muted-color">{{ student.parentPhone || 'No phone' }}</div>
@@ -311,6 +327,63 @@ interface InvoiceDraft {
                                 </section>
                             </div>
                         </div>
+                        <section *ngIf="pendingTransactions.length > 0 && canApproveTransactions" class="workspace-card p-5">
+                            <div class="flex items-center justify-between gap-3 mb-4">
+                                <div>
+                                    <h4 class="text-lg font-display font-bold mb-0">Pending transactions</h4>
+                                    <p class="text-sm text-muted-color mt-1">These transactions require approval before they affect the account balance.</p>
+                                </div>
+                                <span class="rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-xs font-semibold px-2.5 py-1">{{ pendingTransactions.length }} pending</span>
+                            </div>
+                            <div class="space-y-2">
+                                <div *ngFor="let tx of pendingTransactions" class="flex items-center justify-between gap-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
+                                    <div class="text-sm">
+                                        <div class="font-semibold">{{ tx.type }} &mdash; {{ tx.amount | number:'1.0-2' }}</div>
+                                        <div class="text-muted-color text-xs mt-0.5">{{ tx.reference || tx.description || 'No reference' }} &middot; {{ tx.transactionDate | date:'mediumDate' }}</div>
+                                    </div>
+                                    <button pButton type="button" icon="pi pi-check" label="Approve" class="p-button-sm p-button-success" (click)="approveTransaction(tx)"></button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="workspace-card p-5">
+                            <button
+                                type="button"
+                                class="flex w-full items-center justify-between gap-3 text-left"
+                                (click)="actionsExpanded = !actionsExpanded">
+                                <div>
+                                    <h4 class="text-lg font-display font-bold mb-0">Transaction actions</h4>
+                                    <p class="text-sm text-muted-color mt-1">Record an adjustment, refund, or fine against this student's account.</p>
+                                </div>
+                                <i class="pi shrink-0" [ngClass]="actionsExpanded ? 'pi-chevron-up' : 'pi-chevron-down'"></i>
+                            </button>
+
+                            <div *ngIf="actionsExpanded" class="mt-5 grid gap-6 md:grid-cols-3">
+                                <div *ngIf="canRecordAdjustment" class="space-y-3">
+                                    <h5 class="font-semibold text-sm uppercase tracking-[0.18em] text-muted-color">Adjustment</h5>
+                                    <input class="w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2 text-sm" type="number" placeholder="Amount" [(ngModel)]="adjustmentDraft.amount" name="adjAmount" />
+                                    <input class="w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2 text-sm" placeholder="Reference" [(ngModel)]="adjustmentDraft.reference" name="adjRef" />
+                                    <input class="w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2 text-sm" placeholder="Description" [(ngModel)]="adjustmentDraft.description" name="adjDesc" />
+                                    <button pButton type="button" label="Post adjustment" class="p-button-sm w-full" (click)="submitAdjustment()"></button>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <h5 class="font-semibold text-sm uppercase tracking-[0.18em] text-muted-color">Refund</h5>
+                                    <input class="w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2 text-sm" type="number" placeholder="Amount" [(ngModel)]="refundDraft.amount" name="refAmount" />
+                                    <input class="w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2 text-sm" placeholder="Reference" [(ngModel)]="refundDraft.reference" name="refRef" />
+                                    <input class="w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2 text-sm" placeholder="Description" [(ngModel)]="refundDraft.description" name="refDesc" />
+                                    <button pButton type="button" label="Post refund" class="p-button-sm w-full" (click)="submitRefund()"></button>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <h5 class="font-semibold text-sm uppercase tracking-[0.18em] text-muted-color">Fine</h5>
+                                    <input class="w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2 text-sm" type="number" placeholder="Amount" [(ngModel)]="fineDraft.amount" name="fineAmount" />
+                                    <input class="w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2 text-sm" placeholder="Reference" [(ngModel)]="fineDraft.reference" name="fineRef" />
+                                    <input class="w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2 text-sm" placeholder="Description" [(ngModel)]="fineDraft.description" name="fineDesc" />
+                                    <button pButton type="button" label="Charge fine" class="p-button-sm p-button-warning w-full" (click)="submitFine()"></button>
+                                </div>
+                            </div>
+                        </section>
                     </div>
                 </ng-container>
 
@@ -326,6 +399,7 @@ export class AccountantStudents implements OnInit {
     private readonly auth = inject(AuthService);
 
     students: StudentResponse[] = [];
+    overdueLibraryBorrowers: LibraryBorrowerSummaryResponse[] = [];
     selectedStudentId: number | null = null;
     selectedStudent: StudentResponse | null = null;
     studentModalVisible = false;
@@ -334,6 +408,10 @@ export class AccountantStudents implements OnInit {
     selectedInvoice: InvoiceResponse | null = null;
     editingInvoice: InvoiceResponse | null = null;
     invoiceDraft: InvoiceDraft = this.createInvoiceDraft();
+    actionsExpanded = false;
+    adjustmentDraft: TxActionDraft = { amount: 0, reference: '', description: '' };
+    refundDraft: TxActionDraft = { amount: 0, reference: '', description: '' };
+    fineDraft: TxActionDraft = { amount: 0, reference: '', description: '' };
 
     get currentStudents(): StudentResponse[] {
         return this.students.filter((student) => this.isCurrentEnrollment(student));
@@ -351,16 +429,37 @@ export class AccountantStudents implements OnInit {
         return role === 'AccountantSuper' || role === 'AccountantSenior' || role === 'Admin' || role === 'PlatformAdmin';
     }
 
+    get canApproveTransactions(): boolean {
+        return this.canManageInvoices;
+    }
+
+    get canRecordAdjustment(): boolean {
+        const role = this.auth.role();
+        return role === 'AccountantSuper' || role === 'AccountantSenior' || role === 'Admin' || role === 'PlatformAdmin';
+    }
+
+    get pendingTransactions(): StatementLineResponse[] {
+        return (this.statement?.transactions ?? []).filter((tx) => tx.status === 'Pending');
+    }
+
     get studentModalHeader(): string {
         return this.selectedStudent ? `${this.selectedStudent.fullName} finance` : 'Student finance';
     }
 
     ngOnInit(): void {
-        this.api.getStudents(undefined, this.auth.schoolId()).subscribe((students) => {
+        forkJoin({
+            students: this.api.getStudents(undefined, this.auth.schoolId()),
+            overdueLibraryBorrowers: this.api.getLibraryBorrowersWithOverdueLoans(this.auth.schoolId())
+        }).subscribe(({ students, overdueLibraryBorrowers }) => {
             this.students = students;
+            this.overdueLibraryBorrowers = overdueLibraryBorrowers;
             this.selectedStudentId = this.currentStudents[0]?.id ?? null;
             this.loadStatement();
         });
+    }
+
+    getStudentOverdueLoanCount(studentId: number): number {
+        return this.overdueLibraryBorrowers.find((b) => b.borrowerType === 'Student' && b.borrowerId === studentId)?.overdueLoanCount ?? 0;
     }
 
     openStudent(student: StudentResponse): void {
@@ -369,7 +468,11 @@ export class AccountantStudents implements OnInit {
         this.studentModalVisible = true;
         this.selectedInvoice = null;
         this.editingInvoice = null;
+        this.actionsExpanded = false;
         this.invoiceDraft = this.createInvoiceDraft();
+        this.adjustmentDraft = { amount: 0, reference: '', description: '' };
+        this.refundDraft = { amount: 0, reference: '', description: '' };
+        this.fineDraft = { amount: 0, reference: '', description: '' };
         this.loadStudentFinance();
     }
 
@@ -510,6 +613,61 @@ export class AccountantStudents implements OnInit {
 
     canDeleteInvoice(invoice: InvoiceResponse): boolean {
         return this.canEditInvoice(invoice);
+    }
+
+    approveTransaction(tx: StatementLineResponse): void {
+        if (!this.selectedStudentId) {
+            return;
+        }
+        this.api.approveTransaction(tx.transactionId, this.auth.schoolId()).subscribe(() => this.loadStudentFinance());
+    }
+
+    submitAdjustment(): void {
+        if (!this.selectedStudentId || this.adjustmentDraft.amount === 0) {
+            return;
+        }
+        const request: CreateAdjustmentRequest = {
+            studentId: this.selectedStudentId,
+            amount: this.adjustmentDraft.amount,
+            reference: this.adjustmentDraft.reference || null,
+            description: this.adjustmentDraft.description || null
+        };
+        this.api.postAdjustment(request, this.auth.schoolId()).subscribe(() => {
+            this.adjustmentDraft = { amount: 0, reference: '', description: '' };
+            this.loadStudentFinance();
+        });
+    }
+
+    submitRefund(): void {
+        if (!this.selectedStudentId || this.refundDraft.amount === 0) {
+            return;
+        }
+        const request: CreateRefundRequest = {
+            studentId: this.selectedStudentId,
+            amount: this.refundDraft.amount,
+            reference: this.refundDraft.reference || null,
+            description: this.refundDraft.description || null
+        };
+        this.api.postRefund(request, this.auth.schoolId()).subscribe(() => {
+            this.refundDraft = { amount: 0, reference: '', description: '' };
+            this.loadStudentFinance();
+        });
+    }
+
+    submitFine(): void {
+        if (!this.selectedStudentId || this.fineDraft.amount === 0) {
+            return;
+        }
+        const request: CreateFineRequest = {
+            studentId: this.selectedStudentId,
+            amount: this.fineDraft.amount,
+            reference: this.fineDraft.reference || null,
+            description: this.fineDraft.description || null
+        };
+        this.api.postFine(request, this.auth.schoolId()).subscribe(() => {
+            this.fineDraft = { amount: 0, reference: '', description: '' };
+            this.loadStudentFinance();
+        });
     }
 
     exportPdf(): void {

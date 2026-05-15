@@ -134,4 +134,12 @@ public sealed record LibraryBorrowerSummaryResponse(
     string DisplayName,
     string? Reference,
     int ActiveLoanCount,
-    int OverdueLoanCount);
+    int OverdueLoanCount,
+    decimal OutstandingBalance,
+    bool HasOverdueInvoice);
+
+public sealed record BorrowingEligibilityResponse(
+    bool CanBorrow,
+    bool HasOverdueInvoice,
+    decimal OutstandingBalance,
+    string? BlockReason);

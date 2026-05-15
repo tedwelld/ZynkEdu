@@ -6,5 +6,6 @@ public enum AccountingTransactionType
     Payment = 1,
     Adjustment = 2,
     Discount = 3,
-    Refund = 4
+    Refund = 4,
+    Fine = 5
 }

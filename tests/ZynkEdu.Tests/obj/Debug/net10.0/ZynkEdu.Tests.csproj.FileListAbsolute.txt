@@ -501,3 +501,5 @@ C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\re
 C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\refs\Microsoft.Extensions.Options.dll
 C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\refs\Microsoft.Extensions.Primitives.dll
 C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\refs\System.Diagnostics.EventLog.dll
+C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\Castle.Core.dll
+C:\Users\tedwell_d\source\repos\ZynkEdu\tests\ZynkEdu.Tests\bin\Debug\net10.0\Moq.dll

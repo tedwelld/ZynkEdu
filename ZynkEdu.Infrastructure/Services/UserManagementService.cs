@@ -94,9 +94,14 @@ public sealed class UserManagementService : IUserManagementService
 
     public async Task<UserResponse> CreateLibraryAdminAsync(int schoolId, CreateSchoolUserRequest request, CancellationToken cancellationToken = default)
     {
-        if (_currentUserContext.Role is not (UserRole.PlatformAdmin or UserRole.Admin))
+        if (_currentUserContext.Role is not (UserRole.PlatformAdmin or UserRole.Admin or UserRole.LibraryAdmin))
         {
-            throw new UnauthorizedAccessException("Only school and platform admins can create library admins.");
+            throw new UnauthorizedAccessException("Only school, library, and platform admins can create library admins.");
+        }
+
+        if (_currentUserContext.Role == UserRole.LibraryAdmin && _currentUserContext.SchoolId != schoolId)
+        {
+            throw new UnauthorizedAccessException("Library admins can only create accounts for their own school.");
         }
 
         return await CreateUserAsync(UserRole.LibraryAdmin, schoolId, request, cancellationToken);
@@ -310,6 +315,32 @@ public sealed class UserManagementService : IUserManagementService
             if (profile is not null)
             {
                 _dbContext.LibraryAdminUsers.Remove(profile);
+            }
+
+            _dbContext.Users.Remove(user);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        });
+    }
+
+    public async Task DeleteAccountantAsync(int id, CancellationToken cancellationToken = default)
+    {
+        if (_currentUserContext.Role is not (UserRole.PlatformAdmin or UserRole.Admin))
+        {
+            throw new UnauthorizedAccessException("Only school and platform admins can delete accountants.");
+        }
+
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+            var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+                ?? throw new InvalidOperationException("Accountant user not found.");
+
+            if (user.Role is not (UserRole.AccountantJunior or UserRole.AccountantSenior or UserRole.AccountantSuper))
+            {
+                throw new InvalidOperationException("User is not an accountant.");
             }
 
             _dbContext.Users.Remove(user);

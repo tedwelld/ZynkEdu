@@ -242,3 +242,17 @@ public sealed record DefaulterResponse(
 public sealed record DefaulterReportResponse(
     int SchoolId,
     IReadOnlyList<DefaulterResponse> Students);
+
+public sealed record CreateFineRequest(
+    int StudentId,
+    [Range(0, double.MaxValue)] decimal Amount,
+    string? Reference = null,
+    string? Description = null,
+    DateTime? TransactionDate = null);
+
+public sealed record StudentFinancialFlagResponse(
+    int StudentId,
+    string StudentName,
+    decimal Balance,
+    bool HasOverdueInvoice,
+    DateTime? OldestOverdueSince);

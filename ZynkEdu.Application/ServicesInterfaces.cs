@@ -127,6 +127,7 @@ public interface IUserManagementService
     Task DeleteAdminAsync(int id, CancellationToken cancellationToken = default);
     Task<UserResponse> UpdateLibraryAdminAsync(int id, UpdateSchoolUserRequest request, CancellationToken cancellationToken = default);
     Task DeleteLibraryAdminAsync(int id, CancellationToken cancellationToken = default);
+    Task DeleteAccountantAsync(int id, CancellationToken cancellationToken = default);
 }
 
 public interface ILibraryService
@@ -148,6 +149,8 @@ public interface ILibraryService
     Task<LibraryLoanResponse> ReturnAsync(int id, ReturnLibraryBookRequest request, CancellationToken cancellationToken = default);
     Task<LibraryLoanResponse> RenewAsync(int id, RenewLibraryLoanRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<LibraryBorrowerSummaryResponse>> GetBorrowerSummariesAsync(int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<BorrowingEligibilityResponse> GetBorrowingEligibilityAsync(LibraryBorrowerType borrowerType, int borrowerId, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LibraryBorrowerSummaryResponse>> GetBorrowersWithOverdueLoansAsync(int? schoolId = null, CancellationToken cancellationToken = default);
 }
 
 public interface IDashboardService

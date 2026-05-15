@@ -41,6 +41,7 @@
           "Microsoft.AspNetCore.Mvc.Testing": "10.0.7",
           "Microsoft.EntityFrameworkCore.Sqlite": "10.0.7",
           "Microsoft.NET.Test.Sdk": "17.14.1",
+          "Moq": "4.20.69",
           "System.IdentityModel.Tokens.Jwt": "8.17.0",
           "ZynkEdu.Api": "1.0.0",
           "ZynkEdu.Application": "1.0.0",
@@ -404,6 +405,20 @@
         },
         "compile": {
           "lib/net6.0/BouncyCastle.Cryptography.dll": {}
+        }
+      },
+      "Castle.Core/5.1.1": {
+        "dependencies": {
+          "System.Diagnostics.EventLog": "10.0.7"
+        },
+        "runtime": {
+          "lib/net6.0/Castle.Core.dll": {
+            "assemblyVersion": "5.0.0.0",
+            "fileVersion": "5.1.1.0"
+          }
+        },
+        "compile": {
+          "lib/net6.0/Castle.Core.dll": {}
         }
       },
       "MailKit/4.16.0": {
@@ -1135,6 +1150,20 @@
         },
         "compile": {
           "lib/net10.0/MimeKit.dll": {}
+        }
+      },
+      "Moq/4.20.69": {
+        "dependencies": {
+          "Castle.Core": "5.1.1"
+        },
+        "runtime": {
+          "lib/net6.0/Moq.dll": {
+            "assemblyVersion": "4.20.69.0",
+            "fileVersion": "4.20.69.0"
+          }
+        },
+        "compile": {
+          "lib/net6.0/Moq.dll": {}
         }
       },
       "Newtonsoft.Json/13.0.3": {
@@ -3679,6 +3708,13 @@
       "path": "bouncycastle.cryptography/2.6.2",
       "hashPath": "bouncycastle.cryptography.2.6.2.nupkg.sha512"
     },
+    "Castle.Core/5.1.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-rpYtIczkzGpf+EkZgDr9CClTdemhsrwA/W5hMoPjLkRFnXzH44zDLoovXeKtmxb1ykXK9aJVODSpiJml8CTw2g==",
+      "path": "castle.core/5.1.1",
+      "hashPath": "castle.core.5.1.1.nupkg.sha512"
+    },
     "MailKit/4.16.0": {
       "type": "package",
       "serviceable": true,
@@ -3902,6 +3938,13 @@
       "sha512": "sha512-X0LFxeM4gPRIhODyY/HYS9b+zRZ7y//v59rFzgS6wLxcPuZThnMtNZHtrr0fjLyRRkg3gqJBtvW36XfUzZ7Djw==",
       "path": "mimekit/4.16.0",
       "hashPath": "mimekit.4.16.0.nupkg.sha512"
+    },
+    "Moq/4.20.69": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-8P/oAUOL8ZVyXnzBBcgdhTsOD1kQbAWfOcMI7KDQO3HqQtzB/0WYLdnMa4Jefv8nu/MQYiiG0IuoJdvG0v0Nig==",
+      "path": "moq/4.20.69",
+      "hashPath": "moq.4.20.69.nupkg.sha512"
     },
     "Newtonsoft.Json/13.0.3": {
       "type": "package",

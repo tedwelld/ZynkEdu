@@ -80,7 +80,7 @@ type LibraryAdminDraft = {
                             </td>
                             <td class="text-right">
                                 <button *ngIf="canManage" pButton type="button" icon="pi pi-pencil" class="p-button-text p-button-sm" (click)="openEdit(admin)"></button>
-                                <button *ngIf="canManage" pButton type="button" icon="pi pi-trash" class="p-button-text p-button-sm p-button-danger" (click)="deleteAdmin(admin)"></button>
+                                <button *ngIf="canDelete" pButton type="button" icon="pi pi-trash" class="p-button-text p-button-sm p-button-danger" (click)="deleteAdmin(admin)"></button>
                             </td>
                         </tr>
                     </ng-template>
@@ -143,7 +143,13 @@ export class LibraryUsers implements OnInit {
     }
 
     get canManage(): boolean {
-        return this.auth.role() === 'PlatformAdmin' || this.auth.role() === 'Admin';
+        const role = this.auth.role();
+        return role === 'PlatformAdmin' || role === 'Admin' || role === 'LibraryAdmin';
+    }
+
+    get canDelete(): boolean {
+        const role = this.auth.role();
+        return role === 'PlatformAdmin' || role === 'Admin';
     }
 
     get schoolOptions(): { label: string; value: number }[] {

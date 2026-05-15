@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { ApiService } from '../../core/api/api.service';
-import { AgingReportResponse, CollectionReportResponse, DefaulterReportResponse, RevenueByClassReportResponse } from '../../core/api/api.models';
+import { AgingReportResponse, CollectionReportResponse, DefaulterReportResponse, LibraryBorrowerSummaryResponse, RevenueByClassReportResponse } from '../../core/api/api.models';
+
 import { AuthService } from '../../core/auth/auth.service';
 
 type AgingChartSlice = {
@@ -76,7 +77,7 @@ type AgingChartSlice = {
                 <div class="mt-4 text-sm text-muted-color">Scope: <span class="font-semibold text-color">{{ schoolLabel }}</span></div>
             </header>
 
-            <div class="grid md:grid-cols-4 gap-4">
+            <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <article class="workspace-card p-5">
                     <div class="text-xs uppercase tracking-[0.22em] text-muted-color">Billed</div>
                     <div class="text-3xl font-bold mt-2">{{ (collection?.totalBilled || 0) | number:'1.0-2' }}</div>
@@ -92,6 +93,11 @@ type AgingChartSlice = {
                 <article class="workspace-card p-5">
                     <div class="text-xs uppercase tracking-[0.22em] text-muted-color">Defaulters</div>
                     <div class="text-3xl font-bold mt-2">{{ defaulters?.students?.length || 0 }}</div>
+                </article>
+                <article class="workspace-card p-5 border-l-4" [ngClass]="overdueLibraryBorrowersCount > 0 ? 'border-l-orange-500' : 'border-l-surface-300 dark:border-l-surface-600'">
+                    <div class="text-xs uppercase tracking-[0.22em] text-muted-color">Library overdue</div>
+                    <div class="text-3xl font-bold mt-2" [ngClass]="overdueLibraryBorrowersCount > 0 ? 'text-orange-600 dark:text-orange-400' : ''">{{ overdueLibraryBorrowersCount }}</div>
+                    <div class="text-xs text-muted-color mt-1">Students with overdue loans</div>
                 </article>
             </div>
 
@@ -182,6 +188,11 @@ export class AccountantDashboard implements OnInit {
     aging: AgingReportResponse | null = null;
     revenue: RevenueByClassReportResponse | null = null;
     defaulters: DefaulterReportResponse | null = null;
+    overdueLibraryBorrowers: LibraryBorrowerSummaryResponse[] = [];
+
+    get overdueLibraryBorrowersCount(): number {
+        return this.overdueLibraryBorrowers.filter((b) => b.borrowerType === 'Student').length;
+    }
 
     get schoolLabel(): string {
         return this.auth.schoolId() ? `School ${this.auth.schoolId()}` : 'All schools';
@@ -236,5 +247,6 @@ export class AccountantDashboard implements OnInit {
         this.api.getAgingReport(schoolId).subscribe((response) => (this.aging = response));
         this.api.getRevenueByClassReport(schoolId).subscribe((response) => (this.revenue = response));
         this.api.getDefaulters(schoolId).subscribe((response) => (this.defaulters = response));
+        this.api.getLibraryBorrowersWithOverdueLoans(schoolId).subscribe((response) => (this.overdueLibraryBorrowers = response));
     }
 }

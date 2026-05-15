@@ -40,14 +40,14 @@ public sealed class UsersController : ControllerBase
     }
 
     [HttpPost("library-admins")]
-    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    [Authorize(Roles = RoleNames.LibraryAdminAdminOrPlatformAdmin)]
     public async Task<ActionResult<UserResponse>> CreateLibraryAdmin([FromQuery] int schoolId, [FromBody] CreateSchoolUserRequest request, CancellationToken cancellationToken)
     {
         return Ok(await _userManagementService.CreateLibraryAdminAsync(schoolId, request, cancellationToken));
     }
 
     [HttpGet("teachers")]
-    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    [Authorize(Roles = RoleNames.LibraryAdminAdminOrPlatformAdmin)]
     public async Task<ActionResult<IReadOnlyList<UserResponse>>> GetTeachers([FromQuery] int? schoolId, CancellationToken cancellationToken)
     {
         return Ok(await _userManagementService.GetTeachersAsync(schoolId, cancellationToken));

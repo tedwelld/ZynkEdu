@@ -13,10 +13,12 @@ namespace ZynkEdu.Api.Controllers;
 public sealed class LibraryController : ControllerBase
 {
     private readonly ILibraryService _libraryService;
+    private readonly IAccountingService _accountingService;
 
-    public LibraryController(ILibraryService libraryService)
+    public LibraryController(ILibraryService libraryService, IAccountingService accountingService)
     {
         _libraryService = libraryService;
+        _accountingService = accountingService;
     }
 
     [HttpGet("dashboard")]
@@ -122,5 +124,23 @@ public sealed class LibraryController : ControllerBase
     public async Task<ActionResult<LibraryLoanResponse>> Renew(int id, [FromBody] RenewLibraryLoanRequest request, CancellationToken cancellationToken)
     {
         return Ok(await _libraryService.RenewAsync(id, request, cancellationToken));
+    }
+
+    [HttpGet("borrowers/{borrowerType}/{borrowerId:int}/eligibility")]
+    public async Task<ActionResult<BorrowingEligibilityResponse>> GetBorrowingEligibility([FromRoute] LibraryBorrowerType borrowerType, int borrowerId, [FromQuery] int? schoolId, CancellationToken cancellationToken)
+    {
+        return Ok(await _libraryService.GetBorrowingEligibilityAsync(borrowerType, borrowerId, schoolId, cancellationToken));
+    }
+
+    [HttpGet("borrowers/overdue-loans")]
+    public async Task<ActionResult<IReadOnlyList<LibraryBorrowerSummaryResponse>>> GetBorrowersWithOverdueLoans([FromQuery] int? schoolId, CancellationToken cancellationToken)
+    {
+        return Ok(await _libraryService.GetBorrowersWithOverdueLoansAsync(schoolId, cancellationToken));
+    }
+
+    [HttpGet("students/overdue-invoices")]
+    public async Task<ActionResult<IReadOnlyList<StudentFinancialFlagResponse>>> GetStudentsWithOverdueInvoices([FromQuery] int? schoolId, CancellationToken cancellationToken)
+    {
+        return Ok(await _accountingService.GetStudentsWithOverdueInvoicesAsync(schoolId, cancellationToken));
     }
 }

@@ -125,8 +125,6 @@ public sealed class AccountingFinancialStatementTests
             context,
             currentUser,
             new StubAuditLogService(),
-            new RecordingEmailSender(),
-            new ReportEmailTemplateService(),
             new StubNotificationService());
     }
 

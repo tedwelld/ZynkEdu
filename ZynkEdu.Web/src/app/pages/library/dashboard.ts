@@ -6,7 +6,7 @@ import { TagModule } from 'primeng/tag';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { LibraryBookResponse, LibraryDashboardResponse, LibraryLoanResponse, SchoolResponse } from '../../core/api/api.models';
+import { LibraryBookResponse, LibraryDashboardResponse, LibraryLoanResponse, SchoolResponse, StudentFinancialFlagResponse } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 
 @Component({
@@ -26,6 +26,26 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
                     <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
                 </div>
             </header>
+
+            <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="workspace-card flex flex-col gap-1">
+                    <span class="text-xs uppercase tracking-[0.2em] text-muted-color font-semibold">Books</span>
+                    <span class="text-3xl font-display font-bold">{{ dashboard?.bookCount ?? '—' }}</span>
+                </div>
+                <div class="workspace-card flex flex-col gap-1">
+                    <span class="text-xs uppercase tracking-[0.2em] text-muted-color font-semibold">Copies</span>
+                    <span class="text-3xl font-display font-bold">{{ dashboard?.copyCount ?? '—' }}</span>
+                </div>
+                <div class="workspace-card flex flex-col gap-1">
+                    <span class="text-xs uppercase tracking-[0.2em] text-muted-color font-semibold">Active loans</span>
+                    <span class="text-3xl font-display font-bold">{{ dashboard?.issuedLoanCount ?? '—' }}</span>
+                </div>
+                <div class="workspace-card flex flex-col gap-1 border-l-4" [ngClass]="blockedStudents.length > 0 ? 'border-l-red-500' : 'border-l-surface-300 dark:border-l-surface-600'">
+                    <span class="text-xs uppercase tracking-[0.2em] text-muted-color font-semibold">Blocked (overdue fees)</span>
+                    <span class="text-3xl font-display font-bold" [ngClass]="blockedStudents.length > 0 ? 'text-red-600 dark:text-red-400' : ''">{{ blockedStudents.length }}</span>
+                    <span *ngIf="blockedStudents.length > 0" class="text-xs text-muted-color">Students blocked from borrowing</span>
+                </div>
+            </section>
 
             <section class="grid gap-6 xl:grid-cols-2">
                 <article class="workspace-card">
@@ -76,6 +96,7 @@ export class LibraryDashboard implements OnInit {
     dashboard: LibraryDashboardResponse | null = null;
     books: LibraryBookResponse[] = [];
     overdueLoans: LibraryLoanResponse[] = [];
+    blockedStudents: StudentFinancialFlagResponse[] = [];
     schools: SchoolResponse[] = [];
     selectedSchoolId: number | null = null;
 
@@ -108,12 +129,14 @@ export class LibraryDashboard implements OnInit {
         forkJoin({
             dashboard: this.api.getLibraryDashboard(schoolId),
             books: this.api.getLibraryBooks(schoolId),
-            overdueLoans: this.api.getLibraryOverdueLoans(schoolId)
+            overdueLoans: this.api.getLibraryOverdueLoans(schoolId),
+            blockedStudents: this.api.getStudentsWithOverdueInvoices(schoolId)
         }).subscribe({
-            next: ({ dashboard, books, overdueLoans }) => {
+            next: ({ dashboard, books, overdueLoans, blockedStudents }) => {
                 this.dashboard = dashboard;
                 this.books = books;
                 this.overdueLoans = overdueLoans;
+                this.blockedStudents = blockedStudents;
             }
         });
     }

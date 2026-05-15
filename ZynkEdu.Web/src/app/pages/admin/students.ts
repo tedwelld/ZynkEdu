@@ -19,12 +19,14 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ApiService } from '../../core/api/api.service';
 import { extractApiErrorMessage } from '../../core/api/api-error';
 import {
+    BorrowingEligibilityResponse,
     BulkStudentSubjectEnrollmentResponse,
     CreateStudentRequest,
     DashboardResponse,
     GuardianRequest,
     ResultResponse,
     SchoolResponse,
+    StudentFinancialFlagResponse,
     StudentResponse,
     SubjectResponse,
     UpdateStudentStatusRequest,
@@ -441,6 +443,43 @@ type GuardianDraft = GuardianRequest & {
                         </div>
 
                         <div class="workspace-card">
+                            <div class="flex items-center justify-between gap-3 mb-4">
+                                <div>
+                                    <h3 class="font-display font-bold mb-1">Financial &amp; Library status</h3>
+                                    <p class="text-sm text-muted-color">Outstanding balance and current library borrowing state.</p>
+                                </div>
+                            </div>
+                            <div class="grid gap-3 md:grid-cols-2">
+                                <div class="rounded-2xl border p-4" [ngClass]="studentFinancialFlag?.hasOverdueInvoice ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30' : 'border-surface-200 dark:border-surface-700'">
+                                    <div class="text-xs uppercase tracking-[0.18em] text-muted-color font-semibold mb-2">Outstanding balance</div>
+                                    <div class="text-2xl font-bold" [ngClass]="(studentFinancialFlag?.balance ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">
+                                        {{ (studentFinancialFlag?.balance ?? 0) | number:'1.0-2' }}
+                                    </div>
+                                    <div *ngIf="studentFinancialFlag?.hasOverdueInvoice" class="mt-2 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 font-semibold">
+                                        <i class="pi pi-exclamation-circle"></i>
+                                        Overdue invoice since {{ studentFinancialFlag?.oldestOverdueSince | date:'mediumDate' }}
+                                    </div>
+                                    <div *ngIf="!studentFinancialFlag?.hasOverdueInvoice" class="mt-2 text-xs text-muted-color">No overdue invoices</div>
+                                </div>
+
+                                <div class="rounded-2xl border p-4" [ngClass]="studentBorrowingEligibility?.canBorrow === false ? 'border-orange-300 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30' : 'border-surface-200 dark:border-surface-700'">
+                                    <div class="text-xs uppercase tracking-[0.18em] text-muted-color font-semibold mb-2">Library borrowing</div>
+                                    <div *ngIf="studentBorrowingEligibility; else eligibilityLoading">
+                                        <div class="flex items-center gap-2">
+                                            <i class="pi" [ngClass]="studentBorrowingEligibility.canBorrow ? 'pi-check-circle text-green-500' : 'pi-ban text-red-500'"></i>
+                                            <span class="font-semibold">{{ studentBorrowingEligibility.canBorrow ? 'Eligible to borrow' : 'Blocked from borrowing' }}</span>
+                                        </div>
+                                        <div *ngIf="studentBorrowingEligibility.blockReason" class="mt-2 text-xs text-orange-600 dark:text-orange-400">{{ studentBorrowingEligibility.blockReason }}</div>
+                                        <div *ngIf="!studentBorrowingEligibility.blockReason && studentBorrowingEligibility.canBorrow" class="mt-2 text-xs text-muted-color">No borrowing restrictions</div>
+                                    </div>
+                                    <ng-template #eligibilityLoading>
+                                        <div class="text-sm text-muted-color">Loading…</div>
+                                    </ng-template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="workspace-card">
                             <div class="flex items-center justify-between mb-4">
                                 <h3 class="font-display font-bold mb-0">Performance trend</h3>
                                 <span class="text-sm text-muted-color">{{ studentResults.length }} results</span>
@@ -514,6 +553,8 @@ export class AdminStudents implements OnInit {
     skeletonRows = Array.from({ length: 5 });
     bulkEnrollmentLoading = false;
     draft: StudentDraft = this.createEmptyDraft();
+    studentFinancialFlag: StudentFinancialFlagResponse | null = null;
+    studentBorrowingEligibility: BorrowingEligibilityResponse | null = null;
 
     get isPlatformAdmin(): boolean {
         return this.auth.role() === 'PlatformAdmin';
@@ -778,12 +819,23 @@ export class AdminStudents implements OnInit {
         this.drawerMode = 'view';
         this.selectedStudent = student;
         this.editStudentId = null;
+        this.studentFinancialFlag = null;
+        this.studentBorrowingEligibility = null;
         this.drawerVisible = true;
+
         this.api.getResultsByStudent(student.id).subscribe({
             next: (results) => {
                 this.studentResults = results;
                 this.buildChart(results);
             }
+        });
+
+        const schoolId = this.isPlatformAdmin ? this.selectedSchoolId : this.authSchoolId;
+        this.api.getStudentFinancialFlag(student.id, schoolId).subscribe({
+            next: (flag) => (this.studentFinancialFlag = flag)
+        });
+        this.api.getBorrowingEligibility('Student', student.id, schoolId).subscribe({
+            next: (eligibility) => (this.studentBorrowingEligibility = eligibility)
         });
     }
 

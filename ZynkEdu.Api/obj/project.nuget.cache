@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "cSgfKp/7wRw=",
+  "dgSpecHash": "3Zrx9X69EBA=",
   "success": true,
-  "projectFilePath": "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\ZynkEdu.Api\\ZynkEdu.Api.csproj",
+  "projectFilePath": "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\zynkedu.api\\ZynkEdu.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\tedwell_d\\.nuget\\packages\\azure.core\\1.47.1\\azure.core.1.47.1.nupkg.sha512",
     "C:\\Users\\tedwell_d\\.nuget\\packages\\azure.identity\\1.14.2\\azure.identity.1.14.2.nupkg.sha512",

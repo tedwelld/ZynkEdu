@@ -29,4 +29,11 @@ public sealed class AdminAccountingController : ControllerBase
     {
         return Ok(await _userManagementService.GetAccountantsAsync(schoolId, cancellationToken));
     }
+
+    [HttpDelete("accountants/{id:int}")]
+    public async Task<IActionResult> DeleteAccountant(int id, CancellationToken cancellationToken)
+    {
+        await _userManagementService.DeleteAccountantAsync(id, cancellationToken);
+        return NoContent();
+    }
 }
