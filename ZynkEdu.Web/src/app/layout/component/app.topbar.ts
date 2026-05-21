@@ -26,9 +26,7 @@ import { SearchHit } from '../../core/api/api.models';
                 </button>
                 <a class="layout-topbar-logo" routerLink="/">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center text-white shadow-lg">
-                            <i class="pi pi-graduation-cap"></i>
-                        </div>
+                        <img src="assets/images/zynkedu-icon.png" alt="ZynkEdu logo" class="w-11 h-11 object-contain shrink-0" />
                         <div class="flex flex-col">
                             <span class="font-display font-bold text-xl leading-none">ZynkEdu</span>
                             <span class="text-xs text-muted-color uppercase tracking-[0.24em]">{{ workspaceLabel() }}</span>

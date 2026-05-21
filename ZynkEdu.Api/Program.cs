@@ -67,7 +67,19 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+var spaIndexPath = Path.Combine(app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot"), "index.html");
+if (File.Exists(spaIndexPath))
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
+
 app.MapControllers();
+
+if (File.Exists(spaIndexPath))
+{
+    app.MapFallbackToFile("index.html");
+}
 
 var databaseMigrated = await RunBootstrapStepAsync("database initialization", () => InitializeDatabaseAsync(app.Services, app.Logger), app.Logger);
 if (!databaseMigrated)

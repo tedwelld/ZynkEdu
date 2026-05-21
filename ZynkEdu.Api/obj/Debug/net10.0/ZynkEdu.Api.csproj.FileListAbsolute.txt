@@ -1,7 +1,6 @@
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Api\bin\Debug\net10.0\appsettings.Development.json
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Api\bin\Debug\net10.0\appsettings.json
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Api\bin\Debug\net10.0\ZynkEdu.Api.staticwebassets.endpoints.json
-C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Api\bin\Debug\net10.0\ZynkEdu.Api.exe
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Api\bin\Debug\net10.0\ZynkEdu.Api.deps.json
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Api\bin\Debug\net10.0\ZynkEdu.Api.runtimeconfig.json
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Api\bin\Debug\net10.0\ZynkEdu.Api.dll

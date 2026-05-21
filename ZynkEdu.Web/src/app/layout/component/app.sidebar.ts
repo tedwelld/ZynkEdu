@@ -16,9 +16,12 @@ import { AuthService } from '../../core/auth/auth.service';
             <div class="layout-sidebar__footer">
                 <div class="workspace-card layout-sidebar__card">
                     <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-xs uppercase tracking-[0.22em] text-muted-color font-semibold">Signed in</p>
-                            <div class="text-xl font-display font-bold mt-1">ZynkEdu</div>
+                        <div class="flex items-center gap-3">
+                            <img src="assets/images/zynkedu-icon.png" alt="ZynkEdu logo" class="w-10 h-10 object-contain shrink-0" />
+                            <div>
+                                <p class="text-xs uppercase tracking-[0.22em] text-muted-color font-semibold">Signed in</p>
+                                <div class="text-xl font-display font-bold mt-1">ZynkEdu</div>
+                            </div>
                         </div>
                         <i class="pi pi-user text-xl text-primary"></i>
                     </div>

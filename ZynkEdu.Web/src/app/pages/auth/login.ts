@@ -9,52 +9,21 @@ import { MessageService } from 'primeng/api';
 import { AuthService } from '../../core/auth/auth.service';
 import { SchoolResponse } from '../../core/api/api.models';
 
-interface FallingLetterGlyph {
-    char: string;
-    size: number;
-}
-
-interface FallingLetterStream {
-    left: number;
-    duration: string;
-    delay: string;
-    opacity: number;
-    letters: FallingLetterGlyph[];
-}
-
 @Component({
     selector: 'app-login',
     standalone: true,
     imports: [CommonModule, FormsModule, AutoCompleteModule, ButtonModule, InputTextModule, PasswordModule],
     template: `
         <div class="auth-login-page">
-            <div class="auth-login-letters" aria-hidden="true">
-                <div
-                    *ngFor="let stream of letterStreams; let streamIndex = index"
-                    class="auth-login-letter-stream"
-                    [style.left.%]="stream.left"
-                    [style.animationDuration]="stream.duration"
-                    [style.animationDelay]="stream.delay"
-                    [style.opacity]="stream.opacity"
-                >
-                    <span
-                        *ngFor="let letter of stream.letters; let letterIndex = index"
-                        class="auth-login-letter"
-                        [style.fontSize.rem]="letter.size"
-                    >
-                        {{ letter.char }}
-                    </span>
-                </div>
-            </div>
             <div class="auth-login-shell">
-                <section class="workspace-card auth-login-card">
+                <section class="auth-login-card" aria-label="ZynkEdu login">
                     <div class="auth-login-card-content">
-                        <div class="auth-login-brand-row">
-                            <div class="auth-login-brand">
-                                <div class="auth-login-mark" aria-hidden="true"></div>
-                                <p class="auth-login-brand-name">ZynkEdu</p>
-                            </div>
+                        <div class="auth-login-brand">
+                            <img src="assets/images/zynkedu-icon.png" alt="" class="auth-login-mark" />
+                            <p class="auth-login-brand-name">ZynkEdu</p>
                         </div>
+                        <h1 class="auth-login-title">Admin Panel</h1>
+                        <p class="auth-login-subtitle">Control panel login</p>
 
                         <div class="auth-login-mode-switch" role="tablist" aria-label="Login type">
                             <button
@@ -78,93 +47,96 @@ interface FallingLetterStream {
                         <form class="auth-login-form" (ngSubmit)="signIn()">
                             <div *ngIf="mode === 'staff'" class="auth-login-fields">
                                 <div class="auth-login-field">
-                                    <label class="auth-login-label">School</label>
-                                    <p-autoComplete
-                                        [(ngModel)]="schoolQuery"
-                                        [suggestions]="schoolSuggestions"
-                                        (completeMethod)="filterSchools($event)"
-                                        (onSelect)="selectSchool($event.value)"
-                                        (ngModelChange)="onSchoolQueryChange($event)"
-                                        optionLabel="name"
-                                        placeholder="Find your school"
-                                        [dropdown]="false"
-                                        [forceSelection]="true"
-                                        class="w-full auth-login-control"
-                                        styleClass="w-full auth-login-control"
-                                        name="schoolQuery"
-                                    >
-                                        <ng-template let-school pTemplate="item">
-                                            <div class="auth-login-suggestion">
-                                                <span class="auth-login-suggestion-name">{{ school.name }}</span>
-                                                <span class="auth-login-suggestion-meta">{{ school.address }}</span>
-                                            </div>
-                                        </ng-template>
-                                    </p-autoComplete>
-                                    <p class="auth-login-hint">Select your registered school before signing in.</p>
+                                    <span class="auth-login-input-wrap">
+                                        <i class="pi pi-building" aria-hidden="true"></i>
+                                        <p-autoComplete
+                                            [(ngModel)]="schoolQuery"
+                                            [suggestions]="schoolSuggestions"
+                                            (completeMethod)="filterSchools($event)"
+                                            (onSelect)="selectSchool($event.value)"
+                                            (ngModelChange)="onSchoolQueryChange($event)"
+                                            optionLabel="name"
+                                            placeholder="Find your school"
+                                            [dropdown]="false"
+                                            [forceSelection]="true"
+                                            class="w-full auth-login-control"
+                                            styleClass="w-full auth-login-control"
+                                            inputStyleClass="w-full auth-login-input"
+                                            name="schoolQuery"
+                                        >
+                                            <ng-template let-school pTemplate="item">
+                                                <div class="auth-login-suggestion">
+                                                    <span class="auth-login-suggestion-name">{{ school.name }}</span>
+                                                    <span class="auth-login-suggestion-meta">{{ school.address }}</span>
+                                                </div>
+                                            </ng-template>
+                                        </p-autoComplete>
+                                    </span>
                                 </div>
 
                                 <div class="auth-login-field">
-                                    <label class="auth-login-label">Username</label>
-                                    <input pInputText [(ngModel)]="username" name="username" class="w-full auth-login-control" placeholder="Staff username" autocomplete="username" />
+                                    <span class="auth-login-input-wrap">
+                                        <i class="pi pi-user" aria-hidden="true"></i>
+                                        <input pInputText [(ngModel)]="username" name="username" class="w-full auth-login-input" placeholder="Staff username" autocomplete="username" />
+                                    </span>
                                 </div>
 
                                 <div class="auth-login-field">
-                                    <label class="auth-login-label">Password</label>
-                                    <p-password
-                                        [(ngModel)]="password"
-                                        name="password"
-                                        [toggleMask]="true"
-                                        [feedback]="false"
-                                        styleClass="w-full auth-login-control"
-                                        inputStyleClass="w-full auth-login-input"
-                                        autocomplete="current-password"
-                                    ></p-password>
+                                    <span class="auth-login-input-wrap">
+                                        <i class="pi pi-key" aria-hidden="true"></i>
+                                        <p-password
+                                            [(ngModel)]="password"
+                                            name="password"
+                                            [toggleMask]="true"
+                                            [feedback]="false"
+                                            styleClass="w-full auth-login-control"
+                                            inputStyleClass="w-full auth-login-input"
+                                            autocomplete="current-password"
+                                        ></p-password>
+                                    </span>
                                 </div>
                             </div>
 
                             <div *ngIf="mode === 'platform'" class="auth-login-fields">
                                 <div class="auth-login-field">
-                                    <label class="auth-login-label">Username</label>
-                                    <input pInputText [(ngModel)]="username" name="username" class="w-full auth-login-control" placeholder="Platform admin username" autocomplete="username" />
+                                    <span class="auth-login-input-wrap">
+                                        <i class="pi pi-user" aria-hidden="true"></i>
+                                        <input pInputText [(ngModel)]="username" name="username" class="w-full auth-login-input" placeholder="Platform admin username" autocomplete="username" />
+                                    </span>
                                 </div>
 
                                 <div class="auth-login-field">
-                                    <label class="auth-login-label">Password</label>
-                                    <p-password
-                                        [(ngModel)]="password"
-                                        name="password"
-                                        [toggleMask]="true"
-                                        [feedback]="false"
-                                        styleClass="w-full auth-login-control"
-                                        inputStyleClass="w-full auth-login-input"
-                                        autocomplete="current-password"
-                                    ></p-password>
+                                    <span class="auth-login-input-wrap">
+                                        <i class="pi pi-key" aria-hidden="true"></i>
+                                        <p-password
+                                            [(ngModel)]="password"
+                                            name="password"
+                                            [toggleMask]="true"
+                                            [feedback]="false"
+                                            styleClass="w-full auth-login-control"
+                                            inputStyleClass="w-full auth-login-input"
+                                            autocomplete="current-password"
+                                        ></p-password>
+                                    </span>
                                 </div>
-                            </div>
-
-                            <div class="auth-login-footer-row">
-                                <label class="auth-login-remember">
-                                    <input type="checkbox" />
-                                    <span>Remember me</span>
-                                </label>
-                                <button type="button" class="auth-login-link" (click)="showHelp()">Forgot password?</button>
                             </div>
 
                             <button
                                 pButton
                                 type="submit"
-                                label="Sign In"
-                                icon="pi pi-arrow-right"
-                                iconPos="right"
-                                class="w-full auth-login-submit"
+                                label="Login"
+                                class="auth-login-submit"
                                 [loading]="loading"
                                 [disabled]="loading"
                             ></button>
 
-                            <p class="auth-login-bottom-note">
-                                Need access to a new workspace? Contact your school administrator or platform admin.
-                            </p>
+                            <button type="button" class="auth-login-link" (click)="showHelp()">Forgot password?</button>
                         </form>
+                    </div>
+                    <div class="auth-login-waves" aria-hidden="true">
+                        <span class="auth-login-wave auth-login-wave-one"></span>
+                        <span class="auth-login-wave auth-login-wave-two"></span>
+                        <span class="auth-login-wave auth-login-wave-three"></span>
                     </div>
                 </section>
             </div>
@@ -174,7 +146,6 @@ interface FallingLetterStream {
 export class Login implements OnInit {
     private readonly auth = inject(AuthService);
     private readonly messages = inject(MessageService);
-    readonly letterStreams = createFallingLetterStreams();
 
     mode: 'staff' | 'platform' = 'staff';
     loading = false;
@@ -266,28 +237,4 @@ export class Login implements OnInit {
 
         return detail;
     }
-}
-
-function createFallingLetterStreams(): FallingLetterStream[] {
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-
-    return Array.from({ length: 20 }, (_, index) => {
-        const left = 2 + ((index * 4.95) % 94);
-        const duration = `${11 + (index % 6) * 1.5}s`;
-        const delay = `-${(index % 8) * 1.25}s`;
-        const opacity = 0.12 + (index % 6) * 0.03;
-        const length = 13 + (index % 6);
-        const letters = Array.from({ length }, (_, letterIndex) => ({
-            char: alphabet[(index * 7 + letterIndex * 11) % alphabet.length],
-            size: 0.78 + ((letterIndex + index) % 5) * 0.18
-        }));
-
-        return {
-            left,
-            duration,
-            delay,
-            opacity,
-            letters
-        };
-    });
 }

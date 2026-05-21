@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "shell",
+  "packages": {
+    "node": "22",
+    "dotnet": "10.0.100"
+  },
+  "caches": {
+    "npm": {
+      "directory": "/root/.npm",
+      "type": "shared"
+    },
+    "nuget": {
+      "directory": "/root/.nuget/packages",
+      "type": "shared"
+    }
+  },
+  "steps": {
+    "build": {
+      "inputs": [
+        {
+          "local": true,
+          "include": ["."]
+        }
+      ],
+      "caches": ["npm", "nuget"],
+      "commands": [
+        "chmod +x ./build.sh ./start.sh",
+        "./build.sh"
+      ],
+      "deployOutputs": [
+        {
+          "include": [".deploy/publish", "start.sh"]
+        }
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "./start.sh"
+  }
+}
