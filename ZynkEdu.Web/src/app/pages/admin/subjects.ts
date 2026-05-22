@@ -35,6 +35,10 @@ type ImportTargetMode = 'catalog' | 'school';
     imports: [CommonModule, FormsModule, ButtonModule, CheckboxModule, DialogModule, InputTextModule, MetricCardComponent, AppDropdownComponent, MultiSelectModule, SkeletonModule, TableModule, TagModule],
     template: `
         <section class="space-y-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <div class="workspace-card flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div class="space-y-2">
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Subjects</p>
@@ -156,6 +160,7 @@ type ImportTargetMode = 'catalog' | 'school';
                     <p-table [value]="filteredSubjects" [rows]="10" [paginator]="true" styleClass="p-datatable-sm">
                         <ng-template pTemplate="header">
                             <tr>
+                                <th class="text-muted-color w-8">#</th>
                                 <th>Code</th>
                                 <th>Subject</th>
                                 <th>Grade level</th>
@@ -166,8 +171,9 @@ type ImportTargetMode = 'catalog' | 'school';
                                 <th class="text-right">Actions</th>
                             </tr>
                         </ng-template>
-                        <ng-template pTemplate="body" let-subject>
+                        <ng-template pTemplate="body" let-subject let-rowIndex="rowIndex">
                             <tr>
+                                <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
                                 <td class="font-semibold">{{ subject.code }}</td>
                                 <td class="font-semibold">{{ subject.name }}</td>
                                 <td><p-tag [value]="levelLabelFor(subject.gradeLevel)" [severity]="severityForLevel(subject.gradeLevel)"></p-tag></td>
@@ -190,6 +196,7 @@ type ImportTargetMode = 'catalog' | 'school';
                     <p-table [value]="filteredCatalogSubjects" [rows]="10" [paginator]="true" styleClass="p-datatable-sm">
                         <ng-template pTemplate="header">
                             <tr>
+                                <th class="text-muted-color w-8">#</th>
                                 <th>Code</th>
                                 <th>Subject</th>
                                 <th>Grade level</th>
@@ -199,8 +206,9 @@ type ImportTargetMode = 'catalog' | 'school';
                                 <th class="text-right">Actions</th>
                             </tr>
                         </ng-template>
-                        <ng-template pTemplate="body" let-subject>
+                        <ng-template pTemplate="body" let-subject let-rowIndex="rowIndex">
                             <tr>
+                                <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
                                 <td class="font-semibold">{{ subject.code }}</td>
                                 <td class="font-semibold">{{ subject.name }}</td>
                                 <td><p-tag [value]="levelLabelFor(subject.gradeLevel)" [severity]="severityForLevel(subject.gradeLevel)"></p-tag></td>
@@ -386,6 +394,7 @@ export class AdminSubjects implements OnInit {
     private readonly messages = inject(MessageService);
 
     loading = true;
+    errorMessage = '';
     viewMode: SubjectViewMode = 'school';
     subjects: SubjectResponse[] = [];
     catalogSubjects: PlatformSubjectCatalogResponse[] = [];
@@ -474,6 +483,7 @@ export class AdminSubjects implements OnInit {
                 },
                 error: () => {
                     this.loading = false;
+                    this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
                 }
             });
             return;
@@ -495,6 +505,7 @@ export class AdminSubjects implements OnInit {
                 },
                 error: () => {
                     this.loading = false;
+                    this.errorMessage = 'Failed to load subjects catalog. Please refresh or check your connection.';
                 }
             });
             return;
@@ -519,6 +530,7 @@ export class AdminSubjects implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load subjects. Please refresh or check your connection.';
             }
         });
     }

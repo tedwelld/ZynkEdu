@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background with blue→violet gradient -->
+  <rect width="64" height="64" rx="14" fill="url(#g1)"/>
+  <!-- Subtle top-half shine for depth -->
+  <rect width="64" height="36" rx="14" fill="url(#g2)"/>
+  <!-- Z lettermark — top bar, diagonal, bottom bar -->
+  <path d="M13 20 L51 20 L13 44 L51 44"
+        stroke="white"
+        stroke-width="7.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+  <!-- Small accent dot — top-right energy mark -->
+  <circle cx="51" cy="13" r="4" fill="white" opacity="0.35"/>
+</svg>

@@ -1,5 +1,6 @@
-import { HttpInterceptorFn } from '@angular/common/http';
+import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { catchError, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
@@ -15,6 +16,13 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
             setHeaders: {
                 Authorization: `Bearer ${token}`
             }
+        })
+    ).pipe(
+        catchError((err: HttpErrorResponse) => {
+            if (err.status === 401) {
+                auth.logout();
+            }
+            return throwError(() => err);
         })
     );
 };

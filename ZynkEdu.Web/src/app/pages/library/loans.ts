@@ -26,7 +26,7 @@ import {
     UserResponse
 } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
-import { buildLibraryBorrowersPdf, buildLibraryOverdueLoansPdf } from '../../shared/report/report-pdf';
+import { ReportSchoolInfo, buildLibraryBorrowersPdf, buildLibraryOverdueLoansPdf } from '../../shared/report/report-pdf';
 
 type IssueDraft = {
     borrowerType: 'Student' | 'Teacher';
@@ -657,11 +657,11 @@ export class LibraryLoans implements OnInit {
     }
 
     exportOverduePdf(): void {
-        buildLibraryOverdueLoansPdf(this.schoolLabel, new Date(), this.filteredOverdueLoans, `library-overdue-loans-${this.fileStamp()}.pdf`);
+        buildLibraryOverdueLoansPdf(this.schoolInfo, new Date(), this.filteredOverdueLoans, 'library-overdue-loans.pdf');
     }
 
     exportBorrowersPdf(): void {
-        buildLibraryBorrowersPdf(this.schoolLabel, new Date(), this.filteredBorrowers, `library-borrowers-${this.fileStamp()}.pdf`);
+        buildLibraryBorrowersPdf(this.schoolInfo, new Date(), this.filteredBorrowers, 'library-borrowers.pdf');
     }
 
     saveIssue(): void {
@@ -763,11 +763,9 @@ export class LibraryLoans implements OnInit {
         };
     }
 
-    private get schoolLabel(): string {
-        return this.auth.schoolId() ? `School ${this.auth.schoolId()}` : 'All schools';
-    }
-
-    private fileStamp(): string {
-        return new Date().toISOString().slice(0, 10);
+    private get schoolInfo(): ReportSchoolInfo {
+        const id = this.auth.schoolId();
+        const school = this.schools.find(s => s.id === id);
+        return { name: school?.name ?? (id ? `School ${id}` : 'All schools'), address: school?.address ?? null };
     }
 }

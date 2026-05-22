@@ -35,8 +35,68 @@ export interface TeacherClassResultRow {
     grade: string;
 }
 
+export interface ReportSchoolInfo {
+    name: string;
+    address?: string | null;
+}
+
+let _logoDataUrl: string | null = null;
+
+export function setLogoDataUrl(dataUrl: string): void {
+    _logoDataUrl = dataUrl;
+}
+
+export function drawLetterhead(doc: jsPDF, schoolInfo: ReportSchoolInfo, title: string, margin: number, pageWidth: number, extraLines?: string[]): number {
+    doc.setFillColor(37, 99, 235);
+    doc.rect(0, 0, pageWidth, 6, 'F');
+
+    if (_logoDataUrl) {
+        try {
+            doc.addImage(_logoDataUrl, 'PNG', pageWidth - margin - 44, 10, 44, 44);
+        } catch { /* skip logo if load fails */ }
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(17, 24, 39);
+    doc.text(schoolInfo.name, margin, 26);
+
+    let lineY = 26;
+    if (schoolInfo.address) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(75, 85, 99);
+        doc.text(schoolInfo.address, margin, 40);
+        lineY = 40;
+    }
+
+    const dividerY = Math.max(lineY + 16, 58);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.8);
+    doc.line(margin, dividerY, pageWidth - margin, dividerY);
+
+    const titleY = dividerY + 22;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(17, 24, 39);
+    doc.text(title, margin, titleY);
+
+    let infoY = titleY + 18;
+    if (extraLines && extraLines.length > 0) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(75, 85, 99);
+        for (const line of extraLines) {
+            doc.text(line, margin, infoY);
+            infoY += 13;
+        }
+    }
+
+    return infoY + 8;
+}
+
 export function buildAccountingReportsPdf(
-    schoolName: string,
+    schoolInfo: ReportSchoolInfo,
     generatedAt: Date | string,
     periodLabel: string,
     collection: CollectionReportResponse | null,
@@ -50,28 +110,22 @@ export function buildAccountingReportsPdf(
     const margin = 40;
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(17, 24, 39);
-    doc.text('Accounting financial statement', margin, 46);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(75, 85, 99);
-    doc.text(`School: ${schoolName}`, margin, 64);
-    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 78);
-    doc.text(`Period: ${periodLabel}`, margin, 92);
+    const metricsY = drawLetterhead(doc, schoolInfo, 'Accounting financial statement', margin, pageWidth, [
+        `Generated: ${formatDate(generatedAt)}`,
+        `Period: ${periodLabel}`
+    ]);
 
     const totalBilled = collection?.totalBilled ?? 0;
     const totalCollected = collection?.totalCollected ?? 0;
     const outstanding = collection?.outstanding ?? 0;
     const defaulterCount = defaulters?.students.length ?? 0;
 
-    drawMetricCard(doc, margin, 110, 160, 60, 'Billed', totalBilled.toFixed(2), 'Invoice total');
-    drawMetricCard(doc, margin + 170, 110, 160, 60, 'Collected', totalCollected.toFixed(2), 'Payments received');
-    drawMetricCard(doc, margin + 340, 110, 160, 60, 'Outstanding', outstanding.toFixed(2), 'Current balances');
-    drawMetricCard(doc, margin + 510, 110, 160, 60, 'Defaulters', defaulterCount.toString(), 'Students behind');
+    drawMetricCard(doc, margin, metricsY, 160, 60, 'Billed', totalBilled.toFixed(2), 'Invoice total');
+    drawMetricCard(doc, margin + 170, metricsY, 160, 60, 'Collected', totalCollected.toFixed(2), 'Payments received');
+    drawMetricCard(doc, margin + 340, metricsY, 160, 60, 'Outstanding', outstanding.toFixed(2), 'Current balances');
+    drawMetricCard(doc, margin + 510, metricsY, 160, 60, 'Defaulters', defaulterCount.toString(), 'Students behind');
 
-    let currentY = 198;
+    let currentY = metricsY + 78;
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
@@ -148,7 +202,7 @@ export function buildAccountingReportsPdf(
 }
 
 export function buildFinancialStatementPdf(
-    schoolName: string,
+    schoolInfo: ReportSchoolInfo,
     generatedAt: Date | string,
     statement: FinancialStatementResponse,
     fileName: string
@@ -157,18 +211,12 @@ export function buildFinancialStatementPdf(
     const margin = 40;
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(17, 24, 39);
-    doc.text(statement.title, margin, 44);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(75, 85, 99);
-    doc.text(`School: ${schoolName}`, margin, 62);
-    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 76);
-    doc.text(`As of: ${formatDate(statement.asOf)}`, margin, 90);
-    doc.text(`Period: ${statement.periodLabel}`, margin, 104, { maxWidth: pageWidth - margin * 2 });
-    doc.text(`Comparison: ${statement.comparisonLabel}`, margin, 118, { maxWidth: pageWidth - margin * 2 });
+    const startY = drawLetterhead(doc, schoolInfo, statement.title, margin, pageWidth, [
+        `Generated: ${formatDate(generatedAt)}`,
+        `As of: ${formatDate(statement.asOf)}`,
+        `Period: ${statement.periodLabel}`,
+        `Comparison: ${statement.comparisonLabel}`
+    ]);
 
     const tableRows = statement.rows.map((row) => ({
         label: `${'  '.repeat(row.level)}${row.label}`,
@@ -181,7 +229,7 @@ export function buildFinancialStatementPdf(
     }));
 
     autoTable(doc, {
-        startY: 136,
+        startY,
         head: [[
             'Line item',
             ...statement.columns.map((column) => column.label)
@@ -224,7 +272,7 @@ export function buildFinancialStatementPdf(
 }
 
 export function buildCollectionReportPdf(
-    schoolName: string,
+    schoolInfo: ReportSchoolInfo,
     generatedAt: Date | string,
     periodLabel: string,
     collection: CollectionReportResponse,
@@ -232,15 +280,16 @@ export function buildCollectionReportPdf(
 ): jsPDF {
     const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
     const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    writeReportHeading(doc, 'Collection summary', schoolName, generatedAt, periodLabel, margin);
-    drawMetricCard(doc, margin, 110, 180, 60, 'Billed', collection.totalBilled.toFixed(2), 'Invoice total');
-    drawMetricCard(doc, margin + 190, 110, 180, 60, 'Collected', collection.totalCollected.toFixed(2), 'Payments received');
-    drawMetricCard(doc, margin + 380, 110, 180, 60, 'Outstanding', collection.outstanding.toFixed(2), 'Current balances');
-    drawMetricCard(doc, margin + 570, 110, 130, 60, 'Invoices', collection.invoiceCount.toString(), 'Count');
+    const metricsY = writeReportHeading(doc, 'Collection summary', schoolInfo, generatedAt, periodLabel, margin, pageWidth);
+    drawMetricCard(doc, margin, metricsY, 180, 60, 'Billed', collection.totalBilled.toFixed(2), 'Invoice total');
+    drawMetricCard(doc, margin + 190, metricsY, 180, 60, 'Collected', collection.totalCollected.toFixed(2), 'Payments received');
+    drawMetricCard(doc, margin + 380, metricsY, 180, 60, 'Outstanding', collection.outstanding.toFixed(2), 'Current balances');
+    drawMetricCard(doc, margin + 570, metricsY, 130, 60, 'Invoices', collection.invoiceCount.toString(), 'Count');
 
     autoTable(doc, {
-        startY: 198,
+        startY: metricsY + 78,
         head: [['Metric', 'Value']],
         body: [
             ['Billed', collection.totalBilled.toFixed(2)],
@@ -260,7 +309,7 @@ export function buildCollectionReportPdf(
 }
 
 export function buildAgingBucketsPdf(
-    schoolName: string,
+    schoolInfo: ReportSchoolInfo,
     generatedAt: Date | string,
     periodLabel: string,
     aging: AgingReportResponse,
@@ -268,10 +317,11 @@ export function buildAgingBucketsPdf(
 ): jsPDF {
     const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
     const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    writeReportHeading(doc, 'Aging buckets', schoolName, generatedAt, periodLabel, margin);
+    const startY = writeReportHeading(doc, 'Aging buckets', schoolInfo, generatedAt, periodLabel, margin, pageWidth);
     autoTable(doc, {
-        startY: 110,
+        startY,
         head: [['Bucket', 'Amount', 'Invoice Count']],
         body: aging.buckets.map((bucket) => [bucket.bucket, bucket.amount.toFixed(2), bucket.invoiceCount.toString()]),
         theme: 'striped',
@@ -285,7 +335,7 @@ export function buildAgingBucketsPdf(
 }
 
 export function buildDefaultersPdf(
-    schoolName: string,
+    schoolInfo: ReportSchoolInfo,
     generatedAt: Date | string,
     periodLabel: string,
     defaulters: DefaulterReportResponse,
@@ -293,10 +343,11 @@ export function buildDefaultersPdf(
 ): jsPDF {
     const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
     const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    writeReportHeading(doc, 'Defaulters list', schoolName, generatedAt, periodLabel, margin);
+    const startY = writeReportHeading(doc, 'Defaulters list', schoolInfo, generatedAt, periodLabel, margin, pageWidth);
     autoTable(doc, {
-        startY: 110,
+        startY,
         head: [['Student', 'Class', 'Grade', 'Balance', 'Last payment', 'Last invoice']],
         body: defaulters.students.map((student) => [
             student.studentName,
@@ -317,7 +368,7 @@ export function buildDefaultersPdf(
 }
 
 export function buildRevenueByClassPdf(
-    schoolName: string,
+    schoolInfo: ReportSchoolInfo,
     generatedAt: Date | string,
     periodLabel: string,
     revenue: RevenueByClassReportResponse,
@@ -325,10 +376,11 @@ export function buildRevenueByClassPdf(
 ): jsPDF {
     const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
     const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    writeReportHeading(doc, 'Revenue by class', schoolName, generatedAt, periodLabel, margin);
+    const startY = writeReportHeading(doc, 'Revenue by class', schoolInfo, generatedAt, periodLabel, margin, pageWidth);
     autoTable(doc, {
-        startY: 110,
+        startY,
         head: [['Class', 'Grade', 'Billed', 'Collected', 'Outstanding']],
         body: revenue.classes.map((row) => [row.className, row.gradeLevel, row.billed.toFixed(2), row.collected.toFixed(2), row.outstanding.toFixed(2)]),
         theme: 'striped',
@@ -342,7 +394,7 @@ export function buildRevenueByClassPdf(
 }
 
 export function buildDailyCashPdf(
-    schoolName: string,
+    schoolInfo: ReportSchoolInfo,
     generatedAt: Date | string,
     periodLabel: string,
     dailyCash: DailyCashReportResponse,
@@ -350,10 +402,11 @@ export function buildDailyCashPdf(
 ): jsPDF {
     const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
     const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    writeReportHeading(doc, 'Daily cash report', schoolName, generatedAt, periodLabel, margin);
+    const startY = writeReportHeading(doc, 'Daily cash report', schoolInfo, generatedAt, periodLabel, margin, pageWidth);
     autoTable(doc, {
-        startY: 110,
+        startY,
         head: [['Method', 'Amount', 'Payments']],
         body: dailyCash.methods.map((row) => [row.method, row.amount.toFixed(2), row.paymentCount.toString()]),
         theme: 'striped',
@@ -367,27 +420,22 @@ export function buildDailyCashPdf(
 }
 
 export function buildLibraryOverdueLoansPdf(
-    schoolName: string,
+    schoolInfo: ReportSchoolInfo,
     generatedAt: Date | string,
     loans: LibraryLoanResponse[],
     fileName: string
 ): jsPDF {
     const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
     const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(17, 24, 39);
-    doc.text('Library overdue loans', margin, 44);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(75, 85, 99);
-    doc.text(`School: ${schoolName}`, margin, 62);
-    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 76);
-    doc.text(`Records: ${loans.length}`, margin, 90);
+    const startY = drawLetterhead(doc, schoolInfo, 'Library overdue loans', margin, pageWidth, [
+        `Generated: ${formatDate(generatedAt)}`,
+        `Records: ${loans.length}`
+    ]);
 
     autoTable(doc, {
-        startY: 108,
+        startY,
         head: [['Book', 'Borrower', 'Due date', 'Status', 'Copy', 'Author']],
         body: loans.map((loan) => [
             loan.bookTitle,
@@ -408,27 +456,22 @@ export function buildLibraryOverdueLoansPdf(
 }
 
 export function buildLibraryBorrowersPdf(
-    schoolName: string,
+    schoolInfo: ReportSchoolInfo,
     generatedAt: Date | string,
     borrowers: LibraryBorrowerSummaryResponse[],
     fileName: string
 ): jsPDF {
     const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
     const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(17, 24, 39);
-    doc.text('Library borrowers', margin, 44);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(75, 85, 99);
-    doc.text(`School: ${schoolName}`, margin, 62);
-    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 76);
-    doc.text(`Records: ${borrowers.length}`, margin, 90);
+    const startY = drawLetterhead(doc, schoolInfo, 'Library borrowers', margin, pageWidth, [
+        `Generated: ${formatDate(generatedAt)}`,
+        `Records: ${borrowers.length}`
+    ]);
 
     autoTable(doc, {
-        startY: 108,
+        startY,
         head: [['Name', 'Reference', 'Type', 'Open loans', 'Overdue']],
         body: borrowers.map((borrower) => [
             borrower.displayName,
@@ -448,7 +491,7 @@ export function buildLibraryBorrowersPdf(
 }
 
 export function buildFeeStructuresPdf(
-    schoolName: string,
+    schoolInfo: ReportSchoolInfo,
     generatedAt: Date | string,
     feeStructures: FeeStructureResponse[],
     fileName?: string,
@@ -456,20 +499,15 @@ export function buildFeeStructuresPdf(
 ): jsPDF {
     const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
     const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(17, 24, 39);
-    doc.text('Fee structures', margin, 44);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(75, 85, 99);
-    doc.text(`School: ${schoolName}`, margin, 62);
-    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 76);
-    doc.text(`Records: ${feeStructures.length}`, margin, 90);
+    const startY = drawLetterhead(doc, schoolInfo, 'Fee structures', margin, pageWidth, [
+        `Generated: ${formatDate(generatedAt)}`,
+        `Records: ${feeStructures.length}`
+    ]);
 
     autoTable(doc, {
-        startY: 108,
+        startY,
         head: [['Grade level', 'Term', 'Amount', 'Description', 'Updated']],
         body: feeStructures.map((fee) => [
             fee.gradeLevel,
@@ -490,24 +528,19 @@ export function buildFeeStructuresPdf(
     return doc;
 }
 
-export function buildStudentStatementPdf(statement: StudentStatementResponse, fileName: string): jsPDF {
+export function buildStudentStatementPdf(statement: StudentStatementResponse, schoolInfo: ReportSchoolInfo, fileName: string): jsPDF {
     const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
     const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(17, 24, 39);
-    doc.text('Student financial statement', margin, 44);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(75, 85, 99);
-    doc.text(`Student: ${statement.studentName}`, margin, 62);
-    doc.text(`School ID: ${statement.schoolId}`, margin, 76);
-    doc.text(`Opening balance: ${statement.openingBalance.toFixed(2)}`, margin, 90);
-    doc.text(`Closing balance: ${statement.closingBalance.toFixed(2)}`, margin, 104);
+    const startY = drawLetterhead(doc, schoolInfo, 'Student financial statement', margin, pageWidth, [
+        `Student: ${statement.studentName}`,
+        `Opening balance: ${statement.openingBalance.toFixed(2)}`,
+        `Closing balance: ${statement.closingBalance.toFixed(2)}`
+    ]);
 
     autoTable(doc, {
-        startY: 122,
+        startY,
         head: [['Date', 'Type', 'Status', 'Reference', 'Debit', 'Credit', 'Running']],
         body: statement.transactions.map((line) => [
             formatDate(line.transactionDate),
@@ -529,6 +562,7 @@ export function buildStudentStatementPdf(statement: StudentStatementResponse, fi
 }
 
 export function buildAdminResultsReportPdf(
+    schoolInfo: ReportSchoolInfo,
     title: string,
     description: string,
     scope: string,
@@ -541,19 +575,13 @@ export function buildAdminResultsReportPdf(
     const margin = 40;
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    doc.setTextColor(17, 24, 39);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.text(title, margin, 46);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(75, 85, 99);
-    doc.text(description, margin, 64, { maxWidth: pageWidth - margin * 2 });
-    doc.text(`Scope: ${scope}`, margin, 82);
-    doc.text(`Filters: ${filters}`, margin, 96);
-    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 110);
+    let currentY = drawLetterhead(doc, schoolInfo, title, margin, pageWidth, [
+        description,
+        `Scope: ${scope}`,
+        `Filters: ${filters}`,
+        `Generated: ${formatDate(generatedAt)}`
+    ]);
 
-    let currentY = 126;
     for (const schoolGroup of groups) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(13);
@@ -582,17 +610,9 @@ export function buildAdminResultsReportPdf(
                     formatDate(result.createdAt)
                 ]),
                 theme: 'striped',
-                styles: {
-                    fontSize: 8,
-                    cellPadding: 4
-                },
-                headStyles: {
-                    fillColor: [37, 99, 235]
-                },
-                margin: {
-                    left: margin,
-                    right: margin
-                }
+                styles: { fontSize: 8, cellPadding: 4 },
+                headStyles: { fillColor: [37, 99, 235] },
+                margin: { left: margin, right: margin }
             });
 
             currentY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 18 : currentY + 110;
@@ -622,13 +642,20 @@ export function buildParentPreviewReportPdf(report: ParentPreviewReportResponse)
 
     doc.setFillColor(...accent);
     doc.rect(0, 0, pageWidth, 118, 'F');
+
+    if (_logoDataUrl) {
+        try {
+            doc.addImage(_logoDataUrl, 'PNG', margin, 8, 36, 36);
+        } catch { /* skip logo if load fails */ }
+    }
+
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(20);
-    doc.text('Guardian result slip', margin, 38);
+    doc.text('Guardian result slip', _logoDataUrl ? margin + 44 : margin, 38);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
-    doc.text('A structured summary for the selected learner and level.', margin, 56);
+    doc.text('A structured summary for the selected learner and level.', _logoDataUrl ? margin + 44 : margin, 56);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text(report.schoolName, pageWidth - margin, 38, { align: 'right' });
@@ -813,17 +840,11 @@ function formatStatementPercent(value?: number | null): string {
     return value < 0 ? `(${formatted}%)` : `${formatted}%`;
 }
 
-function writeReportHeading(doc: jsPDF, title: string, schoolName: string, generatedAt: Date | string, periodLabel: string, margin: number): void {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(17, 24, 39);
-    doc.text(title, margin, 44);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(75, 85, 99);
-    doc.text(`School: ${schoolName}`, margin, 62);
-    doc.text(`Period: ${periodLabel}`, margin, 76);
-    doc.text(`Generated: ${formatDate(generatedAt)}`, margin, 90);
+function writeReportHeading(doc: jsPDF, title: string, schoolInfo: ReportSchoolInfo, generatedAt: Date | string, periodLabel: string, margin: number, pageWidth: number): number {
+    return drawLetterhead(doc, schoolInfo, title, margin, pageWidth, [
+        `Period: ${periodLabel}`,
+        `Generated: ${formatDate(generatedAt)}`
+    ]);
 }
 
 function drawMetricCard(doc: jsPDF, x: number, y: number, width: number, height: number, label: string, value: string, secondary: string): void {

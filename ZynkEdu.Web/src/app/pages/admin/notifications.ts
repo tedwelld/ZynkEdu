@@ -23,6 +23,10 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
     imports: [CommonModule, FormsModule, ButtonModule, InputTextModule, MetricCardComponent, MultiSelectModule, AppDropdownComponent, PaginatorModule, SkeletonModule, TagModule, TextareaModule, TimelineModule],
     template: `
         <section class="space-y-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Notifications</p>
@@ -194,6 +198,7 @@ export class AdminNotifications implements OnInit {
     private readonly auth = inject(AuthService);
 
     loading = true;
+    errorMessage = '';
     notifications: NotificationResponse[] = [];
     schools: SchoolResponse[] = [];
     students: StudentResponse[] = [];
@@ -309,6 +314,7 @@ export class AdminNotifications implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load notifications. Please refresh or check your connection.';
             }
         });
     }

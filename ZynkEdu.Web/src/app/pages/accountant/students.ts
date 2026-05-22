@@ -9,8 +9,8 @@ import { TagModule } from 'primeng/tag';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
-import { buildStudentStatementPdf } from '../../shared/report/report-pdf';
-import { CreateAdjustmentRequest, CreateFineRequest, CreateRefundRequest, InvoiceResponse, LibraryBorrowerSummaryResponse, StatementLineResponse, StudentResponse, StudentStatementResponse, UpdateInvoiceRequest } from '../../core/api/api.models';
+import { ReportSchoolInfo, buildStudentStatementPdf } from '../../shared/report/report-pdf';
+import { CreateAdjustmentRequest, CreateFineRequest, CreateRefundRequest, InvoiceResponse, LibraryBorrowerSummaryResponse, SchoolResponse, StatementLineResponse, StudentResponse, StudentStatementResponse, UpdateInvoiceRequest } from '../../core/api/api.models';
 
 interface InvoiceDraft {
     term: string;
@@ -398,6 +398,7 @@ export class AccountantStudents implements OnInit {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
 
+    schools: SchoolResponse[] = [];
     students: StudentResponse[] = [];
     overdueLibraryBorrowers: LibraryBorrowerSummaryResponse[] = [];
     selectedStudentId: number | null = null;
@@ -447,6 +448,7 @@ export class AccountantStudents implements OnInit {
     }
 
     ngOnInit(): void {
+        this.api.getSchools().subscribe({ next: s => this.schools = s });
         forkJoin({
             students: this.api.getStudents(undefined, this.auth.schoolId()),
             overdueLibraryBorrowers: this.api.getLibraryBorrowersWithOverdueLoans(this.auth.schoolId())
@@ -677,7 +679,8 @@ export class AccountantStudents implements OnInit {
 
         buildStudentStatementPdf(
             this.statement,
-            `student-statement-${this.statement.studentName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${this.statement.studentId}.pdf`
+            this.schoolInfo,
+            `student-statement-${this.statement.studentName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
         );
     }
 
@@ -715,5 +718,11 @@ export class AccountantStudents implements OnInit {
     private isCurrentEnrollment(student: StudentResponse): boolean {
         const status = student.status.trim().toLowerCase();
         return status === 'active' || status === 'suspended';
+    }
+
+    private get schoolInfo(): ReportSchoolInfo {
+        const id = this.auth.schoolId();
+        const school = this.schools.find(s => s.id === id);
+        return { name: school?.name ?? (id ? `School ${id}` : 'All schools'), address: school?.address ?? null };
     }
 }

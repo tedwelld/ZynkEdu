@@ -1,10 +1,11 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { StudentStatementResponse } from '../../../core/api/api.models';
+import { ReportSchoolInfo, drawLetterhead } from './report-pdf';
 
 export function buildStudentStatementPdf(
     statement: StudentStatementResponse,
-    schoolName: string,
+    schoolInfo: ReportSchoolInfo,
     generatedAt: Date | string,
     fileName: string
 ): jsPDF {
@@ -12,23 +13,16 @@ export function buildStudentStatementPdf(
     const margin = 40;
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Header
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor(17, 24, 39);
-    doc.text('Student financial statement', margin, 46);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(75, 85, 99);
-    doc.text(`Student: ${statement.studentName}`, margin, 64);
-    doc.text(`Term: ${statement.statementTerm ?? 'All time'}`, margin, 78);
-    doc.text(`Currency: ${statement.currency}`, margin, 92);
-    doc.text(`Opening balance: ${statement.openingBalance.toLocaleString('en-US', { style: 'currency', currency: statement.currency })}`, margin, 106);
-    doc.text(`Closing balance: ${statement.closingBalance.toLocaleString('en-US', { style: 'currency', currency: statement.currency })}`, margin, 120);
+    const startY = drawLetterhead(doc, schoolInfo, 'Student financial statement', margin, pageWidth, [
+        `Student: ${statement.studentName}`,
+        `Term: ${statement.statementTerm ?? 'All time'}`,
+        `Currency: ${statement.currency}`,
+        `Opening balance: ${statement.openingBalance.toLocaleString('en-US', { style: 'currency', currency: statement.currency })}`,
+        `Closing balance: ${statement.closingBalance.toLocaleString('en-US', { style: 'currency', currency: statement.currency })}`
+    ]);
 
-    // Transactions table
     autoTable(doc, {
-        startY: 140,
+        startY,
         head: [['ID', 'Date', 'Type', 'Status', 'Reference', 'Debit', 'Credit', 'Balance']],
         body: statement.transactions.map((line) => [
             line.transactionId.toString(),
@@ -54,4 +48,3 @@ export function buildStudentStatementPdf(
     doc.save(fileName);
     return doc;
 }
-

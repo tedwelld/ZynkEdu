@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ChartData, ChartOptions } from 'chart.js';
 import { ButtonModule } from 'primeng/button';
 import { ChartModule } from 'primeng/chart';
@@ -28,17 +28,15 @@ interface ActiveSchoolRow {
     results: number;
 }
 
-interface ActivitySchoolRow {
-    schoolId: number;
-    schoolName: string;
-    count: number;
-}
-
 @Component({
     standalone: true,
     selector: 'app-platform-dashboard',
     imports: [CommonModule, FormsModule, RouterLink, ButtonModule, ChartModule, MetricCardComponent, AppDropdownComponent, SkeletonModule, TableModule, TagModule],
     template: `
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
         <section class="space-y-6">
             <header class="workspace-card overflow-hidden relative">
                 <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.16),transparent_30%),radial-gradient(circle_at_left,rgba(29,78,216,0.14),transparent_34%)]"></div>
@@ -57,18 +55,6 @@ interface ActivitySchoolRow {
                     </div>
 
                     <div class="space-y-4">
-                        <div class="workspace-card metric-gradient border border-white/20 dark:border-surface-700/60">
-                            <div class="flex items-center justify-between gap-4">
-                                <div>
-                                    <span class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Current scope</span>
-                                    <div class="mt-2 text-2xl font-display font-bold">{{ selectedSchoolLabel }}</div>
-                                </div>
-                                <div class="w-16 h-16 rounded-3xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center text-white">
-                                    <i class="pi pi-sitemap text-2xl"></i>
-                                </div>
-                            </div>
-                        </div>
-
                         <div>
                             <label class="block text-sm font-semibold mb-2">Filter school</label>
                             <app-dropdown
@@ -81,7 +67,6 @@ interface ActivitySchoolRow {
                                 [filter]="true"
                                 filterBy="label"
                                 filterPlaceholder="Search schools"
-                                (opened)="loadData()"
                                 (ngModelChange)="onSchoolChange($event)"
                             ></app-dropdown>
                         </div>
@@ -89,7 +74,7 @@ interface ActivitySchoolRow {
                 </div>
             </header>
 
-            <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <section class="grid gap-4 sm:grid-cols-3">
                 <app-metric-card
                     label="Schools"
                     [value]="schoolCount"
@@ -111,120 +96,77 @@ interface ActivitySchoolRow {
                     [queryParams]="schoolFocusQuery"
                 ></app-metric-card>
                 <app-metric-card
-                    label="Teachers"
-                    [value]="teacherCount"
-                    delta="Across schools"
-                    hint="Active staff"
-                    icon="pi pi-id-card"
-                    tone="purple"
-                    routerLink="/platform/teachers"
-                    [queryParams]="schoolFocusQuery"
-                ></app-metric-card>
-                <app-metric-card
-                    label="Scope"
-                    [value]="selectedSchoolLabel"
-                    delta="Current selection"
-                    hint="Platform drill-down"
-                    icon="pi pi-filter"
-                    tone="orange"
-                    routerLink="/platform/schools"
-                ></app-metric-card>
-                <app-metric-card
                     label="Attendance"
                     [value]="attendanceRate"
-                    delta="Today"
+                    delta="All-time"
                     hint="Present rate"
                     icon="pi pi-check-circle"
-                    tone="green"
+                    tone="cyan"
                     routerLink="/platform/attendance"
                     [queryParams]="schoolFocusQuery"
                 ></app-metric-card>
-                <app-metric-card
-                    label="Performance"
-                    [value]="averageScore"
-                    delta="Overall average"
-                    hint="Results summary"
-                    icon="pi pi-chart-line"
-                    tone="cyan"
-                    routerLink="/platform/results"
-                    [queryParams]="schoolFocusQuery"
-                ></app-metric-card>
             </section>
 
-            <section class="grid gap-6 xl:grid-cols-2 items-stretch">
-                <article class="workspace-card h-full flex flex-col">
-                    <div class="flex items-center justify-between gap-4 mb-5">
-                        <div>
-                            <h2 class="text-xl font-display font-bold mb-1">Growth analytics</h2>
-                            <p class="text-sm text-muted-color">New schools and students added over the last six months.</p>
-                        </div>
-                        <span class="text-sm text-muted-color">{{ growthSeries.length }} months</span>
+            <article class="workspace-card flex flex-col">
+                <div class="flex items-center justify-between gap-4 mb-5">
+                    <div>
+                        <h2 class="text-xl font-display font-bold mb-1">Growth analytics</h2>
+                        <p class="text-sm text-muted-color">New schools and students added over the last six months.</p>
                     </div>
-                    <div *ngIf="loading" class="flex-1">
-                        <p-skeleton height="17rem" borderRadius="1rem"></p-skeleton>
-                    </div>
-                    <div *ngIf="!loading" class="chart-canvas-wrap flex-1 min-h-[17rem]">
-                        <p-chart type="line" [data]="growthData" [options]="growthOptions" class="w-full h-full"></p-chart>
-                    </div>
-                </article>
+                    <span class="text-sm text-muted-color">{{ growthSeries.length }} months</span>
+                </div>
+                <div *ngIf="loading" class="flex-1">
+                    <p-skeleton height="17rem" borderRadius="1rem"></p-skeleton>
+                </div>
+                <div *ngIf="!loading" class="chart-canvas-wrap flex-1 min-h-[17rem]">
+                    <p-chart type="line" [data]="growthData" [options]="growthOptions" class="w-full h-full"></p-chart>
+                </div>
+            </article>
 
-                <article class="workspace-card h-full flex flex-col">
-                    <div class="flex items-center justify-between gap-4 mb-5">
-                        <div>
-                            <h2 class="text-xl font-display font-bold mb-1">Attendance mix</h2>
-                            <p class="text-sm text-muted-color">Today’s combined register counts.</p>
-                        </div>
-                        <p-tag [value]="systemHealthLabel" [severity]="systemHealthSeverity"></p-tag>
+            <article class="workspace-card">
+                <div class="flex items-center justify-between gap-4 mb-4">
+                    <div>
+                        <h2 class="text-xl font-display font-bold mb-1">All schools overview</h2>
+                        <p class="text-sm text-muted-color">Every registered school with performance and activity data.</p>
                     </div>
-                    <div *ngIf="loading" class="flex-1">
-                        <p-skeleton height="17rem" borderRadius="1rem"></p-skeleton>
-                    </div>
-                    <div *ngIf="!loading" class="chart-canvas-wrap flex-1 min-h-[17rem] flex items-center justify-center">
-                        <p-chart type="doughnut" [data]="attendanceData" [options]="attendanceOptions" class="w-full h-full"></p-chart>
-                    </div>
-                </article>
-            </section>
-
-            <section class="grid gap-6 xl:grid-cols-2 items-stretch">
-                <article class="workspace-card h-full flex flex-col">
-                    <div class="flex items-center justify-between gap-4 mb-4">
-                        <div>
-                            <h2 class="text-xl font-display font-bold mb-1">Most active schools</h2>
-                            <p class="text-sm text-muted-color">Schools with the highest recent platform activity.</p>
-                        </div>
-                        <span class="text-sm text-muted-color">{{ activeSchools.length }} schools</span>
-                    </div>
-                    <div *ngIf="loading" class="space-y-3">
-                        <p-skeleton *ngFor="let _ of skeletonRows" height="3.5rem" borderRadius="1rem"></p-skeleton>
-                    </div>
-                    <p-table *ngIf="!loading" [value]="activeSchools" [rows]="5" [paginator]="true" styleClass="p-datatable-sm">
-                        <ng-template pTemplate="header">
-                            <tr>
-                                <th>School</th>
-                                <th>Activity</th>
-                                <th>Average</th>
-                                <th>Pass rate</th>
-                            </tr>
-                        </ng-template>
-                        <ng-template pTemplate="body" let-school>
-                            <tr class="cursor-pointer" [routerLink]="['/platform/schools']" [queryParams]="{ focus: school.schoolId }">
-                                <td class="font-semibold">{{ school.schoolName }}</td>
-                                <td>{{ school.results }}</td>
-                                <td>{{ school.score | number: '1.0-1' }}%</td>
-                                <td>{{ school.passRate | number: '1.0-1' }}%</td>
-                            </tr>
-                        </ng-template>
-                    </p-table>
-                </article>
-
-            </section>
+                    <span class="text-sm text-muted-color">{{ activeSchools.length }} school(s)</span>
+                </div>
+                <div *ngIf="loading" class="space-y-3">
+                    <p-skeleton *ngFor="let _ of skeletonRows" height="3.5rem" borderRadius="1rem"></p-skeleton>
+                </div>
+                <p-table *ngIf="!loading" [value]="activeSchools" [rows]="10" [paginator]="true" styleClass="p-datatable-sm">
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th>School</th>
+                            <th>Results</th>
+                            <th>Average</th>
+                            <th>Pass rate</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-school>
+                        <tr class="cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors" (click)="navigateToSchool(school.schoolId)">
+                            <td class="font-semibold">{{ school.schoolName }}</td>
+                            <td>{{ school.results }}</td>
+                            <td>{{ school.score | number: '1.0-1' }}%</td>
+                            <td>{{ school.passRate | number: '1.0-1' }}%</td>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="emptymessage">
+                        <tr>
+                            <td colspan="4" class="text-center text-muted-color py-6">No schools registered yet.</td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+            </article>
         </section>
     `
 })
 export class PlatformDashboard implements OnInit {
     private readonly api = inject(ApiService);
+    private readonly router = inject(Router);
 
     loading = true;
+    errorMessage = '';
     schools: SchoolResponse[] = [];
     admins: UserResponse[] = [];
     students: StudentResponse[] = [];
@@ -233,12 +175,10 @@ export class PlatformDashboard implements OnInit {
     attendanceSummaries: AttendanceDailySummaryResponse[] = [];
     growthSeries: GrowthPoint[] = [];
     activeSchools: ActiveSchoolRow[] = [];
-    skeletonRows = Array.from({ length: 4 });
+    skeletonRows = Array.from({ length: 6 });
     selectedSchoolId: number | null = null;
     growthData!: ChartData<'line'>;
     growthOptions!: ChartOptions<'line'>;
-    attendanceData!: ChartData<'doughnut'>;
-    attendanceOptions!: ChartOptions<'doughnut'>;
 
     ngOnInit(): void {
         this.loadData();
@@ -268,14 +208,6 @@ export class PlatformDashboard implements OnInit {
 
     get studentCount(): string {
         return this.students.length.toString();
-    }
-
-    get teacherCount(): string {
-        return this.teachers.length.toString();
-    }
-
-    get averageScore(): string {
-        return this.dashboard ? `${this.dashboard.overallAverageScore.toFixed(1)}%` : '0%';
     }
 
     get attendanceRate(): string {
@@ -318,21 +250,24 @@ export class PlatformDashboard implements OnInit {
         return this.schools.find((school) => school.id === this.selectedSchoolId)?.name ?? `School ${this.selectedSchoolId}`;
     }
 
+    navigateToSchool(schoolId: number): void {
+        void this.router.navigate(['/platform/schools'], { queryParams: { focus: schoolId } });
+    }
+
     loadData(): void {
         this.loading = true;
+        this.errorMessage = '';
         forkJoin({
             schools: this.api.getPlatformSchools(),
             admins: this.api.getAdmins(this.selectedSchoolId),
             students: this.api.getStudents(undefined, this.selectedSchoolId),
-            teachers: this.api.getTeachers(this.selectedSchoolId),
             dashboard: this.api.getAdminDashboard(this.selectedSchoolId),
-            attendance: this.api.getAttendanceDailySummaries(new Date().toISOString().slice(0, 10), this.selectedSchoolId)
+            attendance: this.api.getAttendanceDailySummaries(null, this.selectedSchoolId)
         }).subscribe({
-            next: ({ schools, admins, students, teachers, dashboard, attendance }) => {
+            next: ({ schools, admins, students, dashboard, attendance }) => {
                 this.schools = schools;
                 this.admins = admins;
                 this.students = students;
-                this.teachers = teachers;
                 this.dashboard = dashboard;
                 this.attendanceSummaries = attendance;
                 this.growthSeries = this.buildGrowthSeries();
@@ -342,6 +277,7 @@ export class PlatformDashboard implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
             }
         });
     }
@@ -361,15 +297,19 @@ export class PlatformDashboard implements OnInit {
     }
 
     private buildActiveSchools(): ActiveSchoolRow[] {
-        return [...(this.dashboard?.schoolPerformance ?? [])]
-            .sort((a, b) => b.averageScore - a.averageScore)
-            .map((row) => ({
-                schoolId: row.schoolId,
-                schoolName: row.schoolName,
-                score: row.averageScore,
-                passRate: row.passRate,
-                results: row.resultCount
-            }));
+        const perfMap = new Map((this.dashboard?.schoolPerformance ?? []).map((p) => [p.schoolId, p]));
+        return this.schools
+            .map((school) => {
+                const perf = perfMap.get(school.id);
+                return {
+                    schoolId: school.id,
+                    schoolName: school.name,
+                    score: perf?.averageScore ?? 0,
+                    passRate: perf?.passRate ?? 0,
+                    results: perf?.resultCount ?? 0
+                };
+            })
+            .sort((a, b) => b.results - a.results);
     }
 
     private buildCharts(): void {
@@ -432,43 +372,6 @@ export class PlatformDashboard implements OnInit {
             }
         };
 
-        const attendanceTotals = {
-            Present: 0,
-            Absent: 0,
-            Late: 0,
-            Excused: 0
-        };
-        this.attendanceSummaries.forEach((item) => {
-            attendanceTotals.Present += item.presentCount;
-            attendanceTotals.Absent += item.absentCount;
-            attendanceTotals.Late += item.lateCount;
-            attendanceTotals.Excused += item.excusedCount;
-        });
-
-        this.attendanceData = {
-            labels: ['Present', 'Absent', 'Late', 'Excused'],
-            datasets: [
-                {
-                    data: [attendanceTotals.Present, attendanceTotals.Absent, attendanceTotals.Late, attendanceTotals.Excused],
-                    backgroundColor: ['#16a34a', '#ef4444', '#f59e0b', '#64748b'],
-                    borderColor: ['#ffffff', '#ffffff', '#ffffff', '#ffffff'],
-                    borderWidth: 2
-                }
-            ]
-        };
-
-        this.attendanceOptions = {
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        color: textColor,
-                        usePointStyle: true
-                    }
-                }
-            }
-        };
     }
 
     private getRecentMonths(count: number): { label: string; date: Date }[] {

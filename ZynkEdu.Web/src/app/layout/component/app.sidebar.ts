@@ -3,11 +3,12 @@ import { Component, inject } from '@angular/core';
 import { ButtonModule } from 'primeng/button';
 import { AppMenu } from './app.menu';
 import { AuthService } from '../../core/auth/auth.service';
+import { ZynkEduLogo } from '../../shared/ui/zynkedu-logo.component';
 
 @Component({
     selector: 'app-sidebar',
     standalone: true,
-    imports: [CommonModule, AppMenu, ButtonModule],
+    imports: [CommonModule, AppMenu, ButtonModule, ZynkEduLogo],
     template: `
         <aside class="layout-sidebar">
             <div class="layout-sidebar__scroll">
@@ -17,7 +18,7 @@ import { AuthService } from '../../core/auth/auth.service';
                 <div class="workspace-card layout-sidebar__card">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
-                            <img src="assets/images/zynkedu-icon.png" alt="ZynkEdu logo" class="w-10 h-10 object-contain shrink-0" />
+                            <zynkedu-logo [size]="40" class="shrink-0"></zynkedu-logo>
                             <div>
                                 <p class="text-xs uppercase tracking-[0.22em] text-muted-color font-semibold">Signed in</p>
                                 <div class="text-xl font-display font-bold mt-1">ZynkEdu</div>

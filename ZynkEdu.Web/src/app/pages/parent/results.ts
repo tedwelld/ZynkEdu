@@ -18,6 +18,10 @@ type ReportChart = {
     selector: 'app-parent-results',
     imports: [CommonModule, ButtonModule, ChartModule, SkeletonModule, TagModule],
     template: `
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
         <section class="space-y-6">
             <div class="workspace-card">
                 <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Parent report</p>
@@ -169,6 +173,7 @@ type ReportChart = {
 export class ParentResults implements OnInit {
     private readonly api = inject(ApiService);
     loading = true;
+    errorMessage = '';
     reports: ParentPreviewReportResponse[] = [];
     reportCharts: ReportChart[] = [];
     skeletonCards = Array.from({ length: 2 });
@@ -190,6 +195,7 @@ export class ParentResults implements OnInit {
                 this.reports = [];
                 this.reportCharts = [];
                 this.loading = false;
+                this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
             }
         });
     }

@@ -9,6 +9,10 @@ import { StudentCommentResponse } from '../../core/api/api.models';
     selector: 'app-parent-notifications',
     imports: [CommonModule, SkeletonModule],
     template: `
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
         <section class="space-y-6">
             <div class="workspace-card">
                 <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Notifications</p>
@@ -39,6 +43,7 @@ import { StudentCommentResponse } from '../../core/api/api.models';
 export class ParentNotifications implements OnInit {
     private readonly api = inject(ApiService);
     loading = true;
+    errorMessage = '';
     results: StudentCommentResponse[] = [];
     skeletonRows = Array.from({ length: 4 });
 
@@ -55,6 +60,7 @@ export class ParentNotifications implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
             }
         });
     }

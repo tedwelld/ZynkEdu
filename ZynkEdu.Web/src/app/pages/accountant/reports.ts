@@ -14,9 +14,11 @@ import {
     FinancialStatementResponse,
     FinancialStatementRowResponse,
     FinancialStatementType,
-    RevenueByClassReportResponse
+    RevenueByClassReportResponse,
+    SchoolResponse
 } from '../../core/api/api.models';
 import {
+    ReportSchoolInfo,
     buildAgingBucketsPdf,
     buildCollectionReportPdf,
     buildDailyCashPdf,
@@ -36,6 +38,10 @@ type StatementField = FinancialStatementType;
     imports: [CommonModule, FormsModule, DialogModule, TableModule],
     template: `
         <section class="grid gap-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <header class="workspace-card p-6 md:p-8">
                 <p class="text-xs uppercase tracking-[0.28em] text-muted-color font-semibold">Reporting</p>
                 <h1 class="text-3xl md:text-4xl font-display font-bold mt-3">Accounting reports</h1>
@@ -367,6 +373,8 @@ export class AccountantReports implements OnInit {
         { label: 'Cash Flow Statement', value: 'CashFlowStatement' }
     ];
 
+    schools: SchoolResponse[] = [];
+    errorMessage = '';
     collection: CollectionReportResponse | null = null;
     aging: AgingReportResponse | null = null;
     dailyCash: DailyCashReportResponse | null = null;
@@ -402,6 +410,7 @@ export class AccountantReports implements OnInit {
     };
 
     ngOnInit(): void {
+        this.api.getSchools().subscribe({ next: s => this.schools = s });
         this.loadReports();
         this.loadStatement();
     }
@@ -450,36 +459,36 @@ export class AccountantReports implements OnInit {
             return;
         }
 
-        buildFinancialStatementPdf(this.schoolLabel, new Date(), this.statement, `financial-statement-${this.fileStamp()}.pdf`);
+        buildFinancialStatementPdf(this.schoolInfo, new Date(), this.statement, 'financial-statement.pdf');
     }
 
     exportCollectionPdf(): void {
         this.api.getCollectionReport(this.auth.schoolId()).subscribe((collection) => {
-            buildCollectionReportPdf(this.schoolLabel, new Date(), this.periodLabel, collection, `collection-report-${this.fileStamp()}.pdf`);
+            buildCollectionReportPdf(this.schoolInfo, new Date(), this.periodLabel, collection, 'collection-report.pdf');
         });
     }
 
     exportAgingPdf(): void {
         this.api.getAgingReport(this.auth.schoolId(), this.resolveAsOfDate()).subscribe((aging) => {
-            buildAgingBucketsPdf(this.schoolLabel, new Date(), this.periodLabel, aging, `aging-buckets-${this.fileStamp()}.pdf`);
+            buildAgingBucketsPdf(this.schoolInfo, new Date(), this.periodLabel, aging, 'aging-buckets.pdf');
         });
     }
 
     exportDefaultersPdf(): void {
         this.api.getDefaulters(this.auth.schoolId()).subscribe((defaulters) => {
-            buildDefaultersPdf(this.schoolLabel, new Date(), this.periodLabel, defaulters, `defaulters-${this.fileStamp()}.pdf`);
+            buildDefaultersPdf(this.schoolInfo, new Date(), this.periodLabel, defaulters, 'defaulters.pdf');
         });
     }
 
     exportRevenuePdf(): void {
         this.api.getRevenueByClassReport(this.auth.schoolId()).subscribe((revenue) => {
-            buildRevenueByClassPdf(this.schoolLabel, new Date(), this.periodLabel, revenue, `revenue-by-class-${this.fileStamp()}.pdf`);
+            buildRevenueByClassPdf(this.schoolInfo, new Date(), this.periodLabel, revenue, 'revenue-by-class.pdf');
         });
     }
 
     exportDailyCashPdf(): void {
         this.api.getDailyCashReport(this.auth.schoolId(), this.resolveDailyCashDate()).subscribe((dailyCash) => {
-            buildDailyCashPdf(this.schoolLabel, new Date(), this.periodLabel, dailyCash, `daily-cash-${this.fileStamp()}.pdf`);
+            buildDailyCashPdf(this.schoolInfo, new Date(), this.periodLabel, dailyCash, 'daily-cash.pdf');
         });
     }
 
@@ -544,12 +553,17 @@ export class AccountantReports implements OnInit {
             dailyCash: this.api.getDailyCashReport(schoolId, this.resolveDailyCashDate()),
             revenue: this.api.getRevenueByClassReport(schoolId),
             defaulters: this.api.getDefaulters(schoolId)
-        }).subscribe(({ collection, aging, dailyCash, revenue, defaulters }) => {
-            this.collection = collection;
-            this.aging = aging;
-            this.dailyCash = dailyCash;
-            this.revenue = revenue;
-            this.defaulters = defaulters;
+        }).subscribe({
+            next: ({ collection, aging, dailyCash, revenue, defaulters }) => {
+                this.collection = collection;
+                this.aging = aging;
+                this.dailyCash = dailyCash;
+                this.revenue = revenue;
+                this.defaulters = defaulters;
+            },
+            error: () => {
+                this.errorMessage = 'Report data could not be loaded. Please refresh or check your connection.';
+            }
         });
     }
 
@@ -698,8 +712,10 @@ export class AccountantReports implements OnInit {
         return `${yyyy}-${mm}-${dd}`;
     }
 
-    private get schoolLabel(): string {
-        return this.auth.schoolId() ? `School ${this.auth.schoolId()}` : 'All schools';
+    private get schoolInfo(): ReportSchoolInfo {
+        const id = this.auth.schoolId();
+        const school = this.schools.find(s => s.id === id);
+        return { name: school?.name ?? (id ? `School ${id}` : 'All schools'), address: school?.address ?? null };
     }
 
     private get periodLabel(): string {
@@ -719,8 +735,4 @@ export class AccountantReports implements OnInit {
         }
     }
 
-    private fileStamp(): string {
-        const period = this.periodLabel.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
-        return period || new Date().toISOString().slice(0, 10);
-    }
 }

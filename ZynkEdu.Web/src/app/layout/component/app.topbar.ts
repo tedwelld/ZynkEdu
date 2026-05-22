@@ -13,11 +13,12 @@ import { LayoutService } from '../service/layout.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { GlobalSearchService } from '../../core/search/global-search.service';
 import { SearchHit } from '../../core/api/api.models';
+import { ZynkEduLogo } from '../../shared/ui/zynkedu-logo.component';
 
 @Component({
     selector: 'app-topbar',
     standalone: true,
-    imports: [CommonModule, FormsModule, RouterLink, StyleClassModule, AutoCompleteModule, AvatarModule, BadgeModule, ButtonModule, MenuModule],
+    imports: [CommonModule, FormsModule, RouterLink, StyleClassModule, AutoCompleteModule, AvatarModule, BadgeModule, ButtonModule, MenuModule, ZynkEduLogo],
     template: `
         <header class="layout-topbar">
             <div class="layout-topbar-logo-container">
@@ -26,7 +27,7 @@ import { SearchHit } from '../../core/api/api.models';
                 </button>
                 <a class="layout-topbar-logo" routerLink="/">
                     <div class="flex items-center gap-3">
-                        <img src="assets/images/zynkedu-icon.png" alt="ZynkEdu logo" class="w-11 h-11 object-contain shrink-0" />
+                        <zynkedu-logo [size]="44" class="shrink-0"></zynkedu-logo>
                         <div class="flex flex-col">
                             <span class="font-display font-bold text-xl leading-none">ZynkEdu</span>
                             <span class="text-xs text-muted-color uppercase tracking-[0.24em]">{{ workspaceLabel() }}</span>
@@ -74,10 +75,11 @@ import { SearchHit } from '../../core/api/api.models';
                         <i class="pi pi-bolt"></i>
                     </button>
                     <button pButton type="button" label="Logout" icon="pi pi-sign-out" severity="danger" class="logout-button" (click)="auth.logout()"></button>
-                    <button type="button" class="layout-topbar-action" (click)="profileMenu.toggle($event)">
-                        <p-avatar [label]="avatarLabel()" shape="circle" styleClass="bg-gradient-to-br from-blue-600 to-violet-600 text-white"></p-avatar>
+                    <button type="button" class="layout-topbar-action flex items-center gap-1.5 px-2 rounded-full" (click)="profileMenu.toggle($event)">
+                        <p-avatar [label]="avatarLabel()" shape="circle" styleClass="bg-gradient-to-br from-blue-600 to-violet-600 text-white !text-sm !w-8 !h-8"></p-avatar>
+                        <i class="pi pi-chevron-down text-xs text-muted-color"></i>
                     </button>
-                    <p-menu #profileMenu [popup]="true" [model]="profileItems"></p-menu>
+                    <p-menu #profileMenu [popup]="true" [model]="profileItems" appendTo="body"></p-menu>
                 </div>
             </div>
         </header>

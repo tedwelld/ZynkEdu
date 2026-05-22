@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\ZynkEdu.Api\\ZynkEdu.Api.csproj": {}
+    "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\zynkedu.api\\ZynkEdu.Api.csproj": {}
   },
   "projects": {
-    "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\ZynkEdu.Api\\ZynkEdu.Api.csproj": {
+    "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\zynkedu.api\\ZynkEdu.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\ZynkEdu.Api\\ZynkEdu.Api.csproj",
+        "projectUniqueName": "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\zynkedu.api\\ZynkEdu.Api.csproj",
         "projectName": "ZynkEdu.Api",
-        "projectPath": "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\ZynkEdu.Api\\ZynkEdu.Api.csproj",
+        "projectPath": "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\zynkedu.api\\ZynkEdu.Api.csproj",
         "packagesPath": "C:\\Users\\tedwell_d\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\ZynkEdu.Api\\obj\\",
+        "outputPath": "C:\\Users\\tedwell_d\\source\\repos\\ZynkEdu\\zynkedu.api\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

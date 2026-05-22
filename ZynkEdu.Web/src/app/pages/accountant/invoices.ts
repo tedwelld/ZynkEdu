@@ -4,9 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { FeeStructureResponse, StudentResponse } from '../../core/api/api.models';
+import { AcademicTermResponse, FeeStructureResponse, SchoolResponse, StudentResponse } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
-import { buildFeeStructuresPdf } from '../../shared/report/report-pdf';
+import { ReportSchoolInfo, buildFeeStructuresPdf } from '../../shared/report/report-pdf';
 
 type TermOption = {
     label: string;
@@ -119,6 +119,8 @@ export class AccountantInvoices implements OnInit {
     private readonly auth = inject(AuthService);
     private readonly messages = inject(MessageService);
 
+    schools: SchoolResponse[] = [];
+    terms: AcademicTermResponse[] = [];
     students: StudentResponse[] = [];
     feeStructures: FeeStructureResponse[] = [];
     feeSearch = '';
@@ -132,11 +134,18 @@ export class AccountantInvoices implements OnInit {
         description: ''
     };
 
-    readonly termOptions: TermOption[] = [
-        { label: 'Term 1', value: 'Term 1' },
-        { label: 'Term 2', value: 'Term 2' },
-        { label: 'Term 3', value: 'Term 3' }
-    ];
+    get termOptions(): TermOption[] {
+        if (this.terms.length > 0) {
+            return [...this.terms]
+                .sort((a, b) => a.termNumber - b.termNumber)
+                .map(t => ({ label: t.name, value: t.name }));
+        }
+        return [
+            { label: 'Term 1', value: 'Term 1' },
+            { label: 'Term 2', value: 'Term 2' },
+            { label: 'Term 3', value: 'Term 3' }
+        ];
+    }
 
     get studentOptions(): { label: string; value: number }[] {
         return this.students.map((student) => ({
@@ -161,6 +170,13 @@ export class AccountantInvoices implements OnInit {
 
     ngOnInit(): void {
         const schoolId = this.auth.schoolId();
+        this.api.getSchools().subscribe({ next: s => this.schools = s });
+        this.api.getAcademicTerms(schoolId).subscribe({ next: terms => {
+            this.terms = terms;
+            if (!this.draft.term && terms.length > 0) {
+                this.draft.term = [...terms].sort((a, b) => a.termNumber - b.termNumber)[0].name;
+            }
+        }});
         this.api.getStudents(undefined, schoolId).subscribe((students) => {
             this.students = students;
             this.draft.studentId = students[0]?.id ?? null;
@@ -175,7 +191,7 @@ export class AccountantInvoices implements OnInit {
     }
 
     exportFeeStructuresPdf(): void {
-        buildFeeStructuresPdf(this.schoolLabel, new Date(), this.filteredFeeStructures, `fee-structures-${this.fileStamp()}.pdf`);
+        buildFeeStructuresPdf(this.schoolInfo, new Date(), this.filteredFeeStructures, 'fee-structures.pdf');
     }
 
     sendFeeNewsletterToAdmin(): void {
@@ -185,7 +201,7 @@ export class AccountantInvoices implements OnInit {
 
         this.sendingNewsletter = true;
         try {
-            const pdf = buildFeeStructuresPdf(this.schoolLabel, new Date(), this.filteredFeeStructures, undefined, false);
+            const pdf = buildFeeStructuresPdf(this.schoolInfo, new Date(), this.filteredFeeStructures, undefined, false);
             const blob = pdf.output('blob');
             this.api.sendFeeStructureNewsletter(
                 { note: 'Attached is the current fee structure newsletter and payment method guide.' },
@@ -242,11 +258,9 @@ export class AccountantInvoices implements OnInit {
         return term;
     }
 
-    private get schoolLabel(): string {
-        return this.auth.schoolId() ? `School ${this.auth.schoolId()}` : 'All schools';
-    }
-
-    private fileStamp(): string {
-        return new Date().toISOString().slice(0, 10);
+    private get schoolInfo(): ReportSchoolInfo {
+        const id = this.auth.schoolId();
+        const school = this.schools.find(s => s.id === id);
+        return { name: school?.name ?? (id ? `School ${id}` : 'All schools'), address: school?.address ?? null };
     }
 }

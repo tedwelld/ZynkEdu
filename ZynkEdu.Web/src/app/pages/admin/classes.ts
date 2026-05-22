@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
@@ -12,9 +12,9 @@ import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
-import { AssignClassSubjectsRequest, CreateSchoolClassRequest, SchoolClassResponse, SchoolResponse, SubjectResponse, UpdateSchoolClassRequest } from '../../core/api/api.models';
+import { AssignClassSubjectsRequest, CreateSchoolClassRequest, SchoolClassResponse, SchoolResponse, SubjectResponse, TeacherAssignmentResponse, UpdateSchoolClassRequest } from '../../core/api/api.models';
 import { AuthService } from '../../core/auth/auth.service';
-import { getClassesForLevel, normalizeSchoolLevel, SCHOOL_LEVEL_OPTIONS, SchoolLevel } from '../../core/school-levels';
+import { getClassesForLevel, getLevelCode, normalizeSchoolLevel, SCHOOL_LEVEL_OPTIONS, SchoolLevel } from '../../core/school-levels';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 
@@ -24,6 +24,10 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
     imports: [CommonModule, FormsModule, ButtonModule, DialogModule, InputTextModule, MetricCardComponent, AppDropdownComponent, MultiSelectModule, SkeletonModule, TableModule, TagModule],
     template: `
         <section class="space-y-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <div class="workspace-card flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Classes</p>
@@ -78,16 +82,19 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 <p-table *ngIf="!loading" [value]="visibleClasses" [rows]="10" [paginator]="true" styleClass="p-datatable-sm">
                     <ng-template pTemplate="header">
                         <tr>
+                            <th class="text-muted-color w-8">#</th>
                             <th>Class</th>
                             <th>Level</th>
                             <th>Subjects</th>
+                            <th>Teachers</th>
                             <th>Status</th>
                             <th>Created</th>
                             <th class="text-right">Actions</th>
                         </tr>
                     </ng-template>
-                    <ng-template pTemplate="body" let-schoolClass>
+                    <ng-template pTemplate="body" let-schoolClass let-rowIndex="rowIndex">
                         <tr>
+                            <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
                             <td>
                                 <div class="font-semibold">{{ schoolClass.className }}</div>
                                 <div class="text-xs text-muted-color">ID {{ schoolClass.id }}</div>
@@ -100,6 +107,13 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                                 </div>
                             </td>
                             <td>
+                                <ng-container *ngIf="schoolClass.isReadyForTeaching; else notReadyTeacher">
+                                    <p-tag *ngIf="teacherCountFor(schoolClass.className) > 0" [value]="teacherCountFor(schoolClass.className) + ' teacher(s)'" severity="success"></p-tag>
+                                    <p-tag *ngIf="teacherCountFor(schoolClass.className) === 0" value="No teacher" severity="warning"></p-tag>
+                                </ng-container>
+                                <ng-template #notReadyTeacher><span class="text-sm text-muted-color">—</span></ng-template>
+                            </td>
+                            <td>
                                 <div class="flex flex-wrap gap-2">
                                     <p-tag [value]="schoolClass.isActive ? 'Active' : 'Inactive'" [severity]="schoolClass.isActive ? 'success' : 'danger'"></p-tag>
                                     <p-tag [value]="schoolClass.isReadyForTeaching ? 'Ready for teaching' : 'Not ready for teaching'" [severity]="schoolClass.isReadyForTeaching ? 'success' : 'warning'"></p-tag>
@@ -107,8 +121,12 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                             </td>
                             <td class="text-sm text-muted-color">{{ schoolClass.createdAt | date: 'mediumDate' }}</td>
                             <td class="text-right">
-                                <button pButton type="button" label="Subjects" class="p-button-text p-button-sm" icon="pi pi-book" (click)="openAssignSubjects(schoolClass)"></button>
-                                <button pButton type="button" icon="pi pi-pencil" class="p-button-text p-button-sm" (click)="openEdit(schoolClass)"></button>
+                                <div class="flex flex-wrap items-center justify-end gap-1">
+                                    <button *ngIf="schoolClass.isReadyForTeaching && teacherCountFor(schoolClass.className) === 0" pButton type="button" label="Assign teacher" icon="pi pi-user-plus" class="p-button-text p-button-sm p-button-warning" (click)="navigateToAssign(schoolClass.className)"></button>
+                                    <button *ngIf="schoolClass.isReadyForTeaching" pButton type="button" label="Students" icon="pi pi-users" class="p-button-text p-button-sm p-button-secondary" (click)="navigateToStudents(schoolClass.className)"></button>
+                                    <button pButton type="button" label="Subjects" class="p-button-text p-button-sm" icon="pi pi-book" (click)="openAssignSubjects(schoolClass)"></button>
+                                    <button pButton type="button" icon="pi pi-pencil" class="p-button-text p-button-sm" (click)="openEdit(schoolClass)"></button>
+                                </div>
                             </td>
                         </tr>
                     </ng-template>
@@ -195,10 +213,13 @@ export class AdminClasses implements OnInit {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
     private readonly route = inject(ActivatedRoute);
+    private readonly router = inject(Router);
     private readonly messages = inject(MessageService);
     loading = true;
+    errorMessage = '';
     schools: SchoolResponse[] = [];
     classes: SchoolClassResponse[] = [];
+    assignments: TeacherAssignmentResponse[] = [];
     subjects: SubjectResponse[] = [];
     selectedSchoolId: number | null = null;
     searchTerm = '';
@@ -253,7 +274,10 @@ export class AdminClasses implements OnInit {
         const level = normalizeSchoolLevel(this.draft.gradeLevel);
         return this.subjects
             .filter((subject) => normalizeSchoolLevel(subject.gradeLevel) === level || normalizeSchoolLevel(subject.gradeLevel) === 'General')
-            .map((subject) => ({ label: `${subject.name} (${normalizeSchoolLevel(subject.gradeLevel)})`, value: subject.id }))
+            .map((subject) => {
+                const code = getLevelCode(subject.gradeLevel);
+                return { label: code ? `${subject.name} [${code}]` : subject.name, value: subject.id };
+            })
             .sort((left, right) => left.label.localeCompare(right.label));
     }
 
@@ -265,7 +289,10 @@ export class AdminClasses implements OnInit {
         const level = normalizeSchoolLevel(this.activeClass.gradeLevel);
         return this.subjects
             .filter((subject) => normalizeSchoolLevel(subject.gradeLevel) === level || normalizeSchoolLevel(subject.gradeLevel) === 'General')
-            .map((subject) => ({ label: `${subject.name} (${normalizeSchoolLevel(subject.gradeLevel)})`, value: subject.id }))
+            .map((subject) => {
+                const code = getLevelCode(subject.gradeLevel);
+                return { label: code ? `${subject.name} [${code}]` : subject.name, value: subject.id };
+            })
             .sort((left, right) => left.label.localeCompare(right.label));
     }
 
@@ -305,6 +332,7 @@ export class AdminClasses implements OnInit {
                 },
                 error: () => {
                     this.loading = false;
+                    this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
                 }
             });
             return;
@@ -314,17 +342,20 @@ export class AdminClasses implements OnInit {
         forkJoin({
             classes: this.api.getClasses(schoolId),
             subjects: this.api.getSubjects(schoolId),
-            schools: this.api.getSchools()
+            schools: this.api.getSchools(),
+            assignments: this.api.getAssignments(schoolId)
         }).subscribe({
-            next: ({ classes, subjects, schools }) => {
+            next: ({ classes, subjects, schools, assignments }) => {
                 this.classes = classes;
                 this.subjects = subjects;
+                this.assignments = assignments;
                 this.schools = this.isPlatformAdmin ? schools : schools.filter((school) => school.id === this.auth.schoolId());
                 this.selectedSchoolId = this.isPlatformAdmin ? this.selectedSchoolId ?? this.schools[0]?.id ?? null : this.auth.schoolId();
                 this.loading = false;
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load classes. Please refresh or check your connection.';
             }
         });
     }
@@ -368,6 +399,22 @@ export class AdminClasses implements OnInit {
         this.activeClass = schoolClass;
         this.subjectDraft = { subjectIds: [...schoolClass.subjectIds].filter((subjectId) => this.subjectOptionsForActiveClass.some((option) => option.value === subjectId)) };
         this.subjectsVisible = true;
+    }
+
+    teacherCountFor(className: string): number {
+        return new Set(
+            this.assignments
+                .filter((a) => a.class === className)
+                .map((a) => a.teacherId)
+        ).size;
+    }
+
+    navigateToAssign(className: string): void {
+        void this.router.navigate(['/admin/assignments'], { queryParams: { class: className } });
+    }
+
+    navigateToStudents(className: string): void {
+        void this.router.navigate(['/admin/students'], { queryParams: { class: className } });
     }
 
     saveClass(): void {

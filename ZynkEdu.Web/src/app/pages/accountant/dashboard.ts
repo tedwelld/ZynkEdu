@@ -70,6 +70,10 @@ type AgingChartSlice = {
     `],
     template: `
         <section class="grid gap-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <header class="workspace-card p-6 md:p-8">
                 <p class="text-xs uppercase tracking-[0.28em] text-muted-color font-semibold">Accounting workspace</p>
                 <h1 class="text-3xl md:text-4xl font-display font-bold mt-3">Finance dashboard</h1>
@@ -189,6 +193,7 @@ export class AccountantDashboard implements OnInit {
     revenue: RevenueByClassReportResponse | null = null;
     defaulters: DefaulterReportResponse | null = null;
     overdueLibraryBorrowers: LibraryBorrowerSummaryResponse[] = [];
+    errorMessage = '';
 
     get overdueLibraryBorrowersCount(): number {
         return this.overdueLibraryBorrowers.filter((b) => b.borrowerType === 'Student').length;
@@ -243,10 +248,11 @@ export class AccountantDashboard implements OnInit {
 
     ngOnInit(): void {
         const schoolId = this.auth.schoolId();
-        this.api.getCollectionReport(schoolId).subscribe((response) => (this.collection = response));
-        this.api.getAgingReport(schoolId).subscribe((response) => (this.aging = response));
-        this.api.getRevenueByClassReport(schoolId).subscribe((response) => (this.revenue = response));
-        this.api.getDefaulters(schoolId).subscribe((response) => (this.defaulters = response));
-        this.api.getLibraryBorrowersWithOverdueLoans(schoolId).subscribe((response) => (this.overdueLibraryBorrowers = response));
+        const onError = () => { this.errorMessage = 'Failed to load dashboard data. Please refresh or check your connection.'; };
+        this.api.getCollectionReport(schoolId).subscribe({ next: (r) => (this.collection = r), error: onError });
+        this.api.getAgingReport(schoolId).subscribe({ next: (r) => (this.aging = r), error: onError });
+        this.api.getRevenueByClassReport(schoolId).subscribe({ next: (r) => (this.revenue = r), error: onError });
+        this.api.getDefaulters(schoolId).subscribe({ next: (r) => (this.defaulters = r), error: onError });
+        this.api.getLibraryBorrowersWithOverdueLoans(schoolId).subscribe({ next: (r) => (this.overdueLibraryBorrowers = r), error: onError });
     }
 }

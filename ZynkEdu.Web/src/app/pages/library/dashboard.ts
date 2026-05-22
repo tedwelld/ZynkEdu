@@ -15,6 +15,10 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
     imports: [CommonModule, FormsModule, ButtonModule, AppDropdownComponent, TagModule],
     template: `
         <section class="space-y-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <header class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Library</p>
@@ -99,6 +103,7 @@ export class LibraryDashboard implements OnInit {
     blockedStudents: StudentFinancialFlagResponse[] = [];
     schools: SchoolResponse[] = [];
     selectedSchoolId: number | null = null;
+    errorMessage = '';
 
     get isPlatformAdmin(): boolean {
         return this.auth.role() === 'PlatformAdmin';
@@ -125,6 +130,7 @@ export class LibraryDashboard implements OnInit {
     }
 
     loadData(): void {
+        this.errorMessage = '';
         const schoolId = this.isPlatformAdmin ? this.selectedSchoolId : this.auth.schoolId();
         forkJoin({
             dashboard: this.api.getLibraryDashboard(schoolId),
@@ -137,6 +143,9 @@ export class LibraryDashboard implements OnInit {
                 this.books = books;
                 this.overdueLoans = overdueLoans;
                 this.blockedStudents = blockedStudents;
+            },
+            error: () => {
+                this.errorMessage = 'Failed to load library data. Please refresh or check your connection.';
             }
         });
     }

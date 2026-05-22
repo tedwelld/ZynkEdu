@@ -20,6 +20,10 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
     imports: [CommonModule, RouterLink, ChartModule, ButtonModule, DialogModule, MetricCardComponent, ProgressBarModule, SkeletonModule, TagModule],
     template: `
         <section class="space-y-8">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <header class="workspace-card overflow-hidden relative">
                 <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(124,58,237,0.16),transparent_30%),radial-gradient(circle_at_left,rgba(29,78,216,0.14),transparent_34%)]"></div>
                 <div class="relative grid gap-6 xl:grid-cols-[1.35fr_0.65fr] items-center">
@@ -63,51 +67,21 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 <app-metric-card [label]="'Notifications Sent'" [value]="todayNotifications" [delta]="notificationTrend" hint="Today" icon="pi pi-bell" tone="green" [direction]="notificationDirection" routerLink="/admin/notifications"></app-metric-card>
             </section>
 
-            <section class="workspace-card">
-                <div class="flex items-center justify-between mb-4">
+            <article class="workspace-card">
+                <div class="flex items-center justify-between gap-4 mb-4">
                     <div>
-                        <h2 class="text-xl font-display font-bold mb-1">Quick actions</h2>
-                        <p class="text-sm text-muted-color">Create work with one click.</p>
+                        <h2 class="text-xl font-display font-bold mb-1">School performance depth chart</h2>
+                        <p class="text-sm text-muted-color">A hybrid line view with layered series for average score and pass rate.</p>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <div class="text-sm text-muted-color">4D line graph</div>
+                        <div class="font-semibold text-blue-600 dark:text-blue-300">Executive view</div>
                     </div>
                 </div>
-                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <button pButton type="button" label="Add Student" icon="pi pi-user-plus" class="w-full justify-start" routerLink="/admin/students"></button>
-                    <button pButton type="button" label="Assign Teacher" icon="pi pi-sitemap" severity="secondary" class="w-full justify-start" routerLink="/admin/assignments"></button>
-                    <button pButton type="button" label="Send Notification" icon="pi pi-bell" severity="help" class="w-full justify-start" routerLink="/admin/notifications"></button>
-                    <button pButton type="button" label="Open System reports" icon="pi pi-file-pdf" severity="contrast" class="w-full justify-start" routerLink="/admin/reports"></button>
+                <div class="chart-canvas-wrap min-h-[11rem]">
+                    <p-chart type="line" [data]="lineData" [options]="lineOptions" class="w-full h-full"></p-chart>
                 </div>
-            </section>
-
-            <section class="grid gap-6 xl:grid-cols-2 items-stretch">
-                <article class="workspace-card h-full flex flex-col">
-                    <div class="flex items-center justify-between gap-4 mb-5">
-                        <div>
-                            <h2 class="text-xl font-display font-bold mb-1">School performance depth chart</h2>
-                            <p class="text-sm text-muted-color">A hybrid line view with layered series for average score and pass rate.</p>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-sm text-muted-color">4D line graph</div>
-                            <div class="font-semibold text-blue-600 dark:text-blue-300">Executive view</div>
-                        </div>
-                    </div>
-                    <div class="chart-canvas-wrap flex-1 min-h-[16rem]">
-                        <p-chart type="line" [data]="lineData" [options]="lineOptions" class="w-full h-full"></p-chart>
-                    </div>
-                </article>
-
-                <article class="workspace-card h-full flex flex-col">
-                    <div class="flex items-center justify-between mb-5">
-                        <div>
-                            <h2 class="text-xl font-display font-bold mb-1">4D pie chart</h2>
-                            <p class="text-sm text-muted-color">Class share visualized with depth, labels, and contrast.</p>
-                        </div>
-                        <i class="pi pi-chart-pie text-2xl text-violet-500"></i>
-                    </div>
-                    <div class="chart-canvas-wrap flex-1 min-h-[14rem] flex items-center justify-center">
-                        <p-chart type="pie" [data]="pieData" [options]="pieOptions" class="w-full h-full"></p-chart>
-                    </div>
-                </article>
-            </section>
+            </article>
 
             <p-dialog [(visible)]="studentDrawerVisible" [modal]="true" [draggable]="false" [dismissableMask]="true" [style]="{ width: 'min(42rem, 96vw)' }" header="Student profile" appendTo="body">
                 <ng-container *ngIf="selectedStudent; else drawerEmpty">
@@ -172,26 +146,26 @@ export class AdminDashboard implements OnInit {
     students: StudentResponse[] = [];
     notifications: NotificationResponse[] = [];
     loading = true;
+    errorMessage = '';
     studentDrawerVisible = false;
     selectedStudent: StudentResponse | null = null;
     studentResults: ResultResponse[] = [];
     studentCount = '0';
-    studentTrend = 'Loading';
+    studentTrend = '—';
     studentTrendDirection: 'up' | 'down' | 'flat' = 'flat';
     averageScore = '0%';
-    averageTrend = 'Live feed';
+    averageTrend = '—';
     averageDirection: 'up' | 'down' | 'flat' = 'flat';
     weakSubjectCount = '0';
     weakSubjectHint = 'Below 65%';
     weakDirection: 'up' | 'down' | 'flat' = 'down';
     todayNotifications = '0';
-    notificationTrend = 'Live today';
+    notificationTrend = '—';
     notificationDirection: 'up' | 'down' | 'flat' = 'up';
     skeletonRows = Array.from({ length: 6 });
     lineData!: ChartData<'line'>;
     lineOptions!: ChartOptions<'line'>;
-    pieData!: ChartData<'pie'>;
-    pieOptions!: ChartOptions<'pie'>;
+
     studentLineData!: ChartData<'line'>;
     studentLineOptions!: ChartOptions<'line'>;
 
@@ -228,6 +202,7 @@ export class AdminDashboard implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Dashboard data could not be loaded. Please refresh or check your connection.';
             }
         });
     }
@@ -267,7 +242,7 @@ export class AdminDashboard implements OnInit {
                     label: 'Average score',
                     data: this.dashboard.schoolPerformance.map((entry) => entry.averageScore),
                     borderColor: primary,
-                    backgroundColor: this.createGradient(primary, violet),
+                    backgroundColor: primary + '26',
                     fill: true,
                     tension: 0.35,
                     pointRadius: 6,
@@ -279,7 +254,7 @@ export class AdminDashboard implements OnInit {
                     label: 'Pass rate',
                     data: this.dashboard.schoolPerformance.map((entry) => entry.passRate),
                     borderColor: violet,
-                    backgroundColor: this.createGradient(violet, primarySoft),
+                    backgroundColor: violet + '26',
                     fill: true,
                     tension: 0.35,
                     pointRadius: 6,
@@ -329,43 +304,11 @@ export class AdminDashboard implements OnInit {
             }
         };
 
-        this.pieData = {
-            labels: this.dashboard.classPerformance.map((entry) => entry.class),
-            datasets: [
-                {
-                    data: this.dashboard.classPerformance.map((entry) => entry.averageScore),
-                    backgroundColor: this.dashboard.classPerformance.map((_, index) => [primary, violet, primarySoft, '#22c55e', '#f97316'][index % 5]),
-                    borderWidth: 6,
-                    borderColor: 'rgba(255,255,255,0.15)',
-                    hoverOffset: 10
-                }
-            ]
-        };
-
-        this.pieOptions = {
-            cutout: '50%',
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        color: textColor,
-                        usePointStyle: true
-                    }
-                },
-                tooltip: {
-                    backgroundColor: '#0f172a',
-                    titleColor: '#fff',
-                    bodyColor: '#e2e8f0',
-                    padding: 14
-                }
-            }
-        };
     }
 
     private buildStudentChart(results: ResultResponse[]): void {
         const documentStyle = getComputedStyle(document.documentElement);
         const primary = documentStyle.getPropertyValue('--p-primary-500').trim() || '#2563eb';
-        const accent = documentStyle.getPropertyValue('--p-purple-500').trim() || '#8b5cf6';
         const textColor = documentStyle.getPropertyValue('--text-color').trim();
         const textMuted = documentStyle.getPropertyValue('--text-color-secondary').trim();
         const surfaceBorder = documentStyle.getPropertyValue('--surface-border').trim();
@@ -377,7 +320,7 @@ export class AdminDashboard implements OnInit {
                     label: 'Score',
                     data: results.map((result) => result.score),
                     borderColor: primary,
-                    backgroundColor: this.createGradient(primary, accent),
+                    backgroundColor: primary + '26',
                     fill: true,
                     tension: 0.35,
                     pointRadius: 5,
@@ -416,19 +359,6 @@ export class AdminDashboard implements OnInit {
                 }
             }
         };
-    }
-
-    private createGradient(from: string, to: string): CanvasGradient | string {
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        if (!context) {
-            return from;
-        }
-
-        const gradient = context.createLinearGradient(0, 0, 320, 0);
-        gradient.addColorStop(0, from);
-        gradient.addColorStop(1, to);
-        return gradient;
     }
 
     private isToday(isoDate: string): boolean {

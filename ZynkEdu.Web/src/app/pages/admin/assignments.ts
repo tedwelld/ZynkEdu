@@ -26,7 +26,7 @@ import {
     UserResponse
 } from '../../core/api/api.models';
 import { AuthService } from '../../core/auth/auth.service';
-import { normalizeSchoolLevel } from '../../core/school-levels';
+import { getLevelCode, normalizeSchoolLevel } from '../../core/school-levels';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 
@@ -48,6 +48,10 @@ interface MissingCoverageEntry {
     imports: [CommonModule, FormsModule, ButtonModule, DrawerModule, InputTextModule, AppDropdownComponent, MultiSelectModule, SkeletonModule, TableModule, TagModule, TooltipModule, MetricCardComponent],
     template: `
         <section class="space-y-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Assignments</p>
@@ -146,13 +150,15 @@ interface MissingCoverageEntry {
                 <p-table *ngIf="!loading" [value]="visibleSubjects" [rows]="8" [paginator]="true" styleClass="p-datatable-sm">
                     <ng-template pTemplate="header">
                         <tr>
+                            <th class="text-muted-color w-8">#</th>
                             <th>Subject</th>
                             <th>Level</th>
                             <th class="text-right">Actions</th>
                         </tr>
                     </ng-template>
-                    <ng-template pTemplate="body" let-subject>
+                    <ng-template pTemplate="body" let-subject let-rowIndex="rowIndex">
                         <tr>
+                            <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
                             <td>
                                 <div class="font-semibold">{{ subject.name }}</div>
                                 <div class="text-xs text-muted-color">{{ subject.code }}</div>
@@ -193,14 +199,16 @@ interface MissingCoverageEntry {
                     <p-table *ngIf="!loading" [value]="visibleAssignments" [rows]="12" [paginator]="true" styleClass="p-datatable-sm">
                         <ng-template pTemplate="header">
                             <tr>
+                                <th class="text-muted-color w-8">#</th>
                                 <th>Teacher</th>
                                 <th>Subject</th>
                                 <th>Class</th>
                                 <th>Level</th>
                             </tr>
                         </ng-template>
-                        <ng-template pTemplate="body" let-assignment>
+                        <ng-template pTemplate="body" let-assignment let-rowIndex="rowIndex">
                             <tr>
+                                <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
                                 <td>
                                     <div class="font-semibold">{{ assignment.teacherName }}</div>
                                     <div class="text-xs text-muted-color">ID {{ assignment.teacherId }}</div>
@@ -228,6 +236,7 @@ export class AdminAssignments implements OnInit {
     private readonly confirmation = inject(ConfirmationService);
 
     loading = true;
+    errorMessage = '';
     schools: SchoolResponse[] = [];
     teachers: UserResponse[] = [];
     subjects: SubjectResponse[] = [];
@@ -240,6 +249,7 @@ export class AdminAssignments implements OnInit {
     assignmentsDrawerVisible = false;
     pendingCoverage: MissingCoverageEntry[] = [];
     coveragePrefillApplied = false;
+    pendingClassFilter: string | null = null;
     draft: AssignmentDraft = { teacherId: null, teacherName: '', subjectIds: [], classes: [] };
 
     get isPlatformAdmin(): boolean {
@@ -279,7 +289,10 @@ export class AdminAssignments implements OnInit {
 
         return this.visibleSubjects
             .filter((subject) => allowedSubjectIds.size === 0 || allowedSubjectIds.has(subject.id))
-            .map((subject) => ({ label: `${subject.name} (${normalizeSchoolLevel(subject.gradeLevel)})`, value: subject.id }));
+            .map((subject) => {
+                const code = getLevelCode(subject.gradeLevel);
+                return { label: code ? `${subject.name} [${code}]` : subject.name, value: subject.id };
+            });
     }
 
     get visibleTeachers(): UserResponse[] {
@@ -322,6 +335,7 @@ export class AdminAssignments implements OnInit {
                 },
                 error: () => {
                     this.loading = false;
+                    this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
                 }
             });
             return;
@@ -351,10 +365,12 @@ export class AdminAssignments implements OnInit {
                 this.onClassesChange(this.draft.classes);
                 this.onTeacherChange(this.draft.teacherId);
                 this.applyPendingCoveragePrefill();
+                this.applyClassQueryParam();
                 this.loading = false;
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load assignments. Please refresh or check your connection.';
             }
         });
     }
@@ -647,6 +663,23 @@ export class AdminAssignments implements OnInit {
 
         this.pendingCoverage = this.parseCoverageQuery(this.route.snapshot.queryParamMap.get('coverage'));
         this.coveragePrefillApplied = false;
+        this.pendingClassFilter = this.route.snapshot.queryParamMap.get('class');
+    }
+
+    private applyClassQueryParam(): void {
+        if (!this.pendingClassFilter || this.pendingCoverage.length > 0) {
+            return;
+        }
+
+        const className = this.pendingClassFilter;
+        this.pendingClassFilter = null;
+
+        if (!this.classOptions.some((option) => option.value === className)) {
+            return;
+        }
+
+        this.draft.classes = [className];
+        this.onClassesChange(this.draft.classes);
     }
 
     private parseCoverageQuery(coverageText: string | null): MissingCoverageEntry[] {

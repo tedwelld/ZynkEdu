@@ -44,6 +44,10 @@ interface TimetableReportRow {
     selector: 'app-teacher-notifications',
     imports: [CommonModule, FormsModule, RouterLink, ButtonModule, DialogModule, AppDropdownComponent, SkeletonModule, TableModule, TagModule],
     template: `
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
         <section class="space-y-6">
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
@@ -224,6 +228,7 @@ export class TeacherNotifications implements OnInit {
     private readonly auth = inject(AuthService);
 
     loading = true;
+    errorMessage = '';
     timetable: TimetableResponse[] = [];
     events: SchoolCalendarEventResponse[] = [];
     terms: AcademicTermResponse[] = [];
@@ -383,11 +388,13 @@ export class TeacherNotifications implements OnInit {
                     },
                     error: () => {
                         this.loading = false;
+                        this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
                     }
                 });
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
             }
         });
     }

@@ -25,6 +25,10 @@ interface SchoolComparisonRow extends SchoolPerformanceDto {
     imports: [CommonModule, FormsModule, RouterLink, ButtonModule, ChartModule, MetricCardComponent, AppDropdownComponent, SkeletonModule, TableModule, TagModule],
     template: `
         <section class="space-y-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Academics</p>
@@ -98,6 +102,7 @@ interface SchoolComparisonRow extends SchoolPerformanceDto {
                 <p-table *ngIf="!loading" [value]="comparisonRows" [rows]="10" [paginator]="true" [rowHover]="true" styleClass="p-datatable-sm">
                     <ng-template pTemplate="header">
                         <tr>
+                            <th class="text-muted-color w-8">#</th>
                             <th>Rank</th>
                             <th>School</th>
                             <th>Average score</th>
@@ -105,8 +110,9 @@ interface SchoolComparisonRow extends SchoolPerformanceDto {
                             <th>Results</th>
                         </tr>
                     </ng-template>
-                    <ng-template pTemplate="body" let-row>
+                    <ng-template pTemplate="body" let-row let-rowIndex="rowIndex">
                         <tr>
+                            <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
                             <td class="font-semibold">{{ row.rank }}</td>
                             <td>{{ row.schoolName }}</td>
                             <td>{{ row.averageScore | number : '1.0-1' }}%</td>
@@ -150,6 +156,7 @@ interface SchoolComparisonRow extends SchoolPerformanceDto {
                 <p-table [value]="filteredResults" [rows]="10" [paginator]="true" styleClass="p-datatable-sm">
                     <ng-template pTemplate="header">
                         <tr>
+                            <th class="text-muted-color w-8">#</th>
                             <th>Student</th>
                             <th>Class</th>
                             <th>Subject</th>
@@ -160,8 +167,9 @@ interface SchoolComparisonRow extends SchoolPerformanceDto {
                             <th class="text-right">Actions</th>
                         </tr>
                     </ng-template>
-                    <ng-template pTemplate="body" let-result>
+                    <ng-template pTemplate="body" let-result let-rowIndex="rowIndex">
                         <tr>
+                            <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
                             <td>
                                 <div class="font-semibold">{{ result.studentName }}</div>
                                 <div class="text-xs text-muted-color">{{ result.studentNumber }}</div>
@@ -197,6 +205,7 @@ export class AdminResults implements OnInit {
     results: ResultResponse[] = [];
     selectedSchoolId: number | null = null;
     loading = true;
+    errorMessage = '';
     skeletonRows = Array.from({ length: 4 });
     comparisonRows: SchoolComparisonRow[] = [];
     selectedClass = 'All';
@@ -275,6 +284,7 @@ export class AdminResults implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load results. Please refresh or check your connection.';
             }
         });
     }

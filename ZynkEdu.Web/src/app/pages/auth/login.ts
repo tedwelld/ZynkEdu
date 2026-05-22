@@ -8,18 +8,19 @@ import { PasswordModule } from 'primeng/password';
 import { MessageService } from 'primeng/api';
 import { AuthService } from '../../core/auth/auth.service';
 import { SchoolResponse } from '../../core/api/api.models';
+import { ZynkEduLogo } from '../../shared/ui/zynkedu-logo.component';
 
 @Component({
     selector: 'app-login',
     standalone: true,
-    imports: [CommonModule, FormsModule, AutoCompleteModule, ButtonModule, InputTextModule, PasswordModule],
+    imports: [CommonModule, FormsModule, AutoCompleteModule, ButtonModule, InputTextModule, PasswordModule, ZynkEduLogo],
     template: `
         <div class="auth-login-page">
             <div class="auth-login-shell">
                 <section class="auth-login-card" aria-label="ZynkEdu login">
                     <div class="auth-login-card-content">
                         <div class="auth-login-brand">
-                            <img src="assets/images/zynkedu-icon.png" alt="" class="auth-login-mark" />
+                            <zynkedu-logo [size]="56"></zynkedu-logo>
                             <p class="auth-login-brand-name">ZynkEdu</p>
                         </div>
                         <h1 class="auth-login-title">Admin Panel</h1>

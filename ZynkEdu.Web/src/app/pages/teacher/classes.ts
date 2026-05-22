@@ -5,6 +5,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { SkeletonModule } from 'primeng/skeleton';
+import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -24,14 +25,18 @@ interface ClassStudentModalState {
 @Component({
     standalone: true,
     selector: 'app-teacher-classes',
-    imports: [CommonModule, FormsModule, RouterLink, ButtonModule, DialogModule, AppDropdownComponent, MetricCardComponent, SkeletonModule, TagModule],
+    imports: [CommonModule, FormsModule, RouterLink, ButtonModule, DialogModule, AppDropdownComponent, MetricCardComponent, SkeletonModule, TableModule, TagModule],
     template: `
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
         <section class="space-y-6">
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">My classes</p>
                     <h1 class="text-3xl font-display font-bold m-0">Classes and learners</h1>
-                    <p class="text-muted-color mt-2 max-w-2xl">Use the dropdown to switch classes, then jump straight into attendance or results from the cards and quick actions.</p>
+                    <p class="text-muted-color mt-2 max-w-2xl">Use the dropdown to switch classes, then jump straight into attendance or results from the summary and quick actions.</p>
                 </div>
                 <div class="flex gap-3">
                     <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="contrast" (click)="exportClassPdf()"></button>
@@ -40,131 +45,133 @@ interface ClassStudentModalState {
             </div>
 
             <section class="grid gap-4 md:grid-cols-3">
-                <app-metric-card label="Students" [value]="classStudents.length.toString()" delta="Selected class" hint="Roster size" icon="pi pi-users" tone="blue" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></app-metric-card>
-                <app-metric-card label="Results" [value]="classResults.length.toString()" delta="Selected class" hint="Published rows" icon="pi pi-chart-line" tone="purple" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></app-metric-card>
+                <app-metric-card label="Students" [value]="classStudents.length.toString()" delta="Roster" hint="Class size" icon="pi pi-users" tone="blue" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></app-metric-card>
+                <app-metric-card label="Results" [value]="classResults.length.toString()" delta="Published" hint="Result rows" icon="pi pi-chart-line" tone="purple" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></app-metric-card>
                 <app-metric-card label="Average" [value]="classAverage.toFixed(1) + '%'" delta="Current class" hint="Performance" icon="pi pi-bolt" tone="green" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></app-metric-card>
             </section>
 
             <article class="workspace-card space-y-4">
-                <div class="grid gap-4 xl:grid-cols-[0.7fr_1.3fr] items-start">
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-semibold mb-2">Choose class</label>
-                            <app-dropdown [options]="classOptions" [(ngModel)]="selectedClass" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadClassData()" (ngModelChange)="loadClassData()"></app-dropdown>
-                        </div>
-
-                        <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
-                            <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Class load</div>
-                            <div class="text-2xl font-display font-bold mt-2">{{ selectedClass || 'No class selected' }}</div>
-                            <div class="text-sm text-muted-color mt-1">{{ classStudents.length }} students - {{ classResults.length }} results</div>
-                        </div>
+                <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                    <div class="w-full xl:max-w-sm">
+                        <label class="block text-sm font-semibold mb-2">Choose class</label>
+                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClass" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadClassData()" (ngModelChange)="loadClassData()"></app-dropdown>
                     </div>
-
-                    <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
-                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Selected class</div>
-                        <div class="text-2xl font-display font-bold mt-2">{{ selectedClass || 'Choose a class' }}</div>
-                        <div class="text-sm text-muted-color mt-1">View the full roster, open student profiles, and export the class list.</div>
+                    <div class="flex flex-wrap items-center gap-3 xl:justify-end">
+                        <span class="text-sm text-muted-color">{{ selectedClass || 'No class selected' }} - {{ classStudents.length }} students - {{ classResults.length }} results</span>
+                        <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="secondary" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
+                        <button pButton type="button" label="Enter results" icon="pi pi-table" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></button>
+                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="contrast" (click)="exportClassPdf()"></button>
+                        <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="help" routerLink="/teacher/profile"></button>
                     </div>
                 </div>
 
-                <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-5 space-y-4">
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                            <h2 class="text-xl font-display font-bold mb-1">Students in class</h2>
-                            <p class="text-sm text-muted-color">The roster now fills the full card area. Click any learner to open the student profile modal.</p>
-                        </div>
-                        <div class="flex flex-wrap gap-3">
-                            <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="secondary" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
-                            <button pButton type="button" label="Enter results" icon="pi pi-table" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></button>
-                            <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="contrast" (click)="exportClassPdf()"></button>
-                            <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="help" routerLink="/teacher/profile"></button>
-                        </div>
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <h2 class="text-xl font-display font-bold mb-1">Students in class</h2>
+                        <p class="text-sm text-muted-color">Roster details are shown in rows, with learner actions at the end of each row.</p>
                     </div>
-
-                    <div *ngIf="loading" class="grid gap-3">
-                        <p-skeleton *ngFor="let _ of skeletonRows" height="7rem" borderRadius="1.25rem"></p-skeleton>
-                    </div>
-
-                    <ng-container *ngIf="!loading">
-                        <div *ngIf="classStudents.length === 0" class="rounded-3xl border border-dashed border-surface-300 dark:border-surface-700 p-8 text-center text-muted-color">
-                            No students are assigned to {{ selectedClass || 'the selected class' }} yet.
-                        </div>
-
-                        <div *ngIf="classStudents.length > 0" class="grid gap-3">
-                            <div
-                                *ngFor="let student of classStudents"
-                                class="rounded-3xl border border-surface-200 dark:border-surface-700 bg-surface-50/70 dark:bg-surface-900/30 p-4 transition-colors hover:border-primary hover:bg-primary-50/40 dark:hover:bg-primary-500/10 cursor-pointer"
-                                (click)="openStudent(student)"
-                            >
-                                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                                    <div class="flex items-start gap-4 min-w-0">
-                                        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-200 shrink-0">
-                                            <i class="pi pi-user text-lg"></i>
-                                        </div>
-                                        <div class="min-w-0">
-                                            <div class="text-base font-semibold truncate">{{ student.fullName }}</div>
-                                            <div class="text-sm text-muted-color">{{ student.studentNumber }} - {{ student.class }}</div>
-                                            <div class="text-xs text-muted-color mt-1 truncate">{{ student.parentEmail || 'No guardian email' }} - {{ student.parentPhone || 'No guardian phone' }}</div>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex flex-wrap items-center gap-3">
-                                        <p-tag [value]="studentAverage(student.id)" [severity]="studentAverageValue(student.id) >= 75 ? 'success' : studentAverageValue(student.id) >= 60 ? 'warning' : 'danger'"></p-tag>
-                                        <button pButton type="button" icon="pi pi-eye" label="View" class="p-button-text p-button-sm" (click)="$event.stopPropagation(); openStudent(student)"></button>
-                                    </div>
-                                </div>
-
-                                <div class="mt-3 grid gap-2 md:grid-cols-2">
-                                    <div class="rounded-2xl bg-surface-100/80 dark:bg-surface-900/50 px-3 py-2">
-                                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Guardian email</div>
-                                        <div class="text-sm font-medium break-all">{{ student.parentEmail || 'Not set' }}</div>
-                                    </div>
-                                    <div class="rounded-2xl bg-surface-100/80 dark:bg-surface-900/50 px-3 py-2">
-                                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Guardian phone</div>
-                                        <div class="text-sm font-medium">{{ student.parentPhone || 'Not set' }}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </ng-container>
+                    <span class="text-sm text-muted-color">{{ classStudents.length }} visible</span>
                 </div>
+
+                <div *ngIf="loading" class="space-y-3">
+                    <p-skeleton *ngFor="let _ of skeletonRows" height="3.5rem" borderRadius="1rem"></p-skeleton>
+                </div>
+
+                <ng-container *ngIf="!loading">
+                    <div *ngIf="classStudents.length === 0" class="rounded-3xl border border-dashed border-surface-300 dark:border-surface-700 p-8 text-center text-muted-color">
+                        No students are assigned to {{ selectedClass || 'the selected class' }} yet.
+                    </div>
+
+                    <p-table *ngIf="classStudents.length > 0" [value]="classStudents" [rows]="10" [paginator]="true" styleClass="p-datatable-sm">
+                        <ng-template pTemplate="header">
+                            <tr>
+                                <th class="text-muted-color w-8">#</th>
+                                <th>Student</th>
+                                <th>Class</th>
+                                <th>Guardian email</th>
+                                <th>Guardian phone</th>
+                                <th>Average</th>
+                                <th>Results</th>
+                                <th>Latest comment</th>
+                                <th class="text-right">Actions</th>
+                            </tr>
+                        </ng-template>
+                        <ng-template pTemplate="body" let-student let-rowIndex="rowIndex">
+                            <tr>
+                                <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
+                                <td>
+                                    <div class="font-semibold">{{ student.fullName }}</div>
+                                    <div class="text-xs text-muted-color">{{ student.studentNumber }}</div>
+                                </td>
+                                <td class="text-sm text-muted-color">{{ student.class }}</td>
+                                <td class="text-sm break-all">{{ student.parentEmail || 'Not set' }}</td>
+                                <td class="text-sm">{{ student.parentPhone || 'Not set' }}</td>
+                                <td>
+                                    <p-tag [value]="studentAverage(student.id)" [severity]="studentAverageSeverity(student.id)"></p-tag>
+                                </td>
+                                <td class="text-sm text-muted-color">{{ resultCountForStudent(student.id) }}</td>
+                                <td class="text-sm text-muted-color">{{ latestCommentForStudent(student.id) }}</td>
+                                <td class="text-right">
+                                    <div class="flex flex-wrap items-center justify-end gap-1">
+                                        <button pButton type="button" icon="pi pi-eye" label="View" class="p-button-text p-button-sm" (click)="openStudent(student)"></button>
+                                        <button pButton type="button" icon="pi pi-check-square" label="Attendance" severity="secondary" class="p-button-text p-button-sm" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
+                                        <button pButton type="button" icon="pi pi-table" label="Results" class="p-button-text p-button-sm" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </ng-template>
+                    </p-table>
+                </ng-container>
             </article>
 
             <p-dialog [(visible)]="studentModalVisible" [modal]="true" [draggable]="false" [style]="{ width: 'min(42rem, 95vw)' }" header="Student profile" appendTo="body">
                 <div *ngIf="selectedStudent" class="space-y-4">
-                    <div class="rounded-3xl bg-surface-100 dark:bg-surface-900/50 p-4">
-                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Learner</div>
-                        <div class="text-2xl font-display font-bold">{{ selectedStudent.fullName }}</div>
-                        <div class="text-sm text-muted-color">{{ selectedStudent.studentNumber }} - {{ selectedStudent.class }}</div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-surface-200 dark:border-surface-700 text-left">
+                                    <th class="py-2 pr-4">Student</th>
+                                    <th class="py-2 pr-4">Number</th>
+                                    <th class="py-2 pr-4">Class</th>
+                                    <th class="py-2 pr-4">Guardian email</th>
+                                    <th class="py-2">Guardian phone</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-surface-100 dark:border-surface-800">
+                                    <td class="py-3 pr-4 font-semibold">{{ selectedStudent.fullName }}</td>
+                                    <td class="py-3 pr-4 text-muted-color">{{ selectedStudent.studentNumber }}</td>
+                                    <td class="py-3 pr-4 text-muted-color">{{ selectedStudent.class }}</td>
+                                    <td class="py-3 pr-4 break-all">{{ selectedStudent.parentEmail || 'Not set' }}</td>
+                                    <td class="py-3">{{ selectedStudent.parentPhone || 'Not set' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
 
-                    <div class="grid gap-3 md:grid-cols-2">
-                        <div class="rounded-2xl border border-surface-200 dark:border-surface-700 p-3">
-                            <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Guardian email</div>
-                            <div class="font-semibold mt-1">{{ selectedStudent.parentEmail }}</div>
-                        </div>
-                        <div class="rounded-2xl border border-surface-200 dark:border-surface-700 p-3">
-                            <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Guardian phone</div>
-                            <div class="font-semibold mt-1">{{ selectedStudent.parentPhone }}</div>
-                        </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-surface-200 dark:border-surface-700 text-left">
+                                    <th class="py-2 pr-4">Average score</th>
+                                    <th class="py-2 pr-4">Results</th>
+                                    <th class="py-2">Latest comment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-surface-100 dark:border-surface-800">
+                                    <td class="py-3 pr-4">{{ studentState.averageScore.toFixed(1) }}%</td>
+                                    <td class="py-3 pr-4 text-muted-color">{{ studentState.resultCount }}</td>
+                                    <td class="py-3 text-muted-color">{{ studentState.latestComment || 'No teacher comment yet.' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
 
-                    <div class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-lg font-display font-bold mb-0">Result summary</h3>
-                            <span class="text-sm text-muted-color">{{ studentState.resultCount }} results</span>
-                        </div>
-                        <div class="text-sm text-muted-color">Average score: {{ studentState.averageScore.toFixed(1) }}%</div>
-                        <div class="text-sm text-muted-color">Latest comment: {{ studentState.latestComment || 'No teacher comment yet.' }}</div>
-                    </div>
-
-                    <div class="flex flex-wrap gap-3">
+                    <div class="flex flex-wrap justify-end gap-3">
                         <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="secondary" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
                         <button pButton type="button" label="Enter results" icon="pi pi-table" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></button>
                         <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="help" routerLink="/teacher/profile"></button>
-                    </div>
-
-                    <div class="flex justify-end">
                         <button pButton type="button" label="Close" severity="secondary" (click)="studentModalVisible = false"></button>
                     </div>
                 </div>
@@ -178,6 +185,7 @@ export class TeacherClasses implements OnInit {
     private readonly route = inject(ActivatedRoute);
 
     loading = true;
+    errorMessage = '';
     assignments: TeacherAssignmentResponse[] = [];
     classStudents: StudentResponse[] = [];
     classResults: ResultResponse[] = [];
@@ -202,6 +210,7 @@ export class TeacherClasses implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
             }
         });
     }
@@ -236,6 +245,7 @@ export class TeacherClasses implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
             }
         });
     }
@@ -291,6 +301,27 @@ export class TeacherClasses implements OnInit {
         }
 
         return rows.reduce((total, row) => total + row.score, 0) / rows.length;
+    }
+
+    studentAverageSeverity(studentId: number): 'success' | 'warning' | 'danger' {
+        const average = this.studentAverageValue(studentId);
+        if (average >= 75) {
+            return 'success';
+        }
+
+        if (average >= 60) {
+            return 'warning';
+        }
+
+        return 'danger';
+    }
+
+    resultCountForStudent(studentId: number): number {
+        return this.resultsForStudent(studentId).length;
+    }
+
+    latestCommentForStudent(studentId: number): string {
+        return this.resultsForStudent(studentId)[0]?.comment || 'No comment yet.';
     }
 
     private resultsForStudent(studentId: number): ResultResponse[] {

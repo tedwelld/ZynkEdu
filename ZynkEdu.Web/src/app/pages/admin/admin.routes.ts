@@ -16,5 +16,6 @@ export const adminRoutes: Routes = [
     { path: 'notifications', loadComponent: () => import('./notifications').then((m) => m.AdminNotifications) },
     { path: 'calendar', loadComponent: () => import('./calendar').then((m) => m.AdminCalendar) },
     { path: 'reports', loadComponent: () => import('./reports').then((m) => m.AdminReports) },
-    { path: 'accounting', loadComponent: () => import('./accounting').then((m) => m.AdminAccounting) }
+    { path: 'accounting', loadComponent: () => import('./accounting').then((m) => m.AdminAccounting) },
+    { path: 'logs', loadComponent: () => import('./logs').then((m) => m.AdminLogs) }
 ];

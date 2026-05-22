@@ -34,6 +34,10 @@ interface TeacherFeedItem {
     imports: [CommonModule, RouterLink, ButtonModule, ChartModule, MetricCardComponent, SkeletonModule, TagModule],
     template: `
         <section class="space-y-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <header class="workspace-card overflow-hidden relative">
                 <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(37,99,235,0.14),transparent_28%),radial-gradient(circle_at_left,rgba(124,58,237,0.12),transparent_30%)]"></div>
                 <div class="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -208,6 +212,7 @@ export class TeacherDashboard implements OnInit {
     private readonly auth = inject(AuthService);
 
     loading = true;
+    errorMessage = '';
     assignments: TeacherAssignmentResponse[] = [];
     classInsights: TeacherClassInsight[] = [];
     activityFeed: TeacherFeedItem[] = [];
@@ -246,16 +251,19 @@ export class TeacherDashboard implements OnInit {
                             },
                             error: () => {
                                 this.loading = false;
+                                this.errorMessage = 'Failed to load dashboard data. Please refresh or check your connection.';
                             }
                         });
                     },
                     error: () => {
                         this.loading = false;
+                        this.errorMessage = 'Failed to load dashboard data. Please refresh or check your connection.';
                     }
                 });
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load dashboard data. Please refresh or check your connection.';
             }
         });
     }

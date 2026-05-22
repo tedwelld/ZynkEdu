@@ -14,7 +14,7 @@ import { getClassLevel } from '../../core/school-levels';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 import { ParentPreviewReportResponse, ResultResponse, SchoolResponse, StudentResponse, UserResponse } from '../../core/api/api.models';
-import { buildAdminResultsReportPdf, buildParentPreviewReportPdf } from '../../shared/report/report-pdf';
+import { ReportSchoolInfo, buildAdminResultsReportPdf, buildParentPreviewReportPdf } from '../../shared/report/report-pdf';
 
 interface PreviewRow {
     year: number;
@@ -34,6 +34,10 @@ interface PreviewRow {
     imports: [CommonModule, FormsModule, ButtonModule, MetricCardComponent, AppDropdownComponent, SkeletonModule, TableModule, TagModule],
     template: `
         <section class="space-y-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">System reports</p>
@@ -181,6 +185,7 @@ interface PreviewRow {
                         <p-table [value]="previewResults" [rows]="10" [paginator]="true" styleClass="p-datatable-sm">
                             <ng-template pTemplate="header">
                                 <tr>
+                                    <th class="text-muted-color w-8">#</th>
                                     <th>Year</th>
                                     <th>Class</th>
                                     <th>Student</th>
@@ -190,8 +195,9 @@ interface PreviewRow {
                                     <th>Term</th>
                                 </tr>
                             </ng-template>
-                            <ng-template pTemplate="body" let-row>
+                            <ng-template pTemplate="body" let-row let-rowIndex="rowIndex">
                                 <tr>
+                                    <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
                                     <td>{{ row.year }}</td>
                                     <td class="font-semibold">{{ row.className }}</td>
                                     <td>{{ row.studentName }}</td>
@@ -250,6 +256,7 @@ export class AdminReports implements OnInit {
     private readonly messages = inject(MessageService);
 
     loading = true;
+    errorMessage = '';
     sendingGuardianReports = false;
     accountsNewsletterFile: File | null = null;
     schools: SchoolResponse[] = [];
@@ -396,6 +403,7 @@ export class AdminReports implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load reports. Please refresh or check your connection.';
             }
         });
     }
@@ -424,6 +432,7 @@ export class AdminReports implements OnInit {
 
         try {
             buildAdminResultsReportPdf(
+                this.schoolInfo,
                 'Results report',
                 'Filtered by year, class, student name, and teacher name. Grouped by school and class for easy review.',
                 this.selectedScopeLabel,
@@ -639,12 +648,22 @@ export class AdminReports implements OnInit {
         ].join(' | ');
     }
 
+    private get schoolInfo(): ReportSchoolInfo {
+        const id = this.auth.schoolId();
+        const school = this.schools.find(s => s.id === id) ?? this.schools[0];
+        return { name: school?.name ?? (id ? `School ${id}` : 'All schools'), address: school?.address ?? null };
+    }
+
     private fileNameForReport(): string {
-        return `results-report-${this.selectedYear ?? 'all'}-${this.selectedClass || 'all'}.pdf`;
+        const year = this.selectedYear ? `-${this.selectedYear}` : '';
+        const cls = this.selectedClass ? `-${this.selectedClass.replace(/\s+/g, '-').toLowerCase()}` : '';
+        return `results-report${year}${cls}.pdf`;
     }
 
     private fileNameForExcel(): string {
-        return `results-report-${this.selectedYear ?? 'all'}-${this.selectedClass || 'all'}.xlsx`;
+        const year = this.selectedYear ? `-${this.selectedYear}` : '';
+        const cls = this.selectedClass ? `-${this.selectedClass.replace(/\s+/g, '-').toLowerCase()}` : '';
+        return `results-report${year}${cls}.xlsx`;
     }
 
     onNewsletterFileSelected(event: Event): void {

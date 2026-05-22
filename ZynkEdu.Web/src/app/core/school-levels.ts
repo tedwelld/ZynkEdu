@@ -1,10 +1,22 @@
 export type SchoolLevel = 'ZGC Level' | "O'Level" | "A'Level" | 'General';
 
-export const SCHOOL_LEVEL_OPTIONS: { label: string; value: SchoolLevel }[] = [
-    { label: 'All levels', value: 'General' },
-    { label: 'ZGC Level', value: 'ZGC Level' },
-    { label: "O'Level", value: "O'Level" },
-    { label: "A'Level", value: "A'Level" }
+export const LEVEL_CODE_MAP: Record<string, string> = {
+    'ZGC Level': 'ZGC',
+    "O'Level": 'OL',
+    "A'Level": 'AL',
+    'General': ''
+};
+
+export function getLevelCode(level: string | null | undefined): string {
+    const normalized = normalizeSchoolLevel(level ?? '');
+    return LEVEL_CODE_MAP[normalized] ?? '';
+}
+
+export const SCHOOL_LEVEL_OPTIONS: { label: string; value: SchoolLevel; code: string }[] = [
+    { label: 'All levels', value: 'General', code: '' },
+    { label: 'ZGC Level [ZGC]', value: 'ZGC Level', code: 'ZGC' },
+    { label: "O'Level [OL]", value: "O'Level", code: 'OL' },
+    { label: "A'Level [AL]", value: "A'Level", code: 'AL' }
 ];
 
 export const LEVEL_CLASS_MAP: Record<Exclude<SchoolLevel, 'General'>, string[]> = {

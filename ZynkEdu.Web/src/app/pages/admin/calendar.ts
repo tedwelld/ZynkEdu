@@ -26,6 +26,10 @@ interface CalendarEventDraft {
     imports: [CommonModule, FormsModule, ButtonModule, InputTextModule, AppDropdownComponent, PaginatorModule, SkeletonModule, TagModule],
     template: `
         <section class="space-y-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">School calendar</p>
@@ -165,6 +169,7 @@ export class AdminCalendar implements OnInit {
     private readonly confirmation = inject(ConfirmationService);
 
     loading = true;
+    errorMessage = '';
     terms: AcademicTermResponse[] = [];
     events: SchoolCalendarEventResponse[] = [];
     viewMode: 'list' | 'month' | 'week' = 'list';
@@ -220,6 +225,7 @@ export class AdminCalendar implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load calendar data. Please refresh or check your connection.';
             }
         });
     }

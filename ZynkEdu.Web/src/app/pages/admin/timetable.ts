@@ -45,6 +45,10 @@ interface TimetableReportRow {
     imports: [CommonModule, FormsModule, ButtonModule, DialogModule, SkeletonModule, TableModule, TagModule, AppDropdownComponent, MetricCardComponent],
     template: `
         <section class="space-y-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <div class="workspace-card flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Timetable</p>
@@ -207,6 +211,7 @@ export class AdminTimetable implements OnInit {
     private readonly messages = inject(MessageService);
 
     loading = true;
+    errorMessage = '';
     schools: SchoolResponse[] = [];
     terms: AcademicTermResponse[] = [];
     timetable: TimetableResponse[] = [];
@@ -391,6 +396,7 @@ export class AdminTimetable implements OnInit {
                 },
                 error: () => {
                     this.loading = false;
+                    this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
                 }
             });
             return;
@@ -412,6 +418,7 @@ export class AdminTimetable implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load timetable. Please refresh or check your connection.';
             }
         });
     }

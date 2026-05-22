@@ -15,8 +15,8 @@ import { forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { extractApiErrorMessage } from '../../core/api/api-error';
 import { AuthService } from '../../core/auth/auth.service';
-import { DashboardResponse, SchoolClassResponse, SchoolResponse, SubjectResponse, TeacherPerformanceDto, UserResponse } from '../../core/api/api.models';
-import { normalizeSchoolLevel } from '../../core/school-levels';
+import { DashboardResponse, SchoolClassResponse, SchoolResponse, SubjectResponse, TeacherAssignmentResponse, TeacherPerformanceDto, UserResponse } from '../../core/api/api.models';
+import { getLevelCode, normalizeSchoolLevel } from '../../core/school-levels';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 
@@ -26,6 +26,10 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
     imports: [CommonModule, FormsModule, ButtonModule, CheckboxModule, DialogModule, InputTextModule, MetricCardComponent, AppDropdownComponent, MultiSelectModule, SkeletonModule, TableModule, TagModule],
     template: `
         <section class="space-y-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Teachers</p>
@@ -78,6 +82,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 <p-table *ngIf="!loading" [value]="filteredTeachers" [rows]="10" [paginator]="true" styleClass="p-datatable-sm">
                     <ng-template pTemplate="header">
                         <tr>
+                            <th class="text-muted-color w-8">#</th>
                             <th>Teacher</th>
                             <th>School</th>
                             <th>Status</th>
@@ -86,8 +91,9 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                             <th class="text-right">Actions</th>
                         </tr>
                     </ng-template>
-                    <ng-template pTemplate="body" let-teacher>
+                    <ng-template pTemplate="body" let-teacher let-rowIndex="rowIndex">
                         <tr>
+                            <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
                             <td>
                                 <div class="font-semibold">{{ teacher.displayName }}</div>
                                 <div class="text-xs text-muted-color">{{ teacher.username }}</div>
@@ -188,6 +194,23 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                             <label for="teacher-active" class="text-sm font-medium">{{ draft.isActive ? 'Active' : 'Inactive' }}</label>
                         </div>
                     </div>
+                    <div *ngIf="drawerMode === 'edit'" class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="block text-sm font-semibold">Current assignments</label>
+                            <span class="text-xs text-muted-color">{{ editingAssignments.length }} active</span>
+                        </div>
+                        <p-skeleton *ngIf="editingAssignmentsLoading" height="2.5rem" borderRadius="0.75rem"></p-skeleton>
+                        <div *ngIf="!editingAssignmentsLoading && editingAssignments.length === 0" class="text-sm text-muted-color text-center py-3 rounded-2xl border border-dashed border-surface-300 dark:border-surface-700">
+                            No assignments yet.
+                        </div>
+                        <div *ngFor="let a of editingAssignments" class="flex items-center justify-between gap-3 rounded-2xl border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm">
+                            <div>
+                                <span class="font-semibold">{{ a.subjectName }}</span>
+                                <span class="text-muted-color ml-2">· {{ a.class }}</span>
+                            </div>
+                            <p-tag [value]="a.gradeLevel" severity="secondary"></p-tag>
+                        </div>
+                    </div>
                     <div class="flex justify-end gap-3 pt-3">
                         <button pButton type="button" label="Cancel" severity="secondary" (click)="drawerVisible = false"></button>
                         <button pButton type="button" [label]="drawerMode === 'create' ? 'Save teacher' : 'Update teacher'" icon="pi pi-check" (click)="saveTeacher()"></button>
@@ -205,11 +228,14 @@ export class AdminTeachers implements OnInit {
     private readonly confirmation = inject(ConfirmationService);
 
     loading = true;
+    errorMessage = '';
     teachers: UserResponse[] = [];
     dashboard: DashboardResponse | null = null;
     schools: SchoolResponse[] = [];
     subjects: SubjectResponse[] = [];
     classes: SchoolClassResponse[] = [];
+    editingAssignments: TeacherAssignmentResponse[] = [];
+    editingAssignmentsLoading = false;
     selectedSchoolId: number | null = null;
     pendingFocusTeacherId: number | null = null;
     searchTerm = '';
@@ -264,6 +290,7 @@ export class AdminTeachers implements OnInit {
                 },
                 error: () => {
                     this.loading = false;
+                    this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
                 }
             });
             return;
@@ -295,6 +322,7 @@ export class AdminTeachers implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load teachers. Please refresh or check your connection.';
             }
         });
     }
@@ -357,7 +385,10 @@ export class AdminTeachers implements OnInit {
             { label: 'Select subject', value: null },
             ...this.subjects
                 .filter((subject) => allowedSubjectIds.size === 0 || allowedSubjectIds.has(subject.id))
-                .map((subject) => ({ label: `${subject.name} (${normalizeSchoolLevel(subject.gradeLevel)})`, value: subject.id }))
+                .map((subject) => {
+                    const code = getLevelCode(subject.gradeLevel);
+                    return { label: code ? `${subject.name} [${code}]` : subject.name, value: subject.id };
+                })
         ];
     }
 
@@ -427,6 +458,16 @@ export class AdminTeachers implements OnInit {
             subjectIds: [],
             classes: []
         };
+        this.editingAssignments = [];
+        this.editingAssignmentsLoading = true;
+        const schoolId = this.isPlatformAdmin ? this.selectedSchoolId : this.auth.schoolId();
+        this.api.getAssignmentsByTeacher(teacher.id, schoolId).subscribe({
+            next: (assignments) => {
+                this.editingAssignments = assignments;
+                this.editingAssignmentsLoading = false;
+            },
+            error: () => { this.editingAssignmentsLoading = false; }
+        });
         this.drawerVisible = true;
     }
 

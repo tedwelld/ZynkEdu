@@ -103,14 +103,16 @@ interface GradingSchemeDraft {
                         <p-table [value]="level.bands" styleClass="p-datatable-sm">
                             <ng-template pTemplate="header">
                                 <tr>
+                                    <th class="text-muted-color w-8">#</th>
                                     <th>Grade</th>
                                     <th>Minimum</th>
                                     <th>Maximum</th>
                                     <th>Range</th>
                                 </tr>
                             </ng-template>
-                            <ng-template pTemplate="body" let-band let-index="rowIndex">
+                            <ng-template pTemplate="body" let-band let-index="rowIndex" let-rowIndex="rowIndex">
                                 <tr>
+                                    <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
                                     <td class="font-semibold">{{ band.grade }}</td>
                                     <td class="min-w-28">
                                         <p-inputNumber

@@ -171,13 +171,16 @@ export class ApiService {
         return this.http.delete<void>(`${API_BASE_URL}/classes/${id}${query}`);
     }
 
-    getAttendanceDailySummaries(attendanceDate: string, schoolId?: number | null): Observable<AttendanceDailySummaryResponse[]> {
+    getAttendanceDailySummaries(attendanceDate?: string | null, schoolId?: number | null): Observable<AttendanceDailySummaryResponse[]> {
         const params = new URLSearchParams();
-        params.set('attendanceDate', attendanceDate);
+        if (attendanceDate) {
+            params.set('attendanceDate', attendanceDate);
+        }
         if (schoolId) {
             params.set('schoolId', String(schoolId));
         }
-        return this.http.get<AttendanceDailySummaryResponse[]>(`${API_BASE_URL}/attendance/daily?${params.toString()}`);
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return this.http.get<AttendanceDailySummaryResponse[]>(`${API_BASE_URL}/attendance/daily${query}`);
     }
 
     saveAttendanceRegister(request: SaveAttendanceRegisterRequest, schoolId?: number | null): Observable<AttendanceRegisterResponse> {

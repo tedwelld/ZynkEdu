@@ -25,6 +25,7 @@ import {
     DashboardResponse,
     GuardianRequest,
     ResultResponse,
+    SchoolClassResponse,
     SchoolResponse,
     StudentFinancialFlagResponse,
     StudentResponse,
@@ -32,6 +33,7 @@ import {
     UpdateStudentStatusRequest,
     UpdateStudentRequest
 } from '../../core/api/api.models';
+import { getLevelCode } from '../../core/school-levels';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 
@@ -45,9 +47,9 @@ const LEVEL_CLASS_MAP: Record<string, string[]> = {
 };
 
 const LEVEL_OPTIONS = [
-    { label: 'ZGC Level', value: 'ZGC Level' },
-    { label: "O'Level", value: "O'Level" },
-    { label: "A'Level", value: "A'Level" }
+    { label: 'ZGC Level [ZGC]', value: 'ZGC Level' },
+    { label: "O'Level [OL]", value: "O'Level" },
+    { label: "A'Level [AL]", value: "A'Level" }
 ];
 
 const PERFORMANCE_OPTIONS = [
@@ -110,6 +112,10 @@ type GuardianDraft = GuardianRequest & {
     imports: [CommonModule, FormsModule, ButtonModule, ChartModule, DialogModule, InputTextModule, MetricCardComponent, MultiSelectModule, ProgressBarModule, AppDropdownComponent, SkeletonModule, TableModule, TagModule, TooltipModule],
     template: `
         <section class="space-y-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <p class="text-sm uppercase tracking-[0.2em] text-muted-color font-semibold">Students</p>
@@ -174,6 +180,7 @@ type GuardianDraft = GuardianRequest & {
                 <p-table *ngIf="!loading" [value]="filteredStudents" [rows]="10" [paginator]="true" [rowHover]="true" dataKey="id" styleClass="p-datatable-sm" selectionMode="single" (onRowSelect)="openStudent($event.data)">
                     <ng-template pTemplate="header">
                         <tr>
+                            <th class="text-muted-color w-8">#</th>
                             <th>Student</th>
                             <th>Class</th>
                             <th>Level</th>
@@ -184,8 +191,9 @@ type GuardianDraft = GuardianRequest & {
                             <th class="text-right">Actions</th>
                         </tr>
                     </ng-template>
-                    <ng-template pTemplate="body" let-student>
+                    <ng-template pTemplate="body" let-student let-rowIndex="rowIndex">
                         <tr [pSelectableRow]="student">
+                            <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
                             <td>
                                 <div class="font-semibold">{{ student.fullName }}</div>
                                 <div class="text-xs text-muted-color">{{ student.studentNumber }}</div>
@@ -212,7 +220,7 @@ type GuardianDraft = GuardianRequest & {
                     </ng-template>
                     <ng-template pTemplate="emptymessage">
                         <tr>
-                            <td colspan="8">
+                            <td colspan="9">
                                 <div class="py-8 text-center text-muted-color">No results yet. Teachers will add soon.</div>
                             </td>
                         </tr>
@@ -255,7 +263,7 @@ type GuardianDraft = GuardianRequest & {
                             </div>
                             <div>
                                 <label class="block text-sm font-semibold mb-2">Class</label>
-                                <app-dropdown [options]="classOptionsForDraft" [(ngModel)]="draft.class" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes"></app-dropdown>
+                                <app-dropdown [options]="classOptionsForDraft" [(ngModel)]="draft.class" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes" (ngModelChange)="onClassChange($event)"></app-dropdown>
                             </div>
                         </div>
 
@@ -533,10 +541,12 @@ export class AdminStudents implements OnInit {
     private readonly messages = inject(MessageService);
 
     loading = true;
+    errorMessage = '';
     students: StudentResponse[] = [];
     dashboard: DashboardResponse | null = null;
     schools: SchoolResponse[] = [];
     subjects: SubjectResponse[] = [];
+    classes: SchoolClassResponse[] = [];
     selectedSchoolId: number | null = null;
     searchTerm = '';
     selectedClass = 'All';
@@ -615,20 +625,40 @@ export class AdminStudents implements OnInit {
 
     get classOptionsForDraft(): { label: string; value: string }[] {
         const level = this.normalizeLevel(this.draft.level);
-        return LEVEL_CLASS_MAP[level].map((value) => ({ label: value, value }));
+        const schoolId = this.draft.schoolId ?? this.authSchoolId;
+
+        const apiClasses = this.classes.filter(
+            (c) => c.schoolId === schoolId && this.normalizeLevel(c.gradeLevel) === level
+        );
+
+        if (apiClasses.length > 0) {
+            return apiClasses.map((c) => ({ label: c.className, value: c.className }));
+        }
+
+        return (LEVEL_CLASS_MAP[level] ?? []).map((value) => ({ label: value, value }));
     }
 
     get subjectOptions(): { label: string; value: number }[] {
         const schoolId = this.draft.schoolId ?? this.authSchoolId;
-        if (schoolId == null) {
-            return [];
-        }
+        if (schoolId == null) return [];
 
-        return this.subjects
-            .filter((subject) => subject.schoolId === schoolId)
+        const selectedClass = this.classes.find(
+            (c) => c.schoolId === schoolId && c.className === this.draft.class
+        );
+
+        const allSchoolSubjects = this.subjects.filter((s) => s.schoolId === schoolId);
+
+        const pool = selectedClass?.subjectIds?.length
+            ? allSchoolSubjects.filter((s) => selectedClass.subjectIds.includes(s.id))
+            : allSchoolSubjects;
+
+        return pool
             .slice()
             .sort((a, b) => a.name.localeCompare(b.name))
-            .map((subject) => ({ label: subject.name, value: subject.id }));
+            .map((subject) => {
+                const code = getLevelCode(subject.gradeLevel);
+                return { label: code ? `${subject.name} [${code}]` : subject.name, value: subject.id };
+            });
     }
 
     get yearOptions(): { label: string; value: number }[] {
@@ -684,6 +714,11 @@ export class AdminStudents implements OnInit {
         if (Number.isFinite(focusId)) {
             this.pendingFocusStudentId = focusId;
         }
+
+        const className = this.route.snapshot.queryParamMap.get('class');
+        if (className) {
+            this.selectedClass = className;
+        }
     }
 
     loadData(): void {
@@ -703,6 +738,7 @@ export class AdminStudents implements OnInit {
                 },
                 error: () => {
                     this.loading = false;
+                    this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
                 }
             });
             return;
@@ -715,13 +751,15 @@ export class AdminStudents implements OnInit {
             students: this.api.getStudents(undefined, schoolId),
             dashboard: this.api.getAdminDashboard(schoolId),
             schools: schoolsSource,
-            subjects: this.api.getSubjects(schoolId)
+            subjects: this.api.getSubjects(schoolId),
+            classes: this.api.getClasses(schoolId)
         }).subscribe({
-            next: ({ students, dashboard, schools, subjects }) => {
+            next: ({ students, dashboard, schools, subjects, classes }) => {
                 this.students = students;
                 this.dashboard = dashboard;
                 this.schools = schools;
                 this.subjects = subjects;
+                this.classes = classes;
                 if (!this.isPlatformAdmin && this.authSchoolId && !this.draft.schoolId) {
                     this.draft.schoolId = this.authSchoolId;
                 }
@@ -730,6 +768,7 @@ export class AdminStudents implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load students. Please refresh or check your connection.';
             }
         });
     }
@@ -850,6 +889,19 @@ export class AdminStudents implements OnInit {
         const normalized = this.normalizeLevel(level);
         this.draft.level = normalized;
         this.draft.class = '';
+        this.draft.subjectIds = [];
+    }
+
+    onClassChange(className: string): void {
+        const schoolId = this.draft.schoolId ?? this.authSchoolId;
+        const selectedClass = this.classes.find(
+            (c) => c.schoolId === schoolId && c.className === className
+        );
+        if (selectedClass?.subjectIds?.length) {
+            this.draft.subjectIds = [...selectedClass.subjectIds];
+        } else {
+            this.draft.subjectIds = [];
+        }
     }
 
     saveStudent(): void {

@@ -13,6 +13,10 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
     selector: 'app-parent-dashboard',
     imports: [CommonModule, ButtonModule, ChartModule, MetricCardComponent, SkeletonModule, TagModule],
     template: `
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
         <section class="space-y-6">
             <div class="workspace-card flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
@@ -90,6 +94,7 @@ export class ParentDashboard implements OnInit {
     private readonly api = inject(ApiService);
 
     loading = true;
+    errorMessage = '';
     results: StudentCommentResponse[] = [];
     skeletonRows = Array.from({ length: 4 });
     subjectCards: StudentCommentResponse[] = [];
@@ -113,6 +118,7 @@ export class ParentDashboard implements OnInit {
             },
             error: () => {
                 this.loading = false;
+                this.errorMessage = 'Failed to load data. Please refresh or check your connection.';
             }
         });
     }

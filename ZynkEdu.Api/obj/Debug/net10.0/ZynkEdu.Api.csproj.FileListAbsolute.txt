@@ -169,3 +169,4 @@ C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Api\bin\Debug\net10.0\zh-Hant\Mi
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Api\bin\Debug\net10.0\BouncyCastle.Cryptography.dll
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Api\bin\Debug\net10.0\MailKit.dll
 C:\Users\tedwell_d\source\repos\ZynkEdu\ZynkEdu.Api\bin\Debug\net10.0\MimeKit.dll
+C:\Users\tedwell_d\source\repos\ZynkEdu\zynkedu.api\bin\Debug\net10.0\ZynkEdu.Api.exe
