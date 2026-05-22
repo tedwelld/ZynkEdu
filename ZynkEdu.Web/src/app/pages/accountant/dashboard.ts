@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { ApiService } from '../../core/api/api.service';
 import { AgingReportResponse, CollectionReportResponse, DefaulterReportResponse, LibraryBorrowerSummaryResponse, RevenueByClassReportResponse } from '../../core/api/api.models';
-
 import { AuthService } from '../../core/auth/auth.service';
 
 type AgingChartSlice = {
@@ -70,10 +71,6 @@ type AgingChartSlice = {
     `],
     template: `
         <section class="grid gap-6">
-            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
-                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
-            </div>
-
             <header class="workspace-card p-6 md:p-8">
                 <p class="text-xs uppercase tracking-[0.28em] text-muted-color font-semibold">Accounting workspace</p>
                 <h1 class="text-3xl md:text-4xl font-display font-bold mt-3">Finance dashboard</h1>
@@ -193,7 +190,6 @@ export class AccountantDashboard implements OnInit {
     revenue: RevenueByClassReportResponse | null = null;
     defaulters: DefaulterReportResponse | null = null;
     overdueLibraryBorrowers: LibraryBorrowerSummaryResponse[] = [];
-    errorMessage = '';
 
     get overdueLibraryBorrowersCount(): number {
         return this.overdueLibraryBorrowers.filter((b) => b.borrowerType === 'Student').length;
@@ -248,11 +244,20 @@ export class AccountantDashboard implements OnInit {
 
     ngOnInit(): void {
         const schoolId = this.auth.schoolId();
-        const onError = () => { this.errorMessage = 'Failed to load dashboard data. Please refresh or check your connection.'; };
-        this.api.getCollectionReport(schoolId).subscribe({ next: (r) => (this.collection = r), error: onError });
-        this.api.getAgingReport(schoolId).subscribe({ next: (r) => (this.aging = r), error: onError });
-        this.api.getRevenueByClassReport(schoolId).subscribe({ next: (r) => (this.revenue = r), error: onError });
-        this.api.getDefaulters(schoolId).subscribe({ next: (r) => (this.defaulters = r), error: onError });
-        this.api.getLibraryBorrowersWithOverdueLoans(schoolId).subscribe({ next: (r) => (this.overdueLibraryBorrowers = r), error: onError });
+        forkJoin({
+            collection: this.api.getCollectionReport(schoolId).pipe(catchError(() => of(null as CollectionReportResponse | null))),
+            aging: this.api.getAgingReport(schoolId).pipe(catchError(() => of(null as AgingReportResponse | null))),
+            revenue: this.api.getRevenueByClassReport(schoolId).pipe(catchError(() => of(null as RevenueByClassReportResponse | null))),
+            defaulters: this.api.getDefaulters(schoolId).pipe(catchError(() => of(null as DefaulterReportResponse | null))),
+            libraryBorrowers: this.api.getLibraryBorrowersWithOverdueLoans(schoolId).pipe(catchError(() => of([] as LibraryBorrowerSummaryResponse[])))
+        }).subscribe({
+            next: ({ collection, aging, revenue, defaulters, libraryBorrowers }) => {
+                this.collection = collection;
+                this.aging = aging;
+                this.revenue = revenue;
+                this.defaulters = defaulters;
+                this.overdueLibraryBorrowers = libraryBorrowers ?? [];
+            }
+        });
     }
 }

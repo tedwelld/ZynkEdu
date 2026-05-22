@@ -99,12 +99,33 @@ type TermOption = {
                     </div>
                 </div>
 
-                <div class="mt-5 grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    <button *ngFor="let fee of filteredFeeStructures" type="button" class="text-left rounded-xl border border-surface-200 dark:border-surface-700 px-4 py-3 hover:border-primary transition" (click)="applyFee(fee)">
-                        <div class="font-semibold">{{ fee.gradeLevel }} · {{ fee.term }}</div>
-                        <div class="text-sm text-muted-color">{{ fee.amount | number:'1.0-2' }}</div>
-                        <div class="text-xs text-muted-color mt-1">{{ fee.description || 'No description provided' }}</div>
-                    </button>
+                <div class="mt-5 overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-left text-muted-color uppercase tracking-[0.18em] text-xs">
+                            <tr>
+                                <th class="py-3 pr-4">Grade level</th>
+                                <th class="py-3 pr-4">Term</th>
+                                <th class="py-3 pr-4">Amount</th>
+                                <th class="py-3 pr-4">Description</th>
+                                <th class="py-3">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                *ngFor="let fee of filteredFeeStructures"
+                                class="border-t border-surface-200 dark:border-surface-700 hover:bg-surface-50 dark:hover:bg-surface-900/40 cursor-pointer"
+                                (click)="applyFee(fee)"
+                            >
+                                <td class="py-3 pr-4 font-medium">{{ fee.gradeLevel }}</td>
+                                <td class="py-3 pr-4">{{ fee.term }}</td>
+                                <td class="py-3 pr-4">{{ fee.amount | number:'1.0-2' }}</td>
+                                <td class="py-3 pr-4 text-muted-color">{{ fee.description || '—' }}</td>
+                                <td class="py-3">
+                                    <button type="button" class="text-primary text-xs font-semibold hover:underline" (click)="$event.stopPropagation(); applyFee(fee)">Apply</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
                 <div *ngIf="filteredFeeStructures.length === 0" class="mt-5 rounded-2xl border border-dashed border-surface-300 px-4 py-6 text-sm text-muted-color">

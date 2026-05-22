@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { TableModule } from 'primeng/table';
@@ -450,13 +451,15 @@ export class AccountantStudents implements OnInit {
     ngOnInit(): void {
         this.api.getSchools().subscribe({ next: s => this.schools = s });
         forkJoin({
-            students: this.api.getStudents(undefined, this.auth.schoolId()),
-            overdueLibraryBorrowers: this.api.getLibraryBorrowersWithOverdueLoans(this.auth.schoolId())
-        }).subscribe(({ students, overdueLibraryBorrowers }) => {
-            this.students = students;
-            this.overdueLibraryBorrowers = overdueLibraryBorrowers;
-            this.selectedStudentId = this.currentStudents[0]?.id ?? null;
-            this.loadStatement();
+            students: this.api.getStudents(undefined, this.auth.schoolId()).pipe(catchError(() => of([] as StudentResponse[]))),
+            overdueLibraryBorrowers: this.api.getLibraryBorrowersWithOverdueLoans(this.auth.schoolId()).pipe(catchError(() => of([] as LibraryBorrowerSummaryResponse[])))
+        }).subscribe({
+            next: ({ students, overdueLibraryBorrowers }) => {
+                this.students = students;
+                this.overdueLibraryBorrowers = overdueLibraryBorrowers;
+                this.selectedStudentId = this.currentStudents[0]?.id ?? null;
+                this.loadStatement();
+            }
         });
     }
 

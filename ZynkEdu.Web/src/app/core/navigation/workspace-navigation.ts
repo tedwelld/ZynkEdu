@@ -88,7 +88,8 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuMod
                         { label: 'Students', icon: 'pi pi-fw pi-users', routerLink: ['/accountant/students'] },
                         { label: 'Payments', icon: 'pi pi-fw pi-credit-card', routerLink: ['/accountant/payments'] },
                         { label: 'Invoices', icon: 'pi pi-fw pi-file', routerLink: ['/accountant/invoices'] },
-                        { label: 'Reports', icon: 'pi pi-fw pi-file-pdf', routerLink: ['/accountant/reports'] }
+                        { label: 'Reports', icon: 'pi pi-fw pi-file-pdf', routerLink: ['/accountant/reports'] },
+                        { label: 'Analytics', icon: 'pi pi-fw pi-chart-line', routerLink: ['/accountant/analytics'] }
                     ]
                 }
             ]

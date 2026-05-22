@@ -8,23 +8,19 @@ import { ApiService } from '../../core/api/api.service';
 import {
     AgingReportResponse,
     CollectionReportResponse,
-    DailyCashReportResponse,
     DefaulterReportResponse,
     FinancialStatementPeriodMode,
     FinancialStatementResponse,
     FinancialStatementRowResponse,
     FinancialStatementType,
-    RevenueByClassReportResponse,
     SchoolResponse
 } from '../../core/api/api.models';
 import {
     ReportSchoolInfo,
     buildAgingBucketsPdf,
     buildCollectionReportPdf,
-    buildDailyCashPdf,
     buildDefaultersPdf,
-    buildFinancialStatementPdf,
-    buildRevenueByClassPdf
+    buildFinancialStatementPdf
 } from '../../shared/report/report-pdf';
 import { AuthService } from '../../core/auth/auth.service';
 
@@ -45,40 +41,12 @@ type StatementField = FinancialStatementType;
             <header class="workspace-card p-6 md:p-8">
                 <p class="text-xs uppercase tracking-[0.28em] text-muted-color font-semibold">Reporting</p>
                 <h1 class="text-3xl md:text-4xl font-display font-bold mt-3">Accounting reports</h1>
-                <p class="text-muted-color mt-2">Collection, aging, defaulter, revenue, and daily cash views for the current school scope.</p>
-                <div class="mt-5 grid gap-4 md:grid-cols-2">
-                    <button
-                        class="rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-blue-900/40 dark:from-blue-950/40 dark:via-surface-900 dark:to-cyan-950/40"
-                        type="button"
-                        (click)="openAgingModal()"
-                    >
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <div class="text-xs uppercase tracking-[0.25em] text-blue-700 dark:text-blue-300 font-semibold">Report card</div>
-                                <h2 class="text-xl font-semibold mt-2">View aging buckets</h2>
-                                <p class="text-sm text-muted-color mt-2">Open a searchable modal for bucket analysis and aging totals.</p>
-                            </div>
-                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm">
-                                <i class="pi pi-chart-bar"></i>
-                            </span>
-                        </div>
+                <div class="mt-4 flex flex-wrap gap-3">
+                    <button class="rounded-xl border border-surface-300 px-4 py-2 font-semibold text-sm" type="button" (click)="openAgingModal()">
+                        <i class="pi pi-chart-bar mr-2"></i>Aging buckets
                     </button>
-
-                    <button
-                        class="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-rose-50 p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:border-amber-900/40 dark:from-amber-950/40 dark:via-surface-900 dark:to-rose-950/40"
-                        type="button"
-                        (click)="openDefaultersModal()"
-                    >
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <div class="text-xs uppercase tracking-[0.25em] text-amber-700 dark:text-amber-300 font-semibold">Report card</div>
-                                <h2 class="text-xl font-semibold mt-2">View defaulters</h2>
-                                <p class="text-sm text-muted-color mt-2">Search outstanding balances while keeping the full list visible.</p>
-                            </div>
-                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-600 text-white shadow-sm">
-                                <i class="pi pi-exclamation-triangle"></i>
-                            </span>
-                        </div>
+                    <button class="rounded-xl border border-surface-300 px-4 py-2 font-semibold text-sm" type="button" (click)="openDefaultersModal()">
+                        <i class="pi pi-exclamation-triangle mr-2"></i>Defaulters
                     </button>
                 </div>
             </header>
@@ -98,67 +66,55 @@ type StatementField = FinancialStatementType;
                     </div>
                 </div>
 
-                <div class="mt-5 grid gap-4 xl:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
-                    <div class="space-y-4">
-                        <label class="block">
-                            <span class="text-sm text-muted-color">Statement type</span>
-                            <select class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="selectedStatementType" name="statementType" (ngModelChange)="loadStatement()">
-                                <option *ngFor="let option of statementTypeOptions" [ngValue]="option.value">{{ option.label }}</option>
-                            </select>
-                        </label>
+                <form class="mt-5 flex flex-wrap gap-4 items-end" (ngSubmit)="refreshStatement()">
+                    <label class="block min-w-[12rem]">
+                        <span class="text-sm text-muted-color">Statement type</span>
+                        <select class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="selectedStatementType" name="statementType" (ngModelChange)="loadStatement()">
+                            <option *ngFor="let option of statementTypeOptions" [ngValue]="option.value">{{ option.label }}</option>
+                        </select>
+                    </label>
 
-                        <div class="rounded-2xl border border-surface-200 dark:border-surface-700 p-4">
-                            <div class="text-xs uppercase tracking-[0.22em] text-muted-color">Report basis</div>
-                            <div class="mt-2 text-sm text-color">
-                                <div><span class="font-semibold">Period:</span> {{ statement?.periodLabel || 'Current snapshot' }}</div>
-                                <div class="mt-1"><span class="font-semibold">Comparison:</span> {{ statement?.comparisonLabel || 'Prior period' }}</div>
-                            </div>
-                        </div>
+                    <label class="block min-w-[10rem]">
+                        <span class="text-sm text-muted-color">Filter mode</span>
+                        <select class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="filter.mode" name="mode">
+                            <option value="none">Current snapshot</option>
+                            <option value="date">Single date</option>
+                            <option value="range">Date range</option>
+                            <option value="month">Month</option>
+                            <option value="year">Year</option>
+                        </select>
+                    </label>
+
+                    <label class="block min-w-[10rem]" *ngIf="filter.mode === 'date' || filter.mode === 'range'">
+                        <span class="text-sm text-muted-color">Start date</span>
+                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="filter.startDate" name="startDate" />
+                    </label>
+
+                    <label class="block min-w-[10rem]" *ngIf="filter.mode === 'range'">
+                        <span class="text-sm text-muted-color">End date</span>
+                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="filter.endDate" name="endDate" />
+                    </label>
+
+                    <label class="block min-w-[10rem]" *ngIf="filter.mode === 'date'">
+                        <span class="text-sm text-muted-color">Date</span>
+                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="filter.date" name="date" />
+                    </label>
+
+                    <label class="block min-w-[10rem]" *ngIf="filter.mode === 'month'">
+                        <span class="text-sm text-muted-color">Month</span>
+                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="month" [(ngModel)]="filter.month" name="month" />
+                    </label>
+
+                    <label class="block min-w-[7rem]" *ngIf="filter.mode === 'year'">
+                        <span class="text-sm text-muted-color">Year</span>
+                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="number" min="2000" max="2100" [(ngModel)]="filter.year" name="year" />
+                    </label>
+
+                    <div class="flex gap-3">
+                        <button class="rounded-xl border border-surface-300 px-4 py-2 font-semibold" type="button" (click)="clearFilters()">Clear</button>
+                        <button class="rounded-xl bg-surface-900 text-white px-4 py-2 font-semibold" type="submit">Apply</button>
                     </div>
-
-                    <form class="grid gap-4 md:grid-cols-2 xl:grid-cols-5 items-end" (ngSubmit)="refreshStatement()">
-                        <label class="block">
-                            <span class="text-sm text-muted-color">Filter mode</span>
-                            <select class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="filter.mode" name="mode">
-                                <option value="none">Current snapshot</option>
-                                <option value="date">Single date</option>
-                                <option value="range">Date range</option>
-                                <option value="month">Month</option>
-                                <option value="year">Year</option>
-                            </select>
-                        </label>
-
-                        <label class="block" *ngIf="filter.mode === 'date' || filter.mode === 'range'">
-                            <span class="text-sm text-muted-color">Start date</span>
-                            <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="filter.startDate" name="startDate" />
-                        </label>
-
-                        <label class="block" *ngIf="filter.mode === 'range'">
-                            <span class="text-sm text-muted-color">End date</span>
-                            <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="filter.endDate" name="endDate" />
-                        </label>
-
-                        <label class="block" *ngIf="filter.mode === 'date'">
-                            <span class="text-sm text-muted-color">Date</span>
-                            <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="filter.date" name="date" />
-                        </label>
-
-                        <label class="block" *ngIf="filter.mode === 'month'">
-                            <span class="text-sm text-muted-color">Month</span>
-                            <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="month" [(ngModel)]="filter.month" name="month" />
-                        </label>
-
-                        <label class="block" *ngIf="filter.mode === 'year'">
-                            <span class="text-sm text-muted-color">Year</span>
-                            <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="number" min="2000" max="2100" [(ngModel)]="filter.year" name="year" />
-                        </label>
-
-                        <div class="flex gap-3 xl:col-span-5">
-                            <button class="rounded-xl border border-surface-300 px-4 py-3 font-semibold" type="button" (click)="clearFilters()">Clear filters</button>
-                            <button class="rounded-xl bg-surface-900 text-white px-4 py-3 font-semibold" type="submit">Apply filters</button>
-                        </div>
-                    </form>
-                </div>
+                </form>
 
                 <div class="grid gap-4 md:grid-cols-4 mt-6" *ngIf="statementSummaryRow as summary">
                     <article class="rounded-2xl border border-surface-200 dark:border-surface-700 p-4">
@@ -220,53 +176,6 @@ type StatementField = FinancialStatementType;
                     <div class="text-3xl font-bold mt-2">{{ (collection?.outstanding || 0) | number:'1.0-2' }}</div>
                 </article>
             </div>
-
-            <section class="workspace-card p-6">
-                <div class="flex items-center justify-between gap-4 flex-wrap">
-                    <h2 class="text-xl font-semibold">Revenue by class</h2>
-                    <button class="rounded-xl border border-surface-300 px-4 py-2 font-semibold" type="button" (click)="exportRevenuePdf()">Export PDF</button>
-                </div>
-                <div class="overflow-x-auto mt-4">
-                    <table class="w-full text-sm">
-                        <thead class="text-left text-muted-color uppercase tracking-[0.18em] text-xs">
-                            <tr>
-                                <th class="py-3 pr-4">Class</th>
-                                <th class="py-3 pr-4">Grade</th>
-                                <th class="py-3 pr-4">Billed</th>
-                                <th class="py-3 pr-4">Collected</th>
-                                <th class="py-3">Outstanding</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr *ngFor="let row of (revenue?.classes || [])" class="border-t border-surface-200 dark:border-surface-700">
-                                <td class="py-3 pr-4 font-medium">{{ row.className }}</td>
-                                <td class="py-3 pr-4">{{ row.gradeLevel }}</td>
-                                <td class="py-3 pr-4">{{ row.billed | number:'1.0-2' }}</td>
-                                <td class="py-3 pr-4">{{ row.collected | number:'1.0-2' }}</td>
-                                <td class="py-3">{{ row.outstanding | number:'1.0-2' }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-
-            <section class="workspace-card p-6">
-                <div class="flex items-center justify-between gap-4 flex-wrap">
-                    <h2 class="text-xl font-semibold">Daily cash</h2>
-                    <button class="rounded-xl border border-surface-300 px-4 py-2 font-semibold" type="button" (click)="exportDailyCashPdf()">Export PDF</button>
-                </div>
-                <div class="grid md:grid-cols-3 gap-4 mt-4">
-                    <article class="rounded-xl border border-surface-200 dark:border-surface-700 p-4">
-                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">Total amount</div>
-                        <div class="text-2xl font-bold mt-2">{{ (dailyCash?.totalAmount || 0) | number:'1.0-2' }}</div>
-                    </article>
-                    <article *ngFor="let method of (dailyCash?.methods || [])" class="rounded-xl border border-surface-200 dark:border-surface-700 p-4">
-                        <div class="text-xs uppercase tracking-[0.2em] text-muted-color">{{ method.method }}</div>
-                        <div class="text-2xl font-bold mt-2">{{ method.amount | number:'1.0-2' }}</div>
-                        <div class="text-sm text-muted-color">{{ method.paymentCount }} payment(s)</div>
-                    </article>
-                </div>
-            </section>
 
             <p-dialog [(visible)]="agingModalVisible" [modal]="true" [draggable]="false" [dismissableMask]="true" [style]="{ width: 'min(72rem, 96vw)' }" appendTo="body" header="Aging buckets" (onHide)="closeAgingModal()">
                 <div class="space-y-4">
@@ -377,8 +286,6 @@ export class AccountantReports implements OnInit {
     errorMessage = '';
     collection: CollectionReportResponse | null = null;
     aging: AgingReportResponse | null = null;
-    dailyCash: DailyCashReportResponse | null = null;
-    revenue: RevenueByClassReportResponse | null = null;
     defaulters: DefaulterReportResponse | null = null;
     statement: FinancialStatementResponse | null = null;
     selectedStatementType: StatementField = 'IncomeStatement';
@@ -411,8 +318,8 @@ export class AccountantReports implements OnInit {
 
     ngOnInit(): void {
         this.api.getSchools().subscribe({ next: s => this.schools = s });
-        this.loadReports();
         this.loadStatement();
+        this.loadCollectionAndAging();
     }
 
     clearFilters(): void {
@@ -480,18 +387,6 @@ export class AccountantReports implements OnInit {
         });
     }
 
-    exportRevenuePdf(): void {
-        this.api.getRevenueByClassReport(this.auth.schoolId()).subscribe((revenue) => {
-            buildRevenueByClassPdf(this.schoolInfo, new Date(), this.periodLabel, revenue, 'revenue-by-class.pdf');
-        });
-    }
-
-    exportDailyCashPdf(): void {
-        this.api.getDailyCashReport(this.auth.schoolId(), this.resolveDailyCashDate()).subscribe((dailyCash) => {
-            buildDailyCashPdf(this.schoolInfo, new Date(), this.periodLabel, dailyCash, 'daily-cash.pdf');
-        });
-    }
-
     formatStatementValue(value?: number | null): string {
         if (value == null) {
             return '-';
@@ -545,20 +440,16 @@ export class AccountantReports implements OnInit {
         return '';
     }
 
-    private loadReports(): void {
+    private loadCollectionAndAging(): void {
         const schoolId = this.auth.schoolId();
         forkJoin({
             collection: this.api.getCollectionReport(schoolId),
             aging: this.api.getAgingReport(schoolId, this.resolveAsOfDate()),
-            dailyCash: this.api.getDailyCashReport(schoolId, this.resolveDailyCashDate()),
-            revenue: this.api.getRevenueByClassReport(schoolId),
             defaulters: this.api.getDefaulters(schoolId)
         }).subscribe({
-            next: ({ collection, aging, dailyCash, revenue, defaulters }) => {
+            next: ({ collection, aging, defaulters }) => {
                 this.collection = collection;
                 this.aging = aging;
-                this.dailyCash = dailyCash;
-                this.revenue = revenue;
                 this.defaulters = defaulters;
             },
             error: () => {
@@ -680,21 +571,6 @@ export class AccountantReports implements OnInit {
 
     private currentMonthValue(): string {
         return new Date().toISOString().slice(0, 7);
-    }
-
-    private resolveDailyCashDate(): string | null {
-        switch (this.filter.mode) {
-            case 'date':
-                return this.filter.date || null;
-            case 'range':
-                return this.filter.endDate || this.filter.startDate || null;
-            case 'month':
-                return this.filter.month ? this.endOfMonth(this.filter.month) : null;
-            case 'year':
-                return this.filter.year ? `${this.filter.year}-12-31` : null;
-            default:
-                return null;
-        }
     }
 
     private endOfMonth(monthValue: string): string {

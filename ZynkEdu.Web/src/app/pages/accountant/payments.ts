@@ -54,6 +54,7 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
                             filterBy="label"
                             filterPlaceholder="Search students"
                             [showClear]="true"
+                            (ngModelChange)="onStudentSelect($event)"
                         ></app-dropdown>
                     </label>
 
@@ -82,19 +83,61 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
                 </form>
             </section>
 
+            <section *ngIf="selectedStudent" class="workspace-card p-5">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-muted-color font-semibold">Selected student</p>
+                        <h3 class="text-xl font-display font-bold mt-1">{{ selectedStudent.fullName }}</h3>
+                        <p class="text-sm text-muted-color mt-0.5">{{ selectedStudent.studentNumber }}</p>
+                    </div>
+                    <p-tag [value]="selectedStudent.status" [severity]="statusSeverity(selectedStudent.status)"></p-tag>
+                </div>
+                <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div class="rounded-xl border border-surface-200 dark:border-surface-700 p-3">
+                        <div class="text-xs text-muted-color uppercase tracking-[0.18em]">Class</div>
+                        <div class="font-semibold mt-1">{{ selectedStudent.class || '—' }}</div>
+                    </div>
+                    <div class="rounded-xl border border-surface-200 dark:border-surface-700 p-3">
+                        <div class="text-xs text-muted-color uppercase tracking-[0.18em]">Level</div>
+                        <div class="font-semibold mt-1">{{ selectedStudent.level || '—' }}</div>
+                    </div>
+                    <div class="rounded-xl border border-surface-200 dark:border-surface-700 p-3">
+                        <div class="text-xs text-muted-color uppercase tracking-[0.18em]">Parent email</div>
+                        <div class="font-semibold mt-1">{{ selectedStudent.parentEmail || '—' }}</div>
+                    </div>
+                    <div class="rounded-xl border border-surface-200 dark:border-surface-700 p-3">
+                        <div class="text-xs text-muted-color uppercase tracking-[0.18em]">Parent phone</div>
+                        <div class="font-semibold mt-1">{{ selectedStudent.parentPhone || '—' }}</div>
+                    </div>
+                </div>
+                <div *ngIf="selectedStudent.subjects?.length" class="mt-3 text-sm text-muted-color">
+                    <span class="font-semibold text-color">Subjects:</span> {{ selectedStudent.subjects.join(', ') }}
+                </div>
+            </section>
+
             <section class="workspace-card p-6">
-                <div class="flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-center justify-between gap-4 flex-wrap mb-4">
                     <div>
                         <h2 class="text-xl font-semibold">Students</h2>
-                        <p class="text-sm text-muted-color mt-1">Current enrolled students for the active school, shown with the details you need for payment capture.</p>
+                        <p class="text-sm text-muted-color mt-1">Search by name, class, or level. Click a row to select the student for payment.</p>
                     </div>
-                    <span class="text-sm text-muted-color">{{ currentStudents.length }} current student(s)</span>
+                    <span class="text-sm text-muted-color">{{ filteredStudents.length }} / {{ currentStudents.length }} student(s)</span>
                 </div>
 
-                <div class="overflow-x-auto mt-4">
-                    <p-table [value]="currentStudents" [rows]="10" [paginator]="true" styleClass="p-datatable-sm">
+                <div class="flex flex-wrap gap-3 mb-4">
+                    <input
+                        class="rounded-xl border border-surface-300 bg-surface-0 px-3 py-2 text-sm min-w-[16rem]"
+                        placeholder="Search name, class, or level…"
+                        [(ngModel)]="searchTerm"
+                        name="search"
+                    />
+                </div>
+
+                <div class="overflow-x-auto">
+                    <p-table [value]="filteredStudents" [rows]="10" [paginator]="true" styleClass="p-datatable-sm">
                         <ng-template pTemplate="header">
                             <tr>
+                                <th>#</th>
                                 <th>Student</th>
                                 <th>Student No.</th>
                                 <th>Class</th>
@@ -106,8 +149,13 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
                                 <th>Parent Contact</th>
                             </tr>
                         </ng-template>
-                        <ng-template pTemplate="body" let-student>
-                            <tr>
+                        <ng-template pTemplate="body" let-student let-rowIndex="rowIndex">
+                            <tr
+                                class="cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-900/40"
+                                [ngClass]="selectedStudent?.id === student.id ? 'bg-primary-50 dark:bg-primary-950/30' : ''"
+                                (click)="onStudentSelect(student.id)"
+                            >
+                                <td class="text-sm text-muted-color">{{ rowIndex + 1 }}</td>
                                 <td class="font-medium">
                                     <div>{{ student.fullName }}</div>
                                     <div class="text-xs text-muted-color">{{ student.profileKey }}</div>
@@ -154,6 +202,8 @@ export class AccountantPayments implements OnInit {
     schools: SchoolResponse[] = [];
     students: StudentResponse[] = [];
     selectedSchoolId: number | null = this.auth.schoolId();
+    selectedStudent: StudentResponse | null = null;
+    searchTerm = '';
     draft = {
         studentId: null as number | null,
         amount: 0,
@@ -184,6 +234,15 @@ export class AccountantPayments implements OnInit {
         return this.students.filter((student) => this.isCurrentEnrollment(student));
     }
 
+    get filteredStudents(): StudentResponse[] {
+        const term = this.searchTerm.trim().toLowerCase();
+        if (!term) return this.currentStudents;
+        return this.currentStudents.filter((s) =>
+            [s.fullName, s.class, s.level, s.studentNumber]
+                .some((field) => (field ?? '').toLowerCase().includes(term))
+        );
+    }
+
     get emptyStateMessage(): string {
         if (this.isPlatformAdmin && !this.selectedSchoolId) {
             return 'Choose a school to load enrolled students for payment capture.';
@@ -210,13 +269,23 @@ export class AccountantPayments implements OnInit {
         if (this.isPlatformAdmin && !schoolId) {
             this.students = [];
             this.draft.studentId = null;
+            this.selectedStudent = null;
             return;
         }
 
         this.api.getStudents(undefined, schoolId ?? undefined).subscribe((students) => {
             this.students = students;
-            this.draft.studentId = this.currentStudents[0]?.id ?? null;
+            const firstCurrent = this.currentStudents[0];
+            this.draft.studentId = firstCurrent?.id ?? null;
+            this.selectedStudent = firstCurrent ?? null;
         });
+    }
+
+    onStudentSelect(studentId: number | null): void {
+        this.draft.studentId = studentId;
+        this.selectedStudent = studentId != null
+            ? (this.students.find((s) => s.id === studentId) ?? null)
+            : null;
     }
 
     statusSeverity(status: string): 'success' | 'warning' | 'danger' | 'info' {
