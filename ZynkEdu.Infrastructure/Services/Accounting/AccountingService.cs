@@ -19,17 +19,20 @@ public sealed class AccountingService : IAccountingService
     private readonly ICurrentUserContext _currentUserContext;
     private readonly IAuditLogService _auditLogService;
     private readonly INotificationService _notificationService;
+    private readonly IEmailSender _emailSender;
 
     public AccountingService(
         ZynkEduDbContext dbContext,
         ICurrentUserContext currentUserContext,
         IAuditLogService auditLogService,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IEmailSender emailSender)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
         _auditLogService = auditLogService;
         _notificationService = notificationService;
+        _emailSender = emailSender;
     }
 
     public async Task<IReadOnlyList<FeeStructureResponse>> GetFeeStructuresAsync(int? schoolId = null, CancellationToken cancellationToken = default)
@@ -1293,5 +1296,56 @@ public sealed class AccountingService : IAccountingService
     private int RequireUserId()
     {
         return _currentUserContext.UserId ?? throw new UnauthorizedAccessException("User identity is missing.");
+    }
+
+    public async Task SendInvoicePdfAsync(int invoiceId, byte[]? invoicePdf, string? invoicePdfFileName, int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        var resolvedSchoolId = ResolveReportSchoolId(schoolId);
+
+        var invoice = await _dbContext.Invoices
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == invoiceId && x.SchoolId == resolvedSchoolId, cancellationToken)
+            ?? throw new InvalidOperationException("Invoice not found.");
+
+        var student = await _dbContext.Students
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == invoice.StudentId && x.SchoolId == resolvedSchoolId, cancellationToken)
+            ?? throw new InvalidOperationException("Student not found.");
+
+        var reference = invoice.AccountingTransactionId.HasValue
+            ? await _dbContext.AccountingTransactions
+                .AsNoTracking()
+                .Where(x => x.Id == invoice.AccountingTransactionId.Value)
+                .Select(x => x.Reference)
+                .FirstOrDefaultAsync(cancellationToken)
+            : null;
+
+        var primaryGuardianEmail = await _dbContext.Guardians
+            .AsNoTracking()
+            .Where(g => g.StudentId == student.Id && g.IsActive && g.ParentEmail != null && g.ParentEmail != string.Empty)
+            .OrderByDescending(g => g.IsPrimary)
+            .Select(g => g.ParentEmail)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var recipientEmail = primaryGuardianEmail
+            ?? (string.IsNullOrWhiteSpace(student.ParentEmail) ? null : student.ParentEmail);
+
+        if (string.IsNullOrWhiteSpace(recipientEmail))
+        {
+            throw new InvalidOperationException($"No parent email address is on record for {student.FullName}.");
+        }
+
+        var subject = $"Invoice — {invoice.Term} Fee Statement for {student.FullName}";
+        var refLine = string.IsNullOrWhiteSpace(reference) ? string.Empty : $"Reference: {reference}\n";
+        var body = $"Dear Guardian,\n\nPlease find attached the fee invoice for {student.FullName} ({student.StudentNumber}) covering {invoice.Term}.\n\nAmount due: {invoice.TotalAmount.ToString("F2", CultureInfo.InvariantCulture)}\nDue date: {invoice.DueAt:MMMM d, yyyy}\n{refLine}\nIf you have any questions, please contact the school accounts office.\n\nThank you.";
+
+        if (invoicePdf is { Length: > 0 })
+        {
+            await _emailSender.SendAsync(recipientEmail, subject, body, invoicePdf, invoicePdfFileName ?? $"invoice-{invoice.Term.Replace(" ", "-").ToLowerInvariant()}.pdf", "application/pdf", cancellationToken);
+        }
+        else
+        {
+            await _emailSender.SendAsync(recipientEmail, subject, body, cancellationToken);
+        }
     }
 }

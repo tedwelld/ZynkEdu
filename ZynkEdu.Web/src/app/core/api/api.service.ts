@@ -461,6 +461,13 @@ export class ApiService {
         return this.http.delete<void>(`${API_BASE_URL}/accounting/invoices/${invoiceId}${query}`);
     }
 
+    sendInvoicePdf(invoiceId: number, pdfBlob: Blob, schoolId?: number | null): Observable<void> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        const formData = new FormData();
+        formData.append('invoicePdf', pdfBlob, `invoice-${invoiceId}.pdf`);
+        return this.http.post<void>(`${API_BASE_URL}/accounting/invoices/${invoiceId}/send${query}`, formData);
+    }
+
     postAdjustment(request: CreateAdjustmentRequest, schoolId?: number | null): Observable<AccountingTransactionResponse> {
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.post<AccountingTransactionResponse>(`${API_BASE_URL}/accounting/adjustments${query}`, request);

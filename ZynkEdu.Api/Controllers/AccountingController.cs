@@ -158,6 +158,24 @@ public sealed class AccountingController : ControllerBase
         return Ok(await _accountingService.GetDefaultersAsync(schoolId, cancellationToken));
     }
 
+    [HttpPost("invoices/{invoiceId:int}/send")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> SendInvoicePdf(int invoiceId, [FromQuery] int? schoolId, [FromForm] IFormFile? invoicePdf, CancellationToken cancellationToken)
+    {
+        byte[]? pdfBytes = null;
+        string? fileName = null;
+        if (invoicePdf is not null)
+        {
+            await using var stream = new MemoryStream();
+            await invoicePdf.CopyToAsync(stream, cancellationToken);
+            pdfBytes = stream.ToArray();
+            fileName = invoicePdf.FileName;
+        }
+
+        await _accountingService.SendInvoicePdfAsync(invoiceId, pdfBytes, fileName, schoolId, cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("fines")]
     public async Task<ActionResult<AccountingTransactionResponse>> PostFine([FromQuery] int? schoolId, [FromBody] CreateFineRequest request, CancellationToken cancellationToken)
     {

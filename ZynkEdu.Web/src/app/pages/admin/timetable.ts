@@ -108,47 +108,35 @@ interface TimetableReportRow {
                 </div>
 
                 <div *ngIf="loading" class="space-y-3">
-                    <p-skeleton *ngFor="let _ of skeletonRows" height="5rem" borderRadius="1rem"></p-skeleton>
+                    <p-skeleton *ngFor="let _ of skeletonRows" height="3.5rem" borderRadius="1rem"></p-skeleton>
                 </div>
 
-                <div *ngIf="!loading" class="overflow-x-auto">
-                    <table class="min-w-full border-separate border-spacing-0">
-                        <thead>
-                            <tr class="text-left text-xs uppercase tracking-[0.18em] text-muted-color">
-                                <th class="sticky left-0 z-10 bg-surface-0 dark:bg-surface-950 px-4 py-3">Day</th>
-                                <th *ngFor="let session of sessionRows" class="px-4 py-3 whitespace-nowrap">{{ session.label }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr *ngFor="let row of filteredDayRows" class="border-t border-surface-200 dark:border-surface-800">
-                                <td class="sticky left-0 z-10 bg-surface-0 dark:bg-surface-950 px-4 py-4 align-top">
-                                    <div class="font-semibold">{{ row.day }}</div>
-                                    <div class="text-xs text-muted-color">{{ row.filledCount }}/{{ sessionRows.length }} filled</div>
-                                </td>
-                                <td *ngFor="let cell of row.cells" class="px-4 py-4 align-top">
-                                    <ng-container *ngIf="cell.slots.length > 0; else emptyCell">
-                                        <div class="space-y-2 min-w-52">
-                                            <div *ngFor="let slot of cell.slots" class="rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-0/90 dark:bg-surface-900/40 p-3">
-                                                <div class="font-semibold leading-tight">{{ slot.class }}</div>
-                                                <div class="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-primary">{{ slot.startTime }} - {{ slot.endTime }}</div>
-                                                <div class="mt-1 text-xs text-muted-color">{{ slot.subjectName }}</div>
-                                                <div class="mt-2 flex flex-wrap gap-1">
-                                                    <p-tag [value]="slot.teacherName" severity="secondary"></p-tag>
-                                                    <p-tag [value]="slot.gradeLevel" [severity]="severityForLevel(slot.gradeLevel)"></p-tag>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </ng-container>
-                                    <ng-template #emptyCell>
-                                        <div class="min-w-52 rounded-2xl border border-dashed border-surface-300 dark:border-surface-700 px-3 py-4 text-center text-sm text-muted-color">
-                                            Empty
-                                        </div>
-                                    </ng-template>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div *ngIf="!loading && displayedTimetable.length === 0" class="rounded-2xl border border-dashed border-surface-300 dark:border-surface-700 px-4 py-6 text-center text-sm text-muted-color">
+                    No timetable entries match the current filters.
                 </div>
+
+                <p-table *ngIf="!loading && displayedTimetable.length > 0" [value]="sortedDisplayedTimetable" styleClass="p-datatable-sm" [rows]="50" [paginator]="sortedDisplayedTimetable.length > 50">
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th>Day</th>
+                            <th>Time</th>
+                            <th>Class</th>
+                            <th>Subject</th>
+                            <th>Teacher</th>
+                            <th>Level</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-slot>
+                        <tr>
+                            <td class="font-semibold">{{ slot.dayOfWeek }}</td>
+                            <td class="whitespace-nowrap text-xs text-muted-color font-medium">{{ slot.startTime }} – {{ slot.endTime }}</td>
+                            <td class="font-medium">{{ slot.class }}</td>
+                            <td>{{ slot.subjectName }}</td>
+                            <td>{{ slot.teacherName }}</td>
+                            <td><p-tag [value]="slot.gradeLevel" [severity]="severityForLevel(slot.gradeLevel)"></p-tag></td>
+                        </tr>
+                    </ng-template>
+                </p-table>
             </article>
 
             <p-dialog [(visible)]="previewVisible" [modal]="true" [draggable]="false" [dismissableMask]="true" [style]="{ width: 'min(96rem, 98vw)' }" appendTo="body" header="Timetable preview">
@@ -337,6 +325,18 @@ export class AdminTimetable implements OnInit {
 
     get previewRows(): TimetableReportRow[] {
         return this.buildPdfReportRows();
+    }
+
+    private static readonly dayOrder: Record<string, number> = {
+        Monday: 0, Tuesday: 1, Wednesday: 2, Thursday: 3, Friday: 4
+    };
+
+    get sortedDisplayedTimetable(): TimetableResponse[] {
+        return this.displayedTimetable.slice().sort((a, b) => {
+            const dayDiff = (AdminTimetable.dayOrder[a.dayOfWeek] ?? 5) - (AdminTimetable.dayOrder[b.dayOfWeek] ?? 5);
+            if (dayDiff !== 0) return dayDiff;
+            return a.startTime.localeCompare(b.startTime);
+        });
     }
 
     get filteredDayRows(): TimetableRow[] {

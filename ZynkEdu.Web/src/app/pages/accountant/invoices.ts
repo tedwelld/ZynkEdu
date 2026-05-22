@@ -6,7 +6,7 @@ import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { AcademicTermResponse, FeeStructureResponse, SchoolResponse, StudentResponse } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
-import { ReportSchoolInfo, buildFeeStructuresPdf } from '../../shared/report/report-pdf';
+import { InvoicePdfData, ReportSchoolInfo, buildFeeStructuresPdf, buildInvoicePdf } from '../../shared/report/report-pdf';
 
 type TermOption = {
     label: string;
@@ -249,19 +249,82 @@ export class AccountantInvoices implements OnInit {
             return;
         }
 
-        this.api.postInvoice(
-            {
-                studentId: this.draft.studentId,
-                term: this.draft.term,
-                totalAmount: this.draft.totalAmount,
-                dueAt: new Date(this.draft.dueAt).toISOString(),
-                reference: this.draft.reference || null,
-                description: this.draft.description || null
+        const studentId = this.draft.studentId;
+        const schoolId = this.auth.schoolId();
+        const invoicePayload = {
+            studentId,
+            term: this.draft.term,
+            totalAmount: this.draft.totalAmount,
+            dueAt: new Date(this.draft.dueAt).toISOString(),
+            reference: this.draft.reference || null,
+            description: this.draft.description || null
+        };
+
+        this.api.postInvoice(invoicePayload, schoolId).subscribe({
+            next: (transaction) => {
+                this.draft.reference = '';
+                this.draft.description = '';
+                this.messages.add({ severity: 'success', summary: 'Invoice issued', detail: 'The invoice has been created.' });
+                this.sendInvoicePdfToParent(transaction.id, studentId, invoicePayload, transaction.transactionDate, schoolId);
             },
-            this.auth.schoolId()
-        ).subscribe(() => {
-            this.draft.reference = '';
-            this.draft.description = '';
+            error: () => {
+                this.messages.add({ severity: 'error', summary: 'Invoice failed', detail: 'The invoice could not be created.' });
+            }
+        });
+    }
+
+    private sendInvoicePdfToParent(
+        transactionId: number,
+        studentId: number,
+        payload: { term: string; totalAmount: number; dueAt: string; reference: string | null; description: string | null },
+        transactionDate: string,
+        schoolId: number | null
+    ): void {
+        this.api.getStudentInvoices(studentId, schoolId).subscribe({
+            next: (invoices) => {
+                const invoice = invoices.find(i => i.accountingTransactionId === transactionId)
+                    ?? invoices.at(-1);
+
+                if (!invoice) return;
+
+                const student = this.students.find(s => s.id === studentId);
+                const pdfData: InvoicePdfData = {
+                    invoiceId: invoice.id,
+                    studentName: invoice.studentName,
+                    studentNumber: invoice.studentNumber,
+                    studentClass: invoice.studentClass,
+                    term: invoice.term,
+                    amount: invoice.totalAmount,
+                    dueAt: invoice.dueAt,
+                    issuedAt: invoice.issuedAt,
+                    reference: invoice.reference,
+                    description: invoice.description,
+                    status: invoice.status
+                };
+
+                try {
+                    const pdfBlob = buildInvoicePdf(pdfData, this.schoolInfo);
+                    this.api.sendInvoicePdf(invoice.id, pdfBlob, schoolId).subscribe({
+                        next: () => {
+                            const email = student?.parentEmail;
+                            this.messages.add({
+                                severity: 'info',
+                                summary: 'PDF sent',
+                                detail: email ? `Invoice PDF emailed to ${email}.` : 'Invoice PDF sent to parent email on record.'
+                            });
+                        },
+                        error: () => {
+                            this.messages.add({
+                                severity: 'warn',
+                                summary: 'PDF not sent',
+                                detail: 'Invoice was created but the PDF could not be emailed. Check that a parent email is on file.'
+                            });
+                        }
+                    });
+                } catch {
+                    // PDF build failure is non-critical; invoice was already created successfully
+                }
+            }
         });
     }
 

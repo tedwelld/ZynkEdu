@@ -812,6 +812,102 @@ export function buildTeacherClassResultsPdf(
     return doc;
 }
 
+export interface InvoicePdfData {
+    invoiceId: number;
+    studentName: string;
+    studentNumber: string;
+    studentClass: string;
+    term: string;
+    amount: number;
+    dueAt: string;
+    issuedAt: string;
+    reference?: string | null;
+    description?: string | null;
+    status: string;
+}
+
+export function buildInvoicePdf(invoice: InvoicePdfData, schoolInfo: ReportSchoolInfo): Blob {
+    const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+    const margin = 48;
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    const contentY = drawLetterhead(doc, schoolInfo, 'Fee Invoice', margin, pageWidth, [
+        `Issued: ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' }).format(new Date(invoice.issuedAt))}`,
+        `Due: ${new Intl.DateTimeFormat('en-GB', { dateStyle: 'long' }).format(new Date(invoice.dueAt))}`
+    ]);
+
+    let y = contentY;
+
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin, y, pageWidth - margin * 2, 72, 8, 8, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text('STUDENT', margin + 16, y + 22);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(17, 24, 39);
+    doc.text(invoice.studentName, margin + 16, y + 40);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(75, 85, 99);
+    doc.text(`${invoice.studentNumber}  ·  ${invoice.studentClass}`, margin + 16, y + 58);
+
+    y += 88;
+
+    autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        head: [['Description', 'Term', 'Amount', 'Status']],
+        body: [
+            [
+                invoice.description || invoice.reference || 'School fee',
+                invoice.term,
+                new Intl.NumberFormat('en-US', { minimumFractionDigits: 2 }).format(invoice.amount),
+                invoice.status
+            ]
+        ],
+        headStyles: { fillColor: [37, 99, 235], textColor: 255, fontSize: 9, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 10 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: { 2: { halign: 'right' }, 3: { halign: 'center' } }
+    });
+
+    const afterTable = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY ?? y + 60;
+
+    y = afterTable + 24;
+    const boxWidth = 200;
+    const boxX = pageWidth - margin - boxWidth;
+    doc.setFillColor(239, 246, 255);
+    doc.setDrawColor(147, 197, 253);
+    doc.roundedRect(boxX, y, boxWidth, 56, 8, 8, 'FD');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(75, 85, 99);
+    doc.text('TOTAL AMOUNT DUE', boxX + 12, y + 18);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(37, 99, 235);
+    doc.text(new Intl.NumberFormat('en-US', { minimumFractionDigits: 2 }).format(invoice.amount), boxX + 12, y + 42);
+
+    y += 80;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(107, 114, 128);
+    doc.text('Please present this invoice when making payment. For queries, contact the school accounts office.', margin, y, { maxWidth: pageWidth - margin * 2 });
+
+    if (invoice.reference) {
+        y += 20;
+        doc.text(`Reference: ${invoice.reference}`, margin, y);
+    }
+
+    return doc.output('blob');
+}
+
 function formatDate(value: Date | string): string {
     return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 }
