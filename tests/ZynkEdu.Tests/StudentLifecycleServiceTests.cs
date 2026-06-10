@@ -35,7 +35,6 @@ public sealed class StudentLifecycleServiceTests
                 EnrollmentYear = 2026,
                 ParentEmail = "aminata@example.com",
                 ParentPhone = "+263770000001",
-                ParentPasswordHash = "hash",
                 CreatedAt = DateTime.UtcNow
             };
             context.Students.Add(student);
@@ -108,7 +107,6 @@ public sealed class StudentLifecycleServiceTests
                 EnrollmentYear = 2026,
                 ParentEmail = "bright@example.com",
                 ParentPhone = "+263770000011",
-                ParentPasswordHash = "hash",
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -123,7 +121,6 @@ public sealed class StudentLifecycleServiceTests
                 EnrollmentYear = 2026,
                 ParentEmail = "chipo@example.com",
                 ParentPhone = "+263770000012",
-                ParentPasswordHash = "hash",
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -138,7 +135,6 @@ public sealed class StudentLifecycleServiceTests
                 EnrollmentYear = 2025,
                 ParentEmail = "dumisani@example.com",
                 ParentPhone = "+263770000013",
-                ParentPasswordHash = "hash",
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -209,7 +205,6 @@ public sealed class StudentLifecycleServiceTests
                 EnrollmentYear = 2026,
                 ParentEmail = "elias@example.com",
                 ParentPhone = "+263770000021",
-                ParentPasswordHash = "hash",
                 CreatedAt = DateTime.UtcNow
             };
             context.Students.Add(student);

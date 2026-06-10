@@ -125,7 +125,8 @@ public sealed class AccountingFinancialStatementTests
             context,
             currentUser,
             new StubAuditLogService(),
-            new StubNotificationService());
+            new StubNotificationService(),
+            new StubEmailSender());
     }
 
     private static void SeedSchoolAndStudent(ZynkEdu.Infrastructure.Persistence.ZynkEduDbContext context, int schoolId, string schoolName, string schoolCode, string studentNumber, string studentName)
@@ -150,7 +151,6 @@ public sealed class AccountingFinancialStatementTests
             EnrollmentYear = 2026,
             ParentEmail = $"{studentName.Replace(" ", string.Empty).ToLowerInvariant()}@example.com",
             ParentPhone = "+263770000000",
-            ParentPasswordHash = "hash",
             CreatedAt = DateTime.UtcNow
         };
 

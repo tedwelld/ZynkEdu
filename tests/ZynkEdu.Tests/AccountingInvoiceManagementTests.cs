@@ -29,7 +29,8 @@ public sealed class AccountingInvoiceManagementTests
                 queryContext,
                 currentUser,
                 new StubAuditLogService(),
-                new StubNotificationService());
+                new StubNotificationService(),
+                new StubEmailSender());
 
             var created = await service.PostInvoiceAsync(new CreateInvoiceRequest(
                 studentId,
@@ -99,7 +100,6 @@ public sealed class AccountingInvoiceManagementTests
             EnrollmentYear = 2026,
             ParentEmail = "guardian@example.com",
             ParentPhone = "+263770000001",
-            ParentPasswordHash = "hash",
             CreatedAt = DateTime.UtcNow
         };
 

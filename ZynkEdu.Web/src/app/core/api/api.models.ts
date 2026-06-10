@@ -299,17 +299,6 @@ export interface SaveAttendanceRegisterRequest {
     students: SaveAttendanceRegisterEntryRequest[];
 }
 
-export interface StudentCommentResponse {
-    resultId: number;
-    subjectId: number;
-    subjectName: string;
-    score: number;
-    grade: string;
-    term: string;
-    comment?: string | null;
-    createdAt: string;
-}
-
 export interface ParentReportSubjectResponse {
     subjectId: number;
     subjectName: string;

@@ -49,7 +49,6 @@ public sealed class ZynkEduDbContext : DbContext
     public DbSet<AttendanceDispatchLog> AttendanceDispatchLogs => Set<AttendanceDispatchLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<NotificationRecipient> NotificationRecipients => Set<NotificationRecipient>();
-    public DbSet<ParentOtpChallenge> ParentOtpChallenges => Set<ParentOtpChallenge>();
     public DbSet<TimetableSlot> TimetableSlots => Set<TimetableSlot>();
     public DbSet<TimetablePublication> TimetablePublications => Set<TimetablePublication>();
     public DbSet<TimetableDispatchLog> TimetableDispatchLogs => Set<TimetableDispatchLog>();
@@ -175,7 +174,6 @@ public sealed class ZynkEduDbContext : DbContext
             entity.Property(x => x.Status).HasMaxLength(40);
             entity.Property(x => x.ParentEmail).HasMaxLength(200);
             entity.Property(x => x.ParentPhone).HasMaxLength(50);
-            entity.Property(x => x.ParentPasswordHash).HasMaxLength(512);
             entity.HasIndex(x => x.GuardianId).IsUnique(false);
             entity.HasIndex(x => x.ProfileKey);
             entity.HasIndex(x => x.ParentEmail);
@@ -441,12 +439,6 @@ public sealed class ZynkEduDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.StaffUserId)
                 .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<ParentOtpChallenge>(entity =>
-        {
-            entity.Property(x => x.Destination).HasMaxLength(200);
-            entity.Property(x => x.CodeHash).HasMaxLength(256);
         });
 
         modelBuilder.Entity<TimetableSlot>(entity =>

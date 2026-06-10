@@ -17,7 +17,6 @@ public sealed class Student : EntityBase, ISchoolScoped
     public ICollection<Guardian> Guardians { get; set; } = new List<Guardian>();
     public string ParentEmail { get; set; } = string.Empty;
     public string ParentPhone { get; set; } = string.Empty;
-    public string ParentPasswordHash { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ICollection<Result> Results { get; set; } = new List<Result>();
     public ICollection<StudentSubjectEnrollment> SubjectEnrollments { get; set; } = new List<StudentSubjectEnrollment>();

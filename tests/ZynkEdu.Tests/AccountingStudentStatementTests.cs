@@ -35,6 +35,7 @@ public class AccountingStudentStatementTests
             .AddScoped<ICurrentUserContext>(_ => new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 99, UserId = 1 })
             .AddScoped<IAuditLogService, NoOpAuditLogService>()
             .AddScoped<INotificationService>(_ => new Mock<INotificationService>().Object)
+            .AddScoped<IEmailSender>(_ => new StubEmailSender())
             .AddScoped<IAccountingService, AccountingService>()
             .BuildServiceProvider();
 

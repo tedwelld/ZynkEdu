@@ -104,17 +104,13 @@ internal static class TestDatabase
         return (connection, context);
     }
 
-    public static IOptions<ParentOtpOptions> ParentOtpOptions(int expirationMinutes = 10, int maxAttempts = 5)
-        => Options.Create(new ParentOtpOptions { ExpirationMinutes = expirationMinutes, MaxAttempts = maxAttempts });
-
     public static IOptions<JwtOptions> JwtOptions()
         => Options.Create(new JwtOptions
         {
             Issuer = "TestIssuer",
             Audience = "TestAudience",
             SigningKey = "test-signing-key-which-is-long-enough-1234567890",
-            ExpirationMinutes = 60,
-            ParentExpirationMinutes = 30
+            ExpirationMinutes = 60
         });
 
     public static string CreateDatabasePath()

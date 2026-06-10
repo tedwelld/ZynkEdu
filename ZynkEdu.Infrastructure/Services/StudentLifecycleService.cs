@@ -236,7 +236,6 @@ public sealed class StudentLifecycleService : IStudentLifecycleService
                 EnrollmentYear = sourceStudent.EnrollmentYear,
                 ParentEmail = sourceStudent.ParentEmail,
                 ParentPhone = sourceStudent.ParentPhone,
-                ParentPasswordHash = sourceStudent.ParentPasswordHash,
                 CreatedAt = DateTime.UtcNow
             };
 

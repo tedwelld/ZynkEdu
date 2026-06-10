@@ -304,6 +304,27 @@ internal sealed class StubAuditLogService : IAuditLogService
         => Task.FromResult<IReadOnlyList<AuditLogResponse>>(Array.Empty<AuditLogResponse>());
 }
 
+internal sealed class StubEmailSender : IEmailSender
+{
+    public Task SendAsync(string destination, string subject, string message, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task SendAsync(string destination, string subject, string message, string htmlMessage, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task SendAsync(string destination, string subject, string message, byte[] attachmentBytes, string attachmentFileName, string attachmentContentType = "application/pdf", CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task SendAsync(string destination, string subject, string message, string htmlMessage, byte[] attachmentBytes, string attachmentFileName, string attachmentContentType = "application/pdf", CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task SendAsync(string destination, string subject, string message, string htmlMessage, IReadOnlyList<EmailAttachment> attachments, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task SendAsync(string destination, string subject, string message, IReadOnlyList<EmailAttachment> attachments, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+}
+
 internal sealed class StubGradingSchemeService : IGradingSchemeService
 {
     public Task EnsureDefaultsAsync(int schoolId, CancellationToken cancellationToken = default)
