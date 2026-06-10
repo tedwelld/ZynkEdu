@@ -71,7 +71,6 @@ public sealed class AttendanceServiceTests
                     Status = "Active",
                     ParentEmail = "alice.north@example.com",
                     ParentPhone = "+263770100001",
-                    ParentPasswordHash = "hash",
                     CreatedAt = DateTime.UtcNow
                 },
                 new Student
@@ -84,7 +83,6 @@ public sealed class AttendanceServiceTests
                     Status = "Active",
                     ParentEmail = "brian.lake@example.com",
                     ParentPhone = "+263770200001",
-                    ParentPasswordHash = "hash",
                     CreatedAt = DateTime.UtcNow
                 });
             await context.SaveChangesAsync();

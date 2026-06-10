@@ -74,7 +74,6 @@ public sealed class UserManagementServiceTests
             EnrollmentYear = 2026,
             ParentEmail = "student.one@example.com",
             ParentPhone = "+263770300001",
-            ParentPasswordHash = "hash",
             CreatedAt = DateTime.UtcNow
         };
 

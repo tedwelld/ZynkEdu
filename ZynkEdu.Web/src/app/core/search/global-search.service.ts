@@ -20,25 +20,6 @@ export class GlobalSearchService {
             return of(this.cache());
         }
 
-        if (false) {
-            return this.api.getParentResults().pipe(
-                map((results) =>
-                    results.map((result) => ({
-                        id: `parent-result-${result.resultId}`,
-                        label: result.subjectName,
-                        type: 'Result' as const,
-                        description: `${result.grade} Â· ${result.term}`,
-                        route: '/parent/results'
-                    }))
-                ),
-                map((hits) => {
-                    this.cache.set(hits);
-                    this.cacheRole.set(role);
-                    return hits;
-                })
-            );
-        }
-
         if (role === 'Teacher') {
             return this.api.getAssignments().pipe(
                 map((assignments) =>

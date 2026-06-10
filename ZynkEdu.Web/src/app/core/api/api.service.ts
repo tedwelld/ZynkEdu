@@ -43,7 +43,6 @@ import {
     LoginRequest,
     LoginResponse,
     NotificationResponse,
-    ParentPreviewReportResponse,
     ResultResponse,
     ResultSlipSendResponse,
     TimetableResponse,
@@ -67,7 +66,6 @@ import {
     StudentMovementResponse,
     StudentPromotionRunRequest,
     StudentPromotionRunResponse,
-    StudentCommentResponse,
     StudentResponse,
     CreateSubjectRequest,
     ImportSchoolSubjectsRequest,
@@ -814,14 +812,6 @@ export class ApiService {
         }
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.post<ResultSlipSendResponse>(`${API_BASE_URL}/results/${studentId}/send-slip${query}`, formData);
-    }
-
-    getParentResults(): Observable<StudentCommentResponse[]> {
-        return this.http.get<StudentCommentResponse[]>(`${API_BASE_URL}/parent/results`);
-    }
-
-    getParentReportPreview(): Observable<ParentPreviewReportResponse[]> {
-        return this.http.get<ParentPreviewReportResponse[]>(`${API_BASE_URL}/parent/report-preview`);
     }
 
     getSearchIndex(): Observable<{

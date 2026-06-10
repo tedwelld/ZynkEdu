@@ -145,7 +145,6 @@ public sealed class StudentServiceTests
                     EnrollmentYear = 2026,
                     ParentEmail = "alice@example.com",
                     ParentPhone = "+263770100001",
-                    ParentPasswordHash = "hash",
                     CreatedAt = DateTime.UtcNow
                 },
                 new Student
@@ -159,7 +158,6 @@ public sealed class StudentServiceTests
                     EnrollmentYear = 2026,
                     ParentEmail = "brian@example.com",
                     ParentPhone = "+263770100002",
-                    ParentPasswordHash = "hash",
                     CreatedAt = DateTime.UtcNow
                 });
 
@@ -226,7 +224,6 @@ public sealed class StudentServiceTests
             EnrollmentYear = 2026,
             ParentEmail = $"{studentName.Replace(" ", string.Empty).ToLowerInvariant()}@example.com",
             ParentPhone = $"+263770{schoolId:000}001",
-            ParentPasswordHash = "hash",
             CreatedAt = DateTime.UtcNow
         };
 
