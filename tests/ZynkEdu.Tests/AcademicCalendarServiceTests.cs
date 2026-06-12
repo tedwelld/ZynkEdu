@@ -25,7 +25,7 @@ public sealed class AcademicCalendarServiceTests
         });
         await context.SaveChangesAsync();
 
-        var service = new AcademicCalendarService(context, currentUser);
+        var service = new AcademicCalendarService(context, currentUser, new NoOpAuditLogService());
         await service.UpsertTermAsync(1, new UpsertAcademicTermRequest("Term 1", new DateOnly(2026, 1, 10), new DateOnly(2026, 4, 10)));
         var termTwo = await service.UpsertTermAsync(2, new UpsertAcademicTermRequest("Term 2", new DateOnly(2026, 5, 1), new DateOnly(2026, 8, 1)));
 
@@ -51,7 +51,7 @@ public sealed class AcademicCalendarServiceTests
         });
         await context.SaveChangesAsync();
 
-        var service = new AcademicCalendarService(context, currentUser);
+        var service = new AcademicCalendarService(context, currentUser, new NoOpAuditLogService());
         await service.UpsertTermAsync(1, new UpsertAcademicTermRequest("Term 1", new DateOnly(2026, 1, 1), new DateOnly(2026, 4, 30)));
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -87,13 +87,13 @@ public sealed class AcademicCalendarServiceTests
             });
         await context.SaveChangesAsync();
 
-        var service = new AcademicCalendarService(context, currentUser);
+        var service = new AcademicCalendarService(context, currentUser, new NoOpAuditLogService());
         await service.UpsertTermAsync(1, new UpsertAcademicTermRequest("Term 1", new DateOnly(2026, 1, 1), new DateOnly(2026, 4, 30)));
 
         var otherSchoolContext = new TestCurrentUserContext { Role = UserRole.Admin, SchoolId = 14, UserId = 14, UserName = "other.admin" };
         var (otherConnection, otherDb) = await TestDatabase.CreateContextAsync(databasePath, otherSchoolContext);
         await using var _otherConnection = otherConnection;
-        var otherService = new AcademicCalendarService(otherDb, otherSchoolContext);
+        var otherService = new AcademicCalendarService(otherDb, otherSchoolContext, new NoOpAuditLogService());
 
         var term = await otherService.UpsertTermAsync(1, new UpsertAcademicTermRequest("Term 1", new DateOnly(2026, 1, 1), new DateOnly(2026, 4, 30)));
 

@@ -10,9 +10,10 @@ import {
     LibraryBorrowerSummaryResponse,
     LibraryLoanResponse,
     ParentPreviewReportResponse,
+    PaymentReceiptResponse,
+    ReportCardResponse,
     RevenueByClassReportResponse,
-    ResultResponse,
-    StudentStatementResponse
+    ResultResponse
 } from '../../core/api/api.models';
 
 export interface AdminResultsClassGroup {
@@ -528,39 +529,6 @@ export function buildFeeStructuresPdf(
     return doc;
 }
 
-export function buildStudentStatementPdf(statement: StudentStatementResponse, schoolInfo: ReportSchoolInfo, fileName: string): jsPDF {
-    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' });
-    const margin = 40;
-    const pageWidth = doc.internal.pageSize.getWidth();
-
-    const startY = drawLetterhead(doc, schoolInfo, 'Student financial statement', margin, pageWidth, [
-        `Student: ${statement.studentName}`,
-        `Opening balance: ${statement.openingBalance.toFixed(2)}`,
-        `Closing balance: ${statement.closingBalance.toFixed(2)}`
-    ]);
-
-    autoTable(doc, {
-        startY,
-        head: [['Date', 'Type', 'Status', 'Reference', 'Debit', 'Credit', 'Running']],
-        body: statement.transactions.map((line) => [
-            formatDate(line.transactionDate),
-            line.type,
-            line.status,
-            line.reference ?? '-',
-            line.debit.toFixed(2),
-            line.credit.toFixed(2),
-            line.runningBalance.toFixed(2)
-        ]),
-        theme: 'grid',
-        styles: { fontSize: 8, cellPadding: 4 },
-        headStyles: { fillColor: [37, 99, 235] },
-        margin: { left: margin, right: margin }
-    });
-
-    doc.save(fileName);
-    return doc;
-}
-
 export function buildAdminResultsReportPdf(
     schoolInfo: ReportSchoolInfo,
     title: string,
@@ -1000,4 +968,83 @@ function drawSummaryCard(
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.text(secondary, x + 12, y + height - 10, { maxWidth: width - 24 });
+}
+
+export function buildReportCardPdf(card: ReportCardResponse, schoolInfo: ReportSchoolInfo): jsPDF {
+    const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' });
+    const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    const generatedDate = new Date(card.generatedAt).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const startY = drawLetterhead(doc, schoolInfo, 'Report Card', margin, pageWidth, [
+        `Student: ${card.studentName} (${card.studentNumber})`,
+        `Class: ${card.studentClass}   Term: ${card.term}   Year: ${card.resultYear}`,
+        `Rank: ${card.rank} of ${card.totalStudents}   Average: ${card.averageScore.toFixed(1)}%   Grade: ${card.overallGrade}`
+    ]);
+
+    autoTable(doc, {
+        startY: startY + 8,
+        head: [['Subject', 'Teacher', 'Score', 'Grade', 'Comment']],
+        body: card.subjects.map((s) => [
+            s.subjectName,
+            s.teacherName,
+            `${s.score.toFixed(1)}%`,
+            s.grade,
+            s.comment ?? '—'
+        ]),
+        foot: [[
+            { content: 'Overall', colSpan: 2, styles: { fontStyle: 'bold' } },
+            { content: `${card.averageScore.toFixed(1)}%`, styles: { fontStyle: 'bold' } },
+            { content: card.overallGrade, styles: { fontStyle: 'bold' } },
+            { content: `Rank ${card.rank}/${card.totalStudents}`, styles: { fontStyle: 'bold' } }
+        ]],
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 5 },
+        headStyles: { fillColor: [37, 99, 235] },
+        footStyles: { fillColor: [239, 246, 255], textColor: [37, 99, 235] },
+        margin: { left: margin, right: margin }
+    });
+
+    const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 20;
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Generated on ${generatedDate}`, margin, finalY);
+
+    return doc;
+}
+
+export function buildPaymentReceiptPdf(receipt: PaymentReceiptResponse, schoolInfo: ReportSchoolInfo): jsPDF {
+    const doc = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a5' });
+    const margin = 36;
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    const receivedDate = new Date(receipt.receivedAt).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+    const generatedDate = new Date(receipt.generatedAt).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    const startY = drawLetterhead(doc, schoolInfo, 'Payment Receipt', margin, pageWidth, [
+        `Student: ${receipt.studentName} (${receipt.studentNumber})`,
+        `Class: ${receipt.studentClass}`,
+        `Receipt no.: ${receipt.paymentId}`
+    ]);
+
+    autoTable(doc, {
+        startY: startY + 8,
+        head: [['Field', 'Value']],
+        body: [
+            ['Amount', receipt.amount.toLocaleString('en-US', { style: 'currency', currency: receipt.currency })],
+            ['Payment method', receipt.method],
+            ['Date received', receivedDate],
+            ['Reference', receipt.reference ?? '—'],
+            ['Captured by', receipt.issuedByName],
+            ['Generated on', generatedDate]
+        ],
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 5 },
+        headStyles: { fillColor: [37, 99, 235] },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 120 } },
+        margin: { left: margin, right: margin }
+    });
+
+    return doc;
 }

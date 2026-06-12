@@ -71,6 +71,13 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuMod
                     items: [
                         { label: 'Accounting setup', icon: 'pi pi-fw pi-wallet', routerLink: ['/platform/accounting'] }
                     ]
+                },
+                {
+                    label: 'Logs',
+                    icon: 'pi pi-fw pi-list',
+                    items: [
+                        { label: 'Audit Logs', icon: 'pi pi-fw pi-list', routerLink: ['/admin/logs'] }
+                    ]
                 }
             ]
         };
@@ -84,12 +91,12 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuMod
                     label: 'Accounting',
                     icon: 'pi pi-fw pi-calculator',
                     items: [
-                        { label: 'Dashboard', icon: 'pi pi-fw pi-chart-bar', routerLink: ['/accountant/dashboard'] },
                         { label: 'Students', icon: 'pi pi-fw pi-users', routerLink: ['/accountant/students'] },
                         { label: 'Payments', icon: 'pi pi-fw pi-credit-card', routerLink: ['/accountant/payments'] },
                         { label: 'Invoices', icon: 'pi pi-fw pi-file', routerLink: ['/accountant/invoices'] },
                         { label: 'Reports', icon: 'pi pi-fw pi-file-pdf', routerLink: ['/accountant/reports'] },
-                        { label: 'Analytics', icon: 'pi pi-fw pi-chart-line', routerLink: ['/accountant/analytics'] }
+                        { label: 'Analytics', icon: 'pi pi-fw pi-chart-line', routerLink: ['/accountant/analytics'] },
+                        { label: 'Expenses', icon: 'pi pi-fw pi-minus-circle', routerLink: ['/accountant/expenses'] }
                     ]
                 }
             ]
@@ -108,6 +115,7 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuMod
                         { label: 'Results Entry', icon: 'pi pi-fw pi-table', routerLink: ['/teacher/results'] },
                         { label: 'My Classes', icon: 'pi pi-fw pi-users', routerLink: ['/teacher/classes'] },
                         { label: 'Timetable', icon: 'pi pi-fw pi-calendar', routerLink: ['/teacher/timetable'] },
+                        { label: 'Exam Timetable', icon: 'pi pi-fw pi-calendar-times', routerLink: ['/teacher/exam-timetable'] },
                         { label: 'Subjects', icon: 'pi pi-fw pi-book', routerLink: ['/teacher/subjects'] }
                     ]
                 },
@@ -161,6 +169,7 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuMod
                 items: [
                     { label: 'Assignments', icon: 'pi pi-fw pi-sitemap', routerLink: ['/admin/assignments'] },
                     { label: 'Timetable', icon: 'pi pi-fw pi-clock', routerLink: ['/admin/timetable'] },
+                    { label: 'Exam Timetable', icon: 'pi pi-fw pi-calendar-times', routerLink: ['/admin/exam-timetable'] },
                     { label: 'Results', icon: 'pi pi-fw pi-chart-line', routerLink: ['/admin/results'] },
                     { label: 'Grading', icon: 'pi pi-fw pi-sliders-h', routerLink: ['/admin/grading'] },
                     { label: 'Progression', icon: 'pi pi-fw pi-sort-alt', routerLink: ['/admin/progression'] },
@@ -181,7 +190,8 @@ export function buildWorkspaceMenu(role: WorkspaceRole | null): WorkspaceMenuMod
                 label: 'Communications',
                 icon: 'pi pi-fw pi-comments',
                 items: [
-                    { label: 'Notifications', icon: 'pi pi-fw pi-bell', routerLink: ['/admin/notifications'] }
+                        { label: 'Notifications', icon: 'pi pi-fw pi-bell', routerLink: ['/admin/notifications'] },
+                        { label: 'Discipline Log', icon: 'pi pi-fw pi-shield', routerLink: ['/admin/discipline'] }
                 ]
             },
             {

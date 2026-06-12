@@ -6,8 +6,8 @@ using ZynkEdu.Application.Abstractions;
 using ZynkEdu.Infrastructure.Messaging;
 using ZynkEdu.Infrastructure.Options;
 using ZynkEdu.Infrastructure.Persistence;
-using ZynkEdu.Infrastructure.Services.Accounting;
 using ZynkEdu.Infrastructure.Services;
+using ZynkEdu.Infrastructure.Services.Accounting;
 
 namespace ZynkEdu.Infrastructure;
 
@@ -19,6 +19,7 @@ public static class ServiceCollectionExtensions
 
         services.Configure<JwtOptions>(configuration.GetSection("Jwt"));
         services.Configure<EmailOptions>(configuration.GetSection("Email"));
+        services.Configure<SmsOptions>(configuration.GetSection("Sms"));
 
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=ZynkEduDb;MultipleActiveResultSets=true;TrustServerCertificate=true;";
@@ -44,6 +45,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISchoolService, SchoolService>();
         services.AddScoped<ISubjectService, SubjectService>();
         services.AddScoped<IGradingSchemeService, GradingSchemeService>();
+        services.AddScoped<IAssessmentStructureService, AssessmentStructureService>();
+        services.AddScoped<IExamTimetableService, ExamTimetableService>();
+        services.AddScoped<IExpenseService, ExpenseService>();
+        services.AddScoped<IStudentDocumentService, StudentDocumentService>();
+        services.AddScoped<IDisciplineService, DisciplineService>();
+        services.Configure<FileStoreOptions>(configuration.GetSection("FileStore"));
         services.AddScoped<IStudentLifecycleService, StudentLifecycleService>();
         services.AddScoped<IUserManagementService, UserManagementService>();
         services.AddScoped<IAccountingService, AccountingService>();
@@ -60,7 +67,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAttendanceDispatchService, AttendanceDispatchService>();
         services.AddScoped<IReportEmailTemplateService, ReportEmailTemplateService>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
-        services.AddScoped<ISmsSender, LoggingSmsSender>();
+        services.AddScoped<ISmsSender, AfricasTalkingSmsSender>();
+        services.AddHttpClient("AfricasTalking");
         services.AddHostedService<NotificationDispatchHostedService>();
         services.AddHostedService<AttendanceDispatchHostedService>();
         services.AddHostedService<TimetableDispatchHostedService>();

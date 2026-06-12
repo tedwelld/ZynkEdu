@@ -145,6 +145,40 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.ToTable("AccountingTransactions");
                 });
 
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.Accounting.ExpenseCategory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchoolId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("ExpenseCategories");
+                });
+
             modelBuilder.Entity("ZynkEdu.Domain.Entities.Accounting.FeeStructure", b =>
                 {
                     b.Property<int>("Id")
@@ -325,6 +359,102 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.ToTable("Payments");
                 });
 
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.Accounting.PaymentAllocation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AllocatedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("InvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PaymentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("PaymentId");
+
+                    b.HasIndex("SchoolId", "PaymentId", "InvoiceId")
+                        .IsUnique();
+
+                    b.ToTable("PaymentAllocations");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.Accounting.SchoolExpense", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ApprovedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("ExpenseDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("RecordedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("RecordedByUserId");
+
+                    b.HasIndex("SchoolId", "ExpenseDate");
+
+                    b.ToTable("SchoolExpenses");
+                });
+
             modelBuilder.Entity("ZynkEdu.Domain.Entities.Accounting.StudentAccount", b =>
                 {
                     b.Property<int>("Id")
@@ -438,6 +568,54 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.HasIndex("SchoolId", "Role");
 
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.AssessmentStructure", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AssignmentWeight")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("ExamWeight")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SubjectId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TestWeight")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubjectId");
+
+                    b.HasIndex("SchoolId", "Level", "SubjectId")
+                        .IsUnique()
+                        .HasFilter("[SubjectId] IS NOT NULL");
+
+                    b.ToTable("AssessmentStructures");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.AttendanceDispatchLog", b =>
@@ -621,6 +799,125 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.HasIndex("SchoolId", "CreatedAt");
 
                     b.ToTable("AuditLogs");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.DisciplineIncident", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ActionTaken")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("IncidentDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("IncidentType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("RecordedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudentId");
+
+                    b.HasIndex("SchoolId", "StudentId", "IncidentDate");
+
+                    b.ToTable("DisciplineIncidents");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.ExamTimetableEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Class")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time");
+
+                    b.Property<DateOnly>("ExamDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time");
+
+                    b.Property<int>("SubjectId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Term")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Venue")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubjectId");
+
+                    b.HasIndex("SchoolId", "Term", "Class", "SubjectId", "ExamDate");
+
+                    b.ToTable("ExamTimetableEntries");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.Guardian", b =>
@@ -1184,6 +1481,46 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.ToTable("Results");
                 });
 
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.ResultComponentScore", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Component")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("ResultId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Score")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<decimal>("Weight")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResultId");
+
+                    b.HasIndex("SchoolId", "ResultId", "Component")
+                        .IsUnique();
+
+                    b.ToTable("ResultComponentScores");
+                });
+
             modelBuilder.Entity("ZynkEdu.Domain.Entities.School", b =>
                 {
                     b.Property<int>("Id")
@@ -1203,6 +1540,9 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("LibraryOverdueFineRatePerDay")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -1465,6 +1805,62 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Students");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.StudentDocument", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("StoredFileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UploadedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudentId");
+
+                    b.HasIndex("SchoolId", "StudentId");
+
+                    b.ToTable("StudentDocuments");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.StudentMovement", b =>
@@ -1922,6 +2318,44 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.Accounting.PaymentAllocation", b =>
+                {
+                    b.HasOne("ZynkEdu.Domain.Entities.Accounting.Invoice", "Invoice")
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("ZynkEdu.Domain.Entities.Accounting.Payment", "Payment")
+                        .WithMany("Allocations")
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("Payment");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.Accounting.SchoolExpense", b =>
+                {
+                    b.HasOne("ZynkEdu.Domain.Entities.Accounting.ExpenseCategory", "Category")
+                        .WithMany("Expenses")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ZynkEdu.Domain.Entities.AppUser", "RecordedBy")
+                        .WithMany()
+                        .HasForeignKey("RecordedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("RecordedBy");
+                });
+
             modelBuilder.Entity("ZynkEdu.Domain.Entities.Accounting.StudentAccount", b =>
                 {
                     b.HasOne("ZynkEdu.Domain.Entities.Student", null)
@@ -1940,6 +2374,16 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Account");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.AssessmentStructure", b =>
+                {
+                    b.HasOne("ZynkEdu.Domain.Entities.Subject", "Subject")
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Subject");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.AttendanceRegister", b =>
@@ -1978,6 +2422,28 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.Navigation("AttendanceRegister");
 
                     b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.DisciplineIncident", b =>
+                {
+                    b.HasOne("ZynkEdu.Domain.Entities.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.ExamTimetableEntry", b =>
+                {
+                    b.HasOne("ZynkEdu.Domain.Entities.Subject", "Subject")
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Subject");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.Guardian", b =>
@@ -2096,6 +2562,17 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.Navigation("Teacher");
                 });
 
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.ResultComponentScore", b =>
+                {
+                    b.HasOne("ZynkEdu.Domain.Entities.Result", "Result")
+                        .WithMany("ComponentScores")
+                        .HasForeignKey("ResultId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Result");
+                });
+
             modelBuilder.Entity("ZynkEdu.Domain.Entities.SchoolCalendarEvent", b =>
                 {
                     b.HasOne("ZynkEdu.Domain.Entities.AcademicTerm", "AcademicTerm")
@@ -2145,6 +2622,17 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Guardian");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.StudentDocument", b =>
+                {
+                    b.HasOne("ZynkEdu.Domain.Entities.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.StudentMovement", b =>
@@ -2245,6 +2733,16 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
                     b.Navigation("Events");
                 });
 
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.Accounting.ExpenseCategory", b =>
+                {
+                    b.Navigation("Expenses");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.Accounting.Payment", b =>
+                {
+                    b.Navigation("Allocations");
+                });
+
             modelBuilder.Entity("ZynkEdu.Domain.Entities.AttendanceRegister", b =>
                 {
                     b.Navigation("Entries");
@@ -2258,6 +2756,11 @@ namespace ZynkEdu.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("ZynkEdu.Domain.Entities.Notification", b =>
                 {
                     b.Navigation("Recipients");
+                });
+
+            modelBuilder.Entity("ZynkEdu.Domain.Entities.Result", b =>
+                {
+                    b.Navigation("ComponentScores");
                 });
 
             modelBuilder.Entity("ZynkEdu.Domain.Entities.SchoolClass", b =>

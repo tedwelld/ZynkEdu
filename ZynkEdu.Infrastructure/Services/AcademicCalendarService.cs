@@ -11,11 +11,13 @@ public sealed class AcademicCalendarService : IAcademicCalendarService
 {
     private readonly ZynkEduDbContext _dbContext;
     private readonly ICurrentUserContext _currentUserContext;
+    private readonly IAuditLogService _auditLogService;
 
-    public AcademicCalendarService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext)
+    public AcademicCalendarService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext, IAuditLogService auditLogService)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
+        _auditLogService = auditLogService;
     }
 
     public async Task<IReadOnlyList<AcademicTermResponse>> GetTermsAsync(int? schoolId = null, CancellationToken cancellationToken = default)
@@ -47,6 +49,8 @@ public sealed class AcademicCalendarService : IAcademicCalendarService
         term.EndDate = request.EndDate;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(schoolId, "Updated", "AcademicTerm", term.Id.ToString(),
+            $"Term {termNumber} updated: '{term.Name}' ({term.StartDate}–{term.EndDate}).", cancellationToken);
         return new AcademicTermResponse(term.Id, term.SchoolId, term.TermNumber, term.Name, term.StartDate, term.EndDate, term.CreatedAt);
     }
 
@@ -96,6 +100,8 @@ public sealed class AcademicCalendarService : IAcademicCalendarService
 
         _dbContext.SchoolCalendarEvents.Add(eventItem);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(schoolId, "Created", "CalendarEvent", eventItem.Id.ToString(),
+            $"Calendar event '{eventItem.Title}' on {eventItem.EventDate:yyyy-MM-dd} added.", cancellationToken);
 
         return new SchoolCalendarEventResponse(eventItem.Id, eventItem.SchoolId, eventItem.AcademicTermId, term.Name, eventItem.Title, eventItem.Description, eventItem.EventDate, eventItem.CreatedAt);
     }
@@ -108,8 +114,11 @@ public sealed class AcademicCalendarService : IAcademicCalendarService
         var eventItem = await _dbContext.SchoolCalendarEvents.FirstOrDefaultAsync(x => x.Id == id && x.SchoolId == schoolId, cancellationToken)
             ?? throw new InvalidOperationException("The calendar event was not found.");
 
+        var eventTitle = eventItem.Title;
         _dbContext.SchoolCalendarEvents.Remove(eventItem);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(schoolId, "Deleted", "CalendarEvent", id.ToString(),
+            $"Calendar event '{eventTitle}' deleted.", cancellationToken);
     }
 
     private async Task EnsureDefaultTermsAsync(int schoolId, CancellationToken cancellationToken)

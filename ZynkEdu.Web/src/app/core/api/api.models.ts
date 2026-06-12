@@ -492,6 +492,8 @@ export interface InvoiceResponse {
     accountingTransactionId?: number | null;
     reference?: string | null;
     description?: string | null;
+    paidAmount: number;
+    balanceDue: number;
 }
 
 export interface StatementLineResponse {
@@ -794,6 +796,18 @@ export interface CreateFineRequest {
     transactionDate?: string | null;
 }
 
+export interface ComponentScoreRequest {
+    component: string;
+    score: number;
+    weight: number;
+}
+
+export interface ComponentScoreResponse {
+    component: string;
+    score: number;
+    weight: number;
+}
+
 export interface ResultResponse {
     id: number;
     schoolId: number;
@@ -813,6 +827,7 @@ export interface ResultResponse {
     isLocked: boolean;
     createdAt: string;
     resultYear: number;
+    componentScores?: ComponentScoreResponse[] | null;
 }
 
 export interface ResultFilterPeriod {
@@ -829,6 +844,7 @@ export interface CreateResultRequest {
     score: number;
     term: string;
     comment?: string | null;
+    componentScores?: ComponentScoreRequest[] | null;
 }
 
 export interface CreateSchoolUserRequest {
@@ -970,6 +986,258 @@ export interface ResultSlipSendResponse {
     guardianPhones: string[];
     emailSent: boolean;
     smsSent: boolean;
+}
+
+export interface BulkSlipSendResponse {
+    sentCount: number;
+    failedCount: number;
+    failures: string[];
+}
+
+export interface DisciplineIncidentResponse {
+    id: number;
+    schoolId: number;
+    studentId: number;
+    studentName: string;
+    studentClass: string;
+    incidentType: string;
+    severity: string;
+    incidentDate: string;
+    description: string;
+    actionTaken: string | null;
+    recordedByName: string;
+    isResolved: boolean;
+    resolvedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateDisciplineIncidentRequest {
+    studentId: number;
+    incidentType: string;
+    severity: string;
+    incidentDate: string;
+    description: string;
+    actionTaken?: string | null;
+}
+
+export interface UpdateDisciplineIncidentRequest {
+    incidentType: string;
+    severity: string;
+    incidentDate: string;
+    description: string;
+    actionTaken?: string | null;
+    isResolved: boolean;
+}
+
+export interface StudentDocumentResponse {
+    id: number;
+    schoolId: number;
+    studentId: number;
+    studentName: string;
+    documentType: string;
+    originalFileName: string;
+    fileSizeBytes: number;
+    contentType: string;
+    notes: string | null;
+    uploadedByName: string;
+    createdAt: string;
+}
+
+export interface ExpenseCategoryResponse {
+    id: number;
+    schoolId: number;
+    name: string;
+    description: string | null;
+    isActive: boolean;
+    expenseCount: number;
+    totalSpent: number;
+    createdAt: string;
+}
+
+export interface SaveExpenseCategoryRequest {
+    name: string;
+    description?: string | null;
+}
+
+export interface SchoolExpenseResponse {
+    id: number;
+    schoolId: number;
+    categoryId: number;
+    categoryName: string;
+    amount: number;
+    currency: string;
+    expenseDate: string;
+    reference: string | null;
+    description: string | null;
+    recordedByName: string;
+    approvedByName: string | null;
+    approvedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateSchoolExpenseRequest {
+    categoryId: number;
+    amount: number;
+    currency?: string | null;
+    expenseDate: string;
+    reference?: string | null;
+    description?: string | null;
+}
+
+export interface UpdateSchoolExpenseRequest {
+    categoryId: number;
+    amount: number;
+    currency?: string | null;
+    expenseDate: string;
+    reference?: string | null;
+    description?: string | null;
+}
+
+export interface ExpenseSummaryResponse {
+    totalThisMonth: number;
+    totalThisYear: number;
+    totalAllTime: number;
+    currency: string;
+    byCategory: ExpenseCategoryBreakdown[];
+}
+
+export interface ExpenseCategoryBreakdown {
+    categoryName: string;
+    total: number;
+    count: number;
+}
+
+export interface ExamTimetableEntryResponse {
+    id: number;
+    schoolId: number;
+    term: string;
+    class: string;
+    subjectId: number;
+    subjectName: string;
+    examDate: string;
+    startTime: string;
+    endTime: string;
+    venue: string | null;
+    notes: string | null;
+    isPublished: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateExamTimetableEntryRequest {
+    term: string;
+    class: string;
+    subjectId: number;
+    examDate: string;
+    startTime: string;
+    endTime: string;
+    venue?: string | null;
+    notes?: string | null;
+}
+
+export interface UpdateExamTimetableEntryRequest {
+    term: string;
+    class: string;
+    subjectId: number;
+    examDate: string;
+    startTime: string;
+    endTime: string;
+    venue?: string | null;
+    notes?: string | null;
+}
+
+export interface PublishExamTimetableRequest {
+    term: string;
+    class?: string | null;
+}
+
+export interface BulkCreateExamTimetableRequest {
+    term: string;
+    entries: CreateExamTimetableEntryRequest[];
+}
+
+export interface AssessmentStructureResponse {
+    id: number;
+    schoolId: number;
+    level: string;
+    subjectId: number | null;
+    subjectName: string | null;
+    testWeight: number;
+    assignmentWeight: number;
+    examWeight: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface SaveAssessmentStructureRequest {
+    level: string;
+    subjectId?: number | null;
+    testWeight: number;
+    assignmentWeight: number;
+    examWeight: number;
+}
+
+export interface BulkInvoiceRequest {
+    className: string;
+    term: string;
+    totalAmount: number;
+    dueAt: string;
+    feeStructureId?: number | null;
+    reference?: string | null;
+    description?: string | null;
+}
+
+export interface BulkInvoiceResponse {
+    issuedCount: number;
+    skippedCount: number;
+    failedCount: number;
+    failures: string[];
+}
+
+export interface ReportCardSubjectRow {
+    subjectId: number;
+    subjectName: string;
+    score: number;
+    grade: string;
+    comment: string | null;
+    teacherName: string;
+    componentScores?: ComponentScoreResponse[] | null;
+}
+
+export interface ReportCardResponse {
+    studentId: number;
+    studentName: string;
+    studentNumber: string;
+    studentClass: string;
+    term: string;
+    resultYear: number;
+    schoolName: string;
+    subjects: ReportCardSubjectRow[];
+    averageScore: number;
+    overallGrade: string;
+    rank: number;
+    totalStudents: number;
+    generatedAt: string;
+}
+
+export interface PaymentReceiptResponse {
+    paymentId: number;
+    schoolId: number;
+    schoolName: string;
+    studentId: number;
+    studentName: string;
+    studentNumber: string;
+    studentClass: string;
+    amount: number;
+    currency: string;
+    method: string;
+    receivedAt: string;
+    reference: string | null;
+    description: string | null;
+    issuedByName: string;
+    generatedAt: string;
 }
 
 export interface TimetableResponse {

@@ -10,7 +10,7 @@ import { TagModule } from 'primeng/tag';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { extractApiErrorMessage } from '../../core/api/api-error';
-import { GradingLevelResponse, GradingSchemeResponse, SaveGradingSchemeRequest, SchoolResponse } from '../../core/api/api.models';
+import { AssessmentStructureResponse, GradingLevelResponse, GradingSchemeResponse, SaveGradingSchemeRequest, SchoolResponse } from '../../core/api/api.models';
 import { AuthService } from '../../core/auth/auth.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
@@ -154,6 +154,71 @@ interface GradingSchemeDraft {
                     <p class="text-sm text-muted-color">Pick a school from the dropdown to load its grading bands.</p>
                 </article>
             </ng-template>
+
+            <!-- Assessment weights -->
+            <article class="workspace-card">
+                <div class="flex items-center justify-between gap-4 mb-5">
+                    <div>
+                        <h2 class="text-xl font-display font-bold mb-1">Assessment weights</h2>
+                        <p class="text-sm text-muted-color">Configure component weights (test, CA, exam) per level. Teachers see these when entering results. Defaults are 30 / 20 / 50.</p>
+                    </div>
+                    <button pButton type="button" label="Add weight rule" icon="pi pi-plus" severity="secondary" size="small" (click)="startAddStructure()"></button>
+                </div>
+
+                <p-table *ngIf="assessmentStructures.length > 0; else noWeights" [value]="assessmentStructures" styleClass="p-datatable-sm">
+                    <ng-template pTemplate="header">
+                        <tr>
+                            <th>Level</th>
+                            <th>Subject</th>
+                            <th class="text-right">Test %</th>
+                            <th class="text-right">CA %</th>
+                            <th class="text-right">Exam %</th>
+                            <th>Actions</th>
+                        </tr>
+                    </ng-template>
+                    <ng-template pTemplate="body" let-s>
+                        <tr>
+                            <td class="font-semibold">{{ s.level }}</td>
+                            <td class="text-muted-color text-sm">{{ s.subjectName ?? 'All subjects' }}</td>
+                            <td class="text-right font-mono">{{ s.testWeight }}</td>
+                            <td class="text-right font-mono">{{ s.assignmentWeight }}</td>
+                            <td class="text-right font-mono">{{ s.examWeight }}</td>
+                            <td>
+                                <div class="flex gap-2">
+                                    <button pButton type="button" icon="pi pi-pencil" severity="secondary" size="small" class="p-button-text" (click)="editStructure(s)"></button>
+                                    <button pButton type="button" icon="pi pi-trash" severity="danger" size="small" class="p-button-text" (click)="deleteStructure(s.id)"></button>
+                                </div>
+                            </td>
+                        </tr>
+                    </ng-template>
+                </p-table>
+                <ng-template #noWeights>
+                    <p class="text-muted-color text-sm">No custom weight rules. Defaults (30/20/50) apply to all levels.</p>
+                </ng-template>
+
+                <div *ngIf="structureEditMode" class="mt-5 rounded-2xl border border-surface-200 dark:border-surface-700 p-4 grid gap-4 md:grid-cols-3">
+                    <label class="block">
+                        <span class="text-sm text-muted-color font-medium">Level</span>
+                        <input class="mt-1 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="structureDraft.level" name="sLevel" placeholder="e.g. Primary" />
+                    </label>
+                    <label class="block">
+                        <span class="text-sm text-muted-color font-medium">Test %</span>
+                        <input class="mt-1 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="number" [(ngModel)]="structureDraft.testWeight" name="sTest" min="0" max="100" />
+                    </label>
+                    <label class="block">
+                        <span class="text-sm text-muted-color font-medium">CA %</span>
+                        <input class="mt-1 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="number" [(ngModel)]="structureDraft.assignmentWeight" name="sCA" min="0" max="100" />
+                    </label>
+                    <label class="block">
+                        <span class="text-sm text-muted-color font-medium">Exam %</span>
+                        <input class="mt-1 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="number" [(ngModel)]="structureDraft.examWeight" name="sExam" min="0" max="100" />
+                    </label>
+                    <div class="md:col-span-3 flex gap-2">
+                        <button pButton type="button" label="Save" icon="pi pi-check" (click)="saveStructure()" [disabled]="savingStructure"></button>
+                        <button pButton type="button" label="Cancel" severity="secondary" (click)="cancelStructureEdit()"></button>
+                    </div>
+                </div>
+            </article>
         </section>
     `
 })
@@ -167,6 +232,12 @@ export class AdminGrading implements OnInit {
     schools: SchoolResponse[] = [];
     selectedSchoolId: number | null = null;
     scheme: GradingSchemeDraft | null = null;
+
+    assessmentStructures: AssessmentStructureResponse[] = [];
+    structureEditMode = false;
+    savingStructure = false;
+    editingStructureId: number | null = null;
+    structureDraft = { level: '', testWeight: 30, assignmentWeight: 20, examWeight: 50 };
 
     ngOnInit(): void {
         this.selectedSchoolId = this.isPlatformAdmin ? null : this.auth.schoolId();
@@ -224,12 +295,67 @@ export class AdminGrading implements OnInit {
                 return;
             }
 
-            const scheme = await firstValueFrom(this.api.getGradingScheme(this.selectedSchoolId));
+            const [scheme, structures] = await Promise.all([
+                firstValueFrom(this.api.getGradingScheme(this.selectedSchoolId)),
+                firstValueFrom(this.api.getAssessmentStructures(this.selectedSchoolId)).catch(() => [] as AssessmentStructureResponse[])
+            ]);
             this.scheme = this.cloneScheme(scheme);
+            this.assessmentStructures = structures;
         } catch (error) {
             this.messages.add({ severity: 'error', summary: 'Load failed', detail: extractApiErrorMessage(error, 'The grading scheme could not be loaded.') });
         } finally {
             this.loading = false;
+        }
+    }
+
+    startAddStructure(): void {
+        this.editingStructureId = null;
+        this.structureDraft = { level: '', testWeight: 30, assignmentWeight: 20, examWeight: 50 };
+        this.structureEditMode = true;
+    }
+
+    editStructure(s: AssessmentStructureResponse): void {
+        this.editingStructureId = s.id;
+        this.structureDraft = { level: s.level, testWeight: s.testWeight, assignmentWeight: s.assignmentWeight, examWeight: s.examWeight };
+        this.structureEditMode = true;
+    }
+
+    cancelStructureEdit(): void {
+        this.structureEditMode = false;
+        this.editingStructureId = null;
+    }
+
+    async saveStructure(): Promise<void> {
+        if (!this.structureDraft.level) return;
+        this.savingStructure = true;
+        try {
+            const result = await firstValueFrom(this.api.saveAssessmentStructure(
+                { level: this.structureDraft.level, testWeight: this.structureDraft.testWeight, assignmentWeight: this.structureDraft.assignmentWeight, examWeight: this.structureDraft.examWeight },
+                this.editingStructureId,
+                this.selectedSchoolId
+            ));
+            if (this.editingStructureId) {
+                this.assessmentStructures = this.assessmentStructures.map(s => s.id === result.id ? result : s);
+            } else {
+                this.assessmentStructures = [...this.assessmentStructures, result];
+            }
+            this.structureEditMode = false;
+            this.editingStructureId = null;
+            this.messages.add({ severity: 'success', summary: 'Saved', detail: 'Assessment weights saved.' });
+        } catch (error) {
+            this.messages.add({ severity: 'error', summary: 'Save failed', detail: extractApiErrorMessage(error, 'Could not save assessment weights.') });
+        } finally {
+            this.savingStructure = false;
+        }
+    }
+
+    async deleteStructure(id: number): Promise<void> {
+        try {
+            await firstValueFrom(this.api.deleteAssessmentStructure(id, this.selectedSchoolId));
+            this.assessmentStructures = this.assessmentStructures.filter(s => s.id !== id);
+            this.messages.add({ severity: 'success', summary: 'Deleted', detail: 'Assessment weight rule removed.' });
+        } catch (error) {
+            this.messages.add({ severity: 'error', summary: 'Delete failed', detail: extractApiErrorMessage(error, 'Could not delete the weight rule.') });
         }
     }
 
@@ -273,13 +399,18 @@ export class AdminGrading implements OnInit {
     private async loadScheme(): Promise<void> {
         if (this.selectedSchoolId == null) {
             this.scheme = null;
+            this.assessmentStructures = [];
             return;
         }
 
         this.loading = true;
         try {
-            const response = await firstValueFrom(this.api.getGradingScheme(this.selectedSchoolId));
+            const [response, structures] = await Promise.all([
+                firstValueFrom(this.api.getGradingScheme(this.selectedSchoolId)),
+                firstValueFrom(this.api.getAssessmentStructures(this.selectedSchoolId)).catch(() => [] as AssessmentStructureResponse[])
+            ]);
             this.scheme = this.cloneScheme(response);
+            this.assessmentStructures = structures;
         } catch (error) {
             this.messages.add({ severity: 'error', summary: 'Load failed', detail: extractApiErrorMessage(error, 'The grading scheme could not be loaded.') });
         } finally {

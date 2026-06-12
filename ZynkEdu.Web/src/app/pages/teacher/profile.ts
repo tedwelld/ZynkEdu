@@ -152,7 +152,7 @@ const DEFAULT_PREFERENCES: AccountNotificationPreferences = {
                             <input pInputText type="password" [(ngModel)]="draft.password" class="w-full" [disabled]="!canEditProfile" placeholder="Leave blank to keep current password" />
                         </div>
                         <div class="rounded-2xl border border-dashed border-surface-300 dark:border-surface-700 p-4 text-sm text-muted-color" *ngIf="!canEditProfile">
-                            Platform admin profile details are managed separately for v1. You can still control notification preferences below.
+                            <i class="pi pi-info-circle mr-2"></i>Platform admin profiles are managed at the system level and cannot be edited here.
                         </div>
                         <div class="flex justify-end gap-3 pt-2" *ngIf="canEditProfile">
                             <button pButton type="button" label="Reset" severity="secondary" (click)="resetDraft()"></button>
@@ -216,6 +216,9 @@ const DEFAULT_PREFERENCES: AccountNotificationPreferences = {
                         <div>
                             <h2 class="text-xl font-display font-bold mb-1">Notification preferences</h2>
                             <p class="text-sm text-muted-color">Choose which updates you want to surface first.</p>
+                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-xs font-semibold mt-1">
+                                <i class="pi pi-clock text-xs"></i> Saved locally — server sync coming soon
+                            </span>
                         </div>
                         <button pButton type="button" label="Save preferences" icon="pi pi-save" severity="secondary" (click)="savePreferences()"></button>
                     </div>
@@ -314,7 +317,7 @@ export class TeacherProfile implements OnInit {
     saveMessage = '';
 
     get canEditProfile(): boolean {
-        return this.isTeacher || this.isSchoolAdmin || this.isLibraryAdmin;
+        return this.isTeacher || this.isSchoolAdmin || this.isLibraryAdmin || this.isAccountant;
     }
 
     get isTeacher(): boolean {
@@ -327,6 +330,11 @@ export class TeacherProfile implements OnInit {
 
     get isLibraryAdmin(): boolean {
         return this.auth.role() === 'LibraryAdmin';
+    }
+
+    get isAccountant(): boolean {
+        const role = this.auth.role();
+        return role === 'AccountantSuper' || role === 'AccountantSenior' || role === 'AccountantJunior';
     }
 
     get homeRoute(): string {

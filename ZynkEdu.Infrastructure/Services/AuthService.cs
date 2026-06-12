@@ -14,15 +14,18 @@ public sealed class AuthService : IAuthService
     private readonly ZynkEduDbContext _dbContext;
     private readonly IPasswordHasher<AppUser> _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
+    private readonly IAuditLogService _auditLogService;
 
     public AuthService(
         ZynkEduDbContext dbContext,
         IPasswordHasher<AppUser> passwordHasher,
-        IJwtTokenService jwtTokenService)
+        IJwtTokenService jwtTokenService,
+        IAuditLogService auditLogService)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
+        _auditLogService = auditLogService;
     }
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
@@ -35,6 +38,7 @@ public sealed class AuthService : IAuthService
         if (platformAdmin is not null &&
             _passwordHasher.VerifyHashedPassword(platformAdmin, platformAdmin.PasswordHash, request.Password) != PasswordVerificationResult.Failed)
         {
+            await LogLoginAsync(platformAdmin, cancellationToken);
             return new LoginResponse(
                 _jwtTokenService.CreateToken(platformAdmin),
                 platformAdmin.Role.ToString(),
@@ -81,12 +85,38 @@ public sealed class AuthService : IAuthService
             throw new UnauthorizedAccessException("Invalid credentials.");
         }
 
+        await LogLoginAsync(user, cancellationToken);
         return new LoginResponse(
             _jwtTokenService.CreateToken(user),
             user.Role.ToString(),
             user.Role == UserRole.PlatformAdmin ? null : user.SchoolId,
             user.Id,
             user.DisplayName);
+    }
+
+    private async Task LogLoginAsync(AppUser user, CancellationToken cancellationToken)
+    {
+        var log = new AuditLog
+        {
+            SchoolId = user.SchoolId,
+            ActorUserId = user.Id,
+            ActorRole = user.Role.ToString(),
+            ActorName = user.DisplayName ?? user.Username,
+            Action = "Login",
+            EntityType = "Auth",
+            EntityId = user.Id.ToString(),
+            Summary = $"User '{user.Username}' ({user.Role}) logged in.",
+            CreatedAt = DateTime.UtcNow
+        };
+        try
+        {
+            _dbContext.AuditLogs.Add(log);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            _dbContext.Entry(log).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+        }
     }
 
     public async Task<IReadOnlyList<SchoolResponse>> GetPublicSchoolsAsync(CancellationToken cancellationToken = default)

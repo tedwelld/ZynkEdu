@@ -159,7 +159,7 @@ public sealed class UserManagementServiceTests
 
         await context.SaveChangesAsync();
 
-        var service = new UserManagementService(context, currentUser, new PasswordHasher<AppUser>(), new TeacherAssignmentService(context, currentUser));
+        var service = new UserManagementService(context, currentUser, new PasswordHasher<AppUser>(), new TeacherAssignmentService(context, currentUser), new NoOpAuditLogService());
         await service.DeleteTeacherAsync(teacher.Id);
 
         Assert.False(await context.Users.AsNoTracking().AnyAsync(x => x.Id == teacher.Id));
@@ -189,7 +189,7 @@ public sealed class UserManagementServiceTests
         });
         await context.SaveChangesAsync();
 
-        var service = new UserManagementService(context, currentUser, new PasswordHasher<AppUser>(), new TeacherAssignmentService(context, currentUser));
+        var service = new UserManagementService(context, currentUser, new PasswordHasher<AppUser>(), new TeacherAssignmentService(context, currentUser), new NoOpAuditLogService());
         var created = await service.CreateAccountantAsync(new CreateAccountantRequest(
             Username: "acc.jane",
             Password: "Password123!",

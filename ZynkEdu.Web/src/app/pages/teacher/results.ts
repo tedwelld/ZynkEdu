@@ -8,10 +8,10 @@ import { InputTextModule } from 'primeng/inputtext';
 import { SkeletonModule } from 'primeng/skeleton';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
-import { forkJoin } from 'rxjs';
+import { firstValueFrom, forkJoin } from 'rxjs';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { CreateResultRequest, GradingSchemeResponse, ResultResponse, StudentResponse, TeacherAssignmentResponse } from '../../core/api/api.models';
+import { AssessmentStructureResponse, ComponentScoreRequest, CreateResultRequest, GradingSchemeResponse, ResultResponse, StudentResponse, TeacherAssignmentResponse } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 import { buildTeacherClassResultsPdf } from '../../shared/report/report-pdf';
@@ -97,7 +97,7 @@ const ASSESSMENTS = [
 
                 <div class="flex flex-wrap items-center gap-3 text-sm text-muted-color">
                     <span *ngIf="selectedClass">Class: <strong class="text-color">{{ selectedClass }}</strong></span>
-                    <span>Weights: <strong class="text-color">Test 30%, Assignment 20%, Exam 50%</strong></span>
+                    <span>Weights: <strong class="text-color">Test {{ assessmentWeights.testWeight }}%, CA {{ assessmentWeights.assignmentWeight }}%, Exam {{ assessmentWeights.examWeight }}%</strong></span>
                     <span *ngIf="selectedSubjectName">Subject: <strong class="text-color">{{ selectedSubjectName }}</strong></span>
                     <span *ngIf="draftCount > 0" class="font-semibold text-emerald-600">{{ draftCount }} draft(s) saved locally</span>
                 </div>
@@ -233,6 +233,7 @@ export class TeacherResults implements OnInit {
     entryRows: ResultEntryRow[] = [];
     draftCount = 0;
     gradingScheme: GradingSchemeResponse | null = null;
+    assessmentWeights = { testWeight: 30, assignmentWeight: 20, examWeight: 50 };
 
     ngOnInit(): void {
         const teacherId = this.auth.userId();
@@ -325,6 +326,18 @@ export class TeacherResults implements OnInit {
     onSubjectChange(subjectId: number | null): void {
         this.selectedSubjectId = subjectId;
         this.refreshEntryRows();
+        void this.loadAssessmentWeights();
+    }
+
+    async loadAssessmentWeights(): Promise<void> {
+        const level = this.selectedClassLevel;
+        if (!level) return;
+        try {
+            const structure = await firstValueFrom(this.api.getAssessmentStructureForLevel(level, this.selectedSubjectId));
+            this.assessmentWeights = { testWeight: structure.testWeight, assignmentWeight: structure.assignmentWeight, examWeight: structure.examWeight };
+        } catch {
+            this.assessmentWeights = { testWeight: 30, assignmentWeight: 20, examWeight: 50 };
+        }
     }
 
     onTermChange(): void {
@@ -337,12 +350,25 @@ export class TeacherResults implements OnInit {
         }
 
         row.saving = true;
+        const dynamicAssessments = [
+            { key: 'testScore', label: 'Test', weight: this.assessmentWeights.testWeight },
+            { key: 'assignmentScore', label: 'Assignment', weight: this.assessmentWeights.assignmentWeight },
+            { key: 'examScore', label: 'Exam', weight: this.assessmentWeights.examWeight }
+        ];
+        const componentScores: ComponentScoreRequest[] = dynamicAssessments
+            .map(a => {
+                const score = row[a.key as keyof ResultEntryRow] as number | null;
+                return score !== null ? { component: a.label, score, weight: a.weight } : null;
+            })
+            .filter((cs): cs is NonNullable<typeof cs> => cs !== null) as ComponentScoreRequest[];
+
         const payload: CreateResultRequest = {
             studentId: row.student.id,
             subjectId: this.selectedSubjectId,
             score: row.finalScore,
             term: this.termFilter.trim() || 'Term 1',
-            comment: row.comment.trim() || null
+            comment: row.comment.trim() || null,
+            componentScores: componentScores.length > 0 ? componentScores : null
         };
 
         this.api.createResult(payload).subscribe({

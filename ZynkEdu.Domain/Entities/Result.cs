@@ -18,4 +18,6 @@ public sealed class Result : EntityBase, ISchoolScoped
     public string ApprovalStatus { get; set; } = "Pending";
     public bool IsLocked { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public ICollection<ResultComponentScore> ComponentScores { get; set; } = [];
 }

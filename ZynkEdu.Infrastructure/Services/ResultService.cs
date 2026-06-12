@@ -88,6 +88,24 @@ public sealed class ResultService : IResultService
 
         _dbContext.Results.Add(result);
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        if (request.ComponentScores is { Count: > 0 })
+        {
+            foreach (var cs in request.ComponentScores)
+            {
+                _dbContext.ResultComponentScores.Add(new ResultComponentScore
+                {
+                    SchoolId = schoolId,
+                    ResultId = result.Id,
+                    Component = cs.Component.Trim(),
+                    Score = cs.Score,
+                    Weight = cs.Weight,
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
         await _auditLogService.LogAsync(schoolId, "Created", "Result", result.Id.ToString(), $"Created result for {student.FullName} in {subject.Name} with score {result.Score}.", cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(result.Comment) || result.Score >= 0)
@@ -98,6 +116,8 @@ public sealed class ResultService : IResultService
                 NotificationType.System,
                 new[] { student.Id }), cancellationToken);
         }
+
+        var componentScoreResponses = request.ComponentScores?.Select(cs => new ComponentScoreResponse(cs.Component, cs.Score, cs.Weight)).ToList();
 
         return new ResultResponse(
             result.Id,
@@ -117,7 +137,8 @@ public sealed class ResultService : IResultService
             result.ApprovalStatus,
             result.IsLocked,
             result.CreatedAt,
-            result.CreatedAt.Year);
+            result.CreatedAt.Year,
+            componentScoreResponses);
     }
 
     public async Task<IReadOnlyList<ResultResponse>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -214,6 +235,8 @@ public sealed class ResultService : IResultService
         string slipFileName,
         byte[]? newsletterPdf = null,
         string? newsletterFileName = null,
+        byte[]? statementPdf = null,
+        string? statementFileName = null,
         int? schoolId = null,
         CancellationToken cancellationToken = default)
     {
@@ -270,6 +293,14 @@ public sealed class ResultService : IResultService
                         "application/pdf"));
                 }
 
+                if (statementPdf is { Length: > 0 })
+                {
+                    attachments.Add(new EmailAttachment(
+                        statementPdf,
+                        string.IsNullOrWhiteSpace(statementFileName) ? $"financial-statement-{student.StudentNumber}.pdf" : statementFileName,
+                        "application/pdf"));
+                }
+
                 await _emailSender.SendAsync(
                     destination,
                     emailTemplate.Subject,
@@ -300,6 +331,10 @@ public sealed class ResultService : IResultService
             smsSent = smsRecipients.Length > 0;
         }
 
+        var channels = string.Join(", ", new[] { emailSent ? "email" : null, smsSent ? "SMS" : null }.Where(x => x is not null));
+        await _auditLogService.LogAsync(student.SchoolId, "Sent", "ResultSlip", studentId.ToString(),
+            $"Result slip sent for {student.FullName} via {channels}.", cancellationToken);
+
         return new ResultSlipSendResponse(
             student.Id,
             student.FullName,
@@ -309,6 +344,210 @@ public sealed class ResultService : IResultService
             guardianContacts.Select(x => x.Phone).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             emailSent,
             smsSent);
+    }
+
+    public async Task<BulkSlipSendResponse> SendTermSlipsAsync(
+        string className,
+        string term,
+        bool includeStatement,
+        bool sendEmail,
+        bool sendSms,
+        int? schoolId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var effectiveSchoolId = ResolveSchoolScope(schoolId);
+
+        var studentQuery = _dbContext.Students.AsNoTracking()
+            .Include(s => s.SubjectEnrollments).ThenInclude(se => se.Subject)
+            .Include(s => s.Results).ThenInclude(r => r.Subject)
+            .Include(s => s.Results).ThenInclude(r => r.Teacher)
+            .Where(s => s.Class == className);
+        if (effectiveSchoolId is not null)
+        {
+            studentQuery = studentQuery.Where(s => s.SchoolId == effectiveSchoolId);
+        }
+
+        var students = await studentQuery.ToListAsync(cancellationToken);
+        var schoolNames = await _dbContext.Schools.AsNoTracking()
+            .Where(x => students.Select(s => s.SchoolId).Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
+
+        var sentCount = 0;
+        var failures = new List<string>();
+
+        foreach (var student in students)
+        {
+            try
+            {
+                var hasResults = student.Results.Any(r => r.Term == term);
+                if (!hasResults)
+                {
+                    continue;
+                }
+
+                var preview = BuildParentPreviewReport(student, schoolNames);
+                var emailTemplate = _reportEmailTemplateService.BuildParentResultSlip(preview);
+                var guardianContacts = await LoadPreferredGuardianContactsAsync(student.Id, cancellationToken);
+
+                string? financialSummary = null;
+                if (includeStatement)
+                {
+                    var outstanding = await _dbContext.Set<ZynkEdu.Domain.Entities.Accounting.Invoice>()
+                        .AsNoTracking()
+                        .Where(inv => inv.StudentId == student.Id && inv.Term == term && inv.Status != ZynkEdu.Domain.Enums.InvoiceStatus.Paid)
+                        .SumAsync(inv => (decimal?)inv.TotalAmount ?? 0m, cancellationToken);
+                    if (outstanding > 0m)
+                    {
+                        financialSummary = $"Outstanding balance for {term}: {outstanding:C}";
+                    }
+                }
+
+                var emailBodyWithStatement = financialSummary is not null
+                    ? $"{emailTemplate.HtmlBody}\n<p style='margin-top:16px;color:#b91c1c;font-weight:bold;'>{System.Net.WebUtility.HtmlEncode(financialSummary)}</p>"
+                    : emailTemplate.HtmlBody;
+                var textBodyWithStatement = financialSummary is not null
+                    ? $"{emailTemplate.TextBody}\n\n{financialSummary}"
+                    : emailTemplate.TextBody;
+
+                if (sendEmail)
+                {
+                    var emailRecipients = guardianContacts
+                        .Select(x => x.Email)
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+
+                    foreach (var destination in emailRecipients)
+                    {
+                        await _emailSender.SendAsync(
+                            destination,
+                            emailTemplate.Subject,
+                            textBodyWithStatement,
+                            emailBodyWithStatement,
+                            [],
+                            cancellationToken);
+                    }
+                }
+
+                if (sendSms)
+                {
+                    var smsRecipients = guardianContacts
+                        .Select(x => x.Phone)
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray();
+
+                    foreach (var destination in smsRecipients)
+                    {
+                        await _smsSender.SendAsync(
+                            destination,
+                            $"ZynkEdu: Results for {student.FullName} ({term}) are ready. Please check your email for details.",
+                            cancellationToken);
+                    }
+                }
+
+                await _auditLogService.LogAsync(
+                    student.SchoolId,
+                    "BulkSent",
+                    "ResultSlip",
+                    student.Id.ToString(),
+                    $"Bulk term slip sent for {student.FullName} (class: {className}, term: {term}).",
+                    cancellationToken);
+
+                sentCount++;
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{student.FullName}: {ex.Message}");
+            }
+        }
+
+        return new BulkSlipSendResponse(sentCount, failures.Count, failures);
+    }
+
+    public async Task<ReportCardResponse> GetReportCardAsync(int studentId, string term, int? schoolId = null, CancellationToken cancellationToken = default)
+    {
+        var effectiveSchoolId = ResolveSchoolScope(schoolId);
+
+        var studentQuery = _dbContext.Students.AsNoTracking()
+            .Include(s => s.Results)
+                .ThenInclude(r => r.Subject)
+            .Include(s => s.Results)
+                .ThenInclude(r => r.Teacher)
+            .Include(s => s.Results)
+                .ThenInclude(r => r.ComponentScores)
+            .Where(s => s.Id == studentId);
+
+        if (effectiveSchoolId is not null)
+        {
+            studentQuery = studentQuery.Where(s => s.SchoolId == effectiveSchoolId);
+        }
+
+        var student = await studentQuery.FirstOrDefaultAsync(cancellationToken)
+            ?? throw new InvalidOperationException("Student not found.");
+
+        var schoolName = await _dbContext.Schools.AsNoTracking()
+            .Where(x => x.Id == student.SchoolId)
+            .Select(x => x.Name)
+            .FirstOrDefaultAsync(cancellationToken) ?? $"School {student.SchoolId}";
+
+        var termResults = student.Results
+            .Where(r => r.Term == term && r.ApprovalStatus == "Approved")
+            .ToList();
+
+        var subjectRows = termResults
+            .GroupBy(r => r.SubjectId)
+            .Select(g =>
+            {
+                var latest = g.OrderByDescending(r => r.CreatedAt).First();
+                return new ReportCardSubjectRow(
+                    latest.SubjectId,
+                    latest.Subject?.Name ?? $"Subject {latest.SubjectId}",
+                    latest.Score,
+                    latest.Grade ?? string.Empty,
+                    latest.Comment,
+                    latest.Teacher?.DisplayName ?? string.Empty,
+                    latest.ComponentScores?.Select(cs => new ComponentScoreResponse(cs.Component, cs.Score, cs.Weight)).ToList());
+            })
+            .OrderBy(s => s.SubjectName)
+            .ToList();
+
+        var averageScore = subjectRows.Count > 0 ? Math.Round(subjectRows.Average(s => s.Score), 1) : 0m;
+        var overallGrade = subjectRows.Count > 0
+            ? await _gradingSchemeService.ResolveGradeAsync(student.SchoolId, student.Level, averageScore, cancellationToken)
+            : string.Empty;
+
+        // Compute rank within class for same term
+        var classStudentIds = await _dbContext.Students.AsNoTracking()
+            .Where(s => s.Class == student.Class && s.SchoolId == student.SchoolId && (s.Status == "Active" || s.Status == "Suspended"))
+            .Select(s => s.Id)
+            .ToListAsync(cancellationToken);
+
+        var classAverages = await _dbContext.Results.AsNoTracking()
+            .Where(r => classStudentIds.Contains(r.StudentId) && r.Term == term && r.ApprovalStatus == "Approved")
+            .GroupBy(r => r.StudentId)
+            .Select(g => new { StudentId = g.Key, Average = g.Average(r => r.Score) })
+            .OrderByDescending(x => x.Average)
+            .ToListAsync(cancellationToken);
+
+        var rank = classAverages.FindIndex(x => x.StudentId == studentId) + 1;
+        if (rank == 0) rank = classAverages.Count + 1;
+        var resultYear = termResults.FirstOrDefault()?.CreatedAt.Year ?? DateTime.UtcNow.Year;
+
+        return new ReportCardResponse(
+            student.Id,
+            student.FullName,
+            student.StudentNumber,
+            student.Class,
+            term,
+            resultYear,
+            schoolName,
+            subjectRows,
+            averageScore,
+            overallGrade,
+            rank,
+            classStudentIds.Count,
+            DateTime.UtcNow);
     }
 
     public async Task<ResultResponse> ApproveAsync(int id, CancellationToken cancellationToken = default)

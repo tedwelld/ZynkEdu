@@ -33,6 +33,7 @@ public sealed class ZynkEduDbContext : DbContext
     public DbSet<FeeStructure> FeeStructures => Set<FeeStructure>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
     public DbSet<StudentMovement> StudentMovements => Set<StudentMovement>();
     public DbSet<StudentProgressionRun> StudentProgressionRuns => Set<StudentProgressionRun>();
     public DbSet<Subject> Subjects => Set<Subject>();
@@ -40,8 +41,10 @@ public sealed class ZynkEduDbContext : DbContext
     public DbSet<SchoolClass> SchoolClasses => Set<SchoolClass>();
     public DbSet<SchoolClassSubject> SchoolClassSubjects => Set<SchoolClassSubject>();
     public DbSet<SchoolGradingBand> SchoolGradingBands => Set<SchoolGradingBand>();
+    public DbSet<AssessmentStructure> AssessmentStructures => Set<AssessmentStructure>();
     public DbSet<TeacherAssignment> TeacherAssignments => Set<TeacherAssignment>();
     public DbSet<Result> Results => Set<Result>();
+    public DbSet<ResultComponentScore> ResultComponentScores => Set<ResultComponentScore>();
     public DbSet<StudentNumberCounter> StudentNumberCounters => Set<StudentNumberCounter>();
     public DbSet<StudentSubjectEnrollment> StudentSubjectEnrollments => Set<StudentSubjectEnrollment>();
     public DbSet<AttendanceRegister> AttendanceRegisters => Set<AttendanceRegister>();
@@ -51,6 +54,11 @@ public sealed class ZynkEduDbContext : DbContext
     public DbSet<NotificationRecipient> NotificationRecipients => Set<NotificationRecipient>();
     public DbSet<TimetableSlot> TimetableSlots => Set<TimetableSlot>();
     public DbSet<TimetablePublication> TimetablePublications => Set<TimetablePublication>();
+    public DbSet<ExamTimetableEntry> ExamTimetableEntries => Set<ExamTimetableEntry>();
+    public DbSet<StudentDocument> StudentDocuments => Set<StudentDocument>();
+    public DbSet<DisciplineIncident> DisciplineIncidents => Set<DisciplineIncident>();
+    public DbSet<ExpenseCategory> ExpenseCategories => Set<ExpenseCategory>();
+    public DbSet<SchoolExpense> SchoolExpenses => Set<SchoolExpense>();
     public DbSet<TimetableDispatchLog> TimetableDispatchLogs => Set<TimetableDispatchLog>();
     public DbSet<AcademicTerm> AcademicTerms => Set<AcademicTerm>();
     public DbSet<SchoolCalendarEvent> SchoolCalendarEvents => Set<SchoolCalendarEvent>();
@@ -255,6 +263,20 @@ public sealed class ZynkEduDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.StudentAccountId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(x => x.Allocations)
+                .WithOne(x => x.Payment)
+                .HasForeignKey(x => x.PaymentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<PaymentAllocation>(entity =>
+        {
+            entity.Property(x => x.AllocatedAmount).HasPrecision(18, 2);
+            entity.HasIndex(x => new { x.SchoolId, x.PaymentId, x.InvoiceId }).IsUnique();
+            entity.HasOne(x => x.Invoice)
+                .WithMany()
+                .HasForeignKey(x => x.InvoiceId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<StudentMovement>(entity =>
@@ -371,6 +393,18 @@ public sealed class ZynkEduDbContext : DbContext
             entity.Property(x => x.Comment).HasMaxLength(1000);
             entity.Property(x => x.ApprovalStatus).HasMaxLength(40);
             entity.HasIndex(x => new { x.SchoolId, x.StudentId, x.SubjectId, x.Term });
+            entity.HasMany(x => x.ComponentScores)
+                .WithOne(x => x.Result)
+                .HasForeignKey(x => x.ResultId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ResultComponentScore>(entity =>
+        {
+            entity.Property(x => x.Component).HasMaxLength(50);
+            entity.Property(x => x.Score).HasPrecision(5, 2);
+            entity.Property(x => x.Weight).HasPrecision(5, 2);
+            entity.HasIndex(x => new { x.SchoolId, x.ResultId, x.Component }).IsUnique();
         });
 
         modelBuilder.Entity<AttendanceRegister>(entity =>
@@ -570,6 +604,7 @@ public sealed class ZynkEduDbContext : DbContext
         ApplySchoolFilter<FeeStructure>(modelBuilder);
         ApplySchoolFilter<Invoice>(modelBuilder);
         ApplySchoolFilter<Payment>(modelBuilder);
+        ApplySchoolFilter<PaymentAllocation>(modelBuilder);
         ApplySchoolFilter<StudentSubjectEnrollment>(modelBuilder);
         ApplySchoolFilter<AttendanceRegister>(modelBuilder);
         ApplySchoolFilter<AttendanceRegisterEntry>(modelBuilder);
@@ -581,16 +616,100 @@ public sealed class ZynkEduDbContext : DbContext
         ApplySchoolFilter<StudentProgressionRun>(modelBuilder);
         ApplySchoolFilter<TeacherAssignment>(modelBuilder);
         ApplySchoolFilter<Result>(modelBuilder);
+        ApplySchoolFilter<ResultComponentScore>(modelBuilder);
         ApplySchoolFilter<StudentNumberCounter>(modelBuilder);
         ApplySchoolFilter<Notification>(modelBuilder);
         ApplySchoolFilter<TimetableSlot>(modelBuilder);
         ApplySchoolFilter<TimetablePublication>(modelBuilder);
+        ApplySchoolFilter<ExamTimetableEntry>(modelBuilder);
+        ApplySchoolFilter<StudentDocument>(modelBuilder);
+        ApplySchoolFilter<DisciplineIncident>(modelBuilder);
+        ApplySchoolFilter<ExpenseCategory>(modelBuilder);
+        ApplySchoolFilter<SchoolExpense>(modelBuilder);
         ApplySchoolFilter<TimetableDispatchLog>(modelBuilder);
         ApplySchoolFilter<AcademicTerm>(modelBuilder);
         ApplySchoolFilter<SchoolCalendarEvent>(modelBuilder);
         ApplySchoolFilter<LibraryBook>(modelBuilder);
         ApplySchoolFilter<LibraryBookCopy>(modelBuilder);
         ApplySchoolFilter<LibraryLoan>(modelBuilder);
+        ApplySchoolFilter<AssessmentStructure>(modelBuilder);
+
+        modelBuilder.Entity<ExpenseCategory>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(500);
+            entity.HasIndex(x => new { x.SchoolId, x.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<SchoolExpense>(entity =>
+        {
+            entity.Property(x => x.Amount).HasPrecision(18, 2);
+            entity.Property(x => x.Currency).HasMaxLength(10);
+            entity.Property(x => x.Reference).HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(500);
+            entity.HasOne(x => x.Category)
+                .WithMany(c => c.Expenses)
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.RecordedBy)
+                .WithMany()
+                .HasForeignKey(x => x.RecordedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.SchoolId, x.ExpenseDate });
+        });
+
+        modelBuilder.Entity<DisciplineIncident>(entity =>
+        {
+            entity.Property(x => x.IncidentType).HasMaxLength(200);
+            entity.Property(x => x.Severity).HasMaxLength(50);
+            entity.Property(x => x.Description).HasMaxLength(2000);
+            entity.Property(x => x.ActionTaken).HasMaxLength(2000);
+            entity.HasOne(x => x.Student)
+                .WithMany()
+                .HasForeignKey(x => x.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.SchoolId, x.StudentId, x.IncidentDate });
+        });
+
+        modelBuilder.Entity<StudentDocument>(entity =>
+        {
+            entity.Property(x => x.DocumentType).HasMaxLength(100);
+            entity.Property(x => x.OriginalFileName).HasMaxLength(500);
+            entity.Property(x => x.StoredFileName).HasMaxLength(500);
+            entity.Property(x => x.ContentType).HasMaxLength(100);
+            entity.Property(x => x.Notes).HasMaxLength(500);
+            entity.HasOne(x => x.Student)
+                .WithMany()
+                .HasForeignKey(x => x.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.SchoolId, x.StudentId });
+        });
+
+        modelBuilder.Entity<ExamTimetableEntry>(entity =>
+        {
+            entity.Property(x => x.Term).HasMaxLength(100);
+            entity.Property(x => x.Class).HasMaxLength(100);
+            entity.Property(x => x.Venue).HasMaxLength(200);
+            entity.Property(x => x.Notes).HasMaxLength(500);
+            entity.HasOne(x => x.Subject)
+                .WithMany()
+                .HasForeignKey(x => x.SubjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.SchoolId, x.Term, x.Class, x.SubjectId, x.ExamDate });
+        });
+
+        modelBuilder.Entity<AssessmentStructure>(entity =>
+        {
+            entity.Property(x => x.Level).HasMaxLength(100);
+            entity.Property(x => x.TestWeight).HasPrecision(5, 2);
+            entity.Property(x => x.AssignmentWeight).HasPrecision(5, 2);
+            entity.Property(x => x.ExamWeight).HasPrecision(5, 2);
+            entity.HasOne(x => x.Subject)
+                .WithMany()
+                .HasForeignKey(x => x.SubjectId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(x => new { x.SchoolId, x.Level, x.SubjectId }).IsUnique();
+        });
     }
 
     private void ApplySchoolFilter<TEntity>(ModelBuilder modelBuilder)

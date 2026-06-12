@@ -58,7 +58,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Status</label>
-                        <input pInputText [(ngModel)]="statusFilter" class="w-full" placeholder="All / Active / Inactive" />
+                        <app-dropdown [options]="statusOptions" [(ngModel)]="statusFilter" optionLabel="label" optionValue="value" class="w-full" appendTo="body" placeholder="All statuses" (ngModelChange)="null"></app-dropdown>
                     </div>
                     <div class="flex items-end">
                         <button pButton type="button" label="Clear filters" severity="secondary" class="w-full" (click)="clearFilters()"></button>
@@ -240,6 +240,11 @@ export class AdminTeachers implements OnInit {
     pendingFocusTeacherId: number | null = null;
     searchTerm = '';
     statusFilter = '';
+    readonly statusOptions = [
+        { label: 'All', value: '' },
+        { label: 'Active', value: 'active' },
+        { label: 'Inactive', value: 'inactive' }
+    ];
     drawerVisible = false;
     drawerMode: 'create' | 'edit' = 'create';
     skeletonRows = Array.from({ length: 5 });
@@ -342,7 +347,7 @@ export class AdminTeachers implements OnInit {
     get filteredTeachers(): UserResponse[] {
         return this.teachers.filter((teacher) => {
             const matchesSearch = `${teacher.displayName} ${teacher.username}`.toLowerCase().includes(this.searchTerm.trim().toLowerCase());
-            const matchesStatus = !this.statusFilter.trim() || (teacher.isActive ? 'active' : 'inactive').includes(this.statusFilter.trim().toLowerCase());
+            const matchesStatus = !this.statusFilter || (teacher.isActive ? 'active' : 'inactive') === this.statusFilter;
             return matchesSearch && matchesStatus;
         });
     }

@@ -25,7 +25,7 @@ export class GlobalSearchService {
                 map((assignments) =>
                     assignments.map((assignment) => ({
                         id: `assignment-${assignment.id}`,
-                        label: `${assignment.teacherName} Â· ${assignment.subjectName}`,
+                        label: `${assignment.teacherName} · ${assignment.subjectName}`,
                         type: 'Assignment' as const,
                         description: assignment.class,
                         route: '/teacher/results'

@@ -135,7 +135,7 @@ public sealed class AttendanceServiceTests
         await using var _queryConnection = queryConnection;
         await using (queryContext)
         {
-            var service = new AttendanceService(queryContext, currentUser);
+            var service = new AttendanceService(queryContext, currentUser, new NoOpAuditLogService());
 
             var summaries = await service.GetDailySummariesAsync(new DateTime(2026, 4, 27));
 

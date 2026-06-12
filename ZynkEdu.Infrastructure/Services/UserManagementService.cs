@@ -16,17 +16,20 @@ public sealed class UserManagementService : IUserManagementService
     private readonly ICurrentUserContext _currentUserContext;
     private readonly IPasswordHasher<AppUser> _passwordHasher;
     private readonly ITeacherAssignmentService _teacherAssignmentService;
+    private readonly IAuditLogService _auditLogService;
 
     public UserManagementService(
         ZynkEduDbContext dbContext,
         ICurrentUserContext currentUserContext,
         IPasswordHasher<AppUser> passwordHasher,
-        ITeacherAssignmentService teacherAssignmentService)
+        ITeacherAssignmentService teacherAssignmentService,
+        IAuditLogService auditLogService)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
         _passwordHasher = passwordHasher;
         _teacherAssignmentService = teacherAssignmentService;
+        _auditLogService = auditLogService;
     }
 
     public Task<UserResponse> CreateTeacherAsync(CreateSchoolUserRequest request, int? schoolId = null, CancellationToken cancellationToken = default)
@@ -240,9 +243,12 @@ public sealed class UserManagementService : IUserManagementService
                 _dbContext.TeacherUsers.Remove(profile);
             }
 
+            var snapshot = $"{user.Role} account '{user.Username}'";
             _dbContext.Users.Remove(user);
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            await _auditLogService.LogAsync(user.SchoolId, "Deleted", "User", id.ToString(),
+                $"{snapshot} deleted.", cancellationToken);
         });
     }
 
@@ -276,9 +282,12 @@ public sealed class UserManagementService : IUserManagementService
                 _dbContext.StaffAdmins.Remove(profile);
             }
 
+            var adminSnapshot = $"Admin account '{user.Username}'";
             _dbContext.Users.Remove(user);
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            await _auditLogService.LogAsync(user.SchoolId, "Deleted", "User", id.ToString(),
+                $"{adminSnapshot} deleted.", cancellationToken);
         });
     }
 
@@ -317,9 +326,12 @@ public sealed class UserManagementService : IUserManagementService
                 _dbContext.LibraryAdminUsers.Remove(profile);
             }
 
+            var libSnapshot = $"LibraryAdmin account '{user.Username}'";
             _dbContext.Users.Remove(user);
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            await _auditLogService.LogAsync(user.SchoolId, "Deleted", "User", id.ToString(),
+                $"{libSnapshot} deleted.", cancellationToken);
         });
     }
 
@@ -343,9 +355,12 @@ public sealed class UserManagementService : IUserManagementService
                 throw new InvalidOperationException("User is not an accountant.");
             }
 
+            var acctSnapshot = $"{user.Role} account '{user.Username}'";
             _dbContext.Users.Remove(user);
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            await _auditLogService.LogAsync(user.SchoolId, "Deleted", "User", id.ToString(),
+                $"{acctSnapshot} deleted.", cancellationToken);
         });
     }
 
@@ -421,6 +436,8 @@ public sealed class UserManagementService : IUserManagementService
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        await _auditLogService.LogAsync(user.SchoolId, "Created", "User", user.Id.ToString(),
+            $"{role} account '{user.Username}' ('{user.DisplayName}') created.", cancellationToken);
         return new UserResponse(user.Id, user.Username, user.DisplayName, user.Role.ToString(), user.SchoolId, user.CreatedAt, user.IsActive, user.ContactEmail);
     }
 
@@ -521,6 +538,8 @@ public sealed class UserManagementService : IUserManagementService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(user.SchoolId, "Updated", "User", user.Id.ToString(),
+            $"{user.Role} account '{user.Username}' ('{user.DisplayName}') updated.", cancellationToken);
         return new UserResponse(user.Id, user.Username, user.DisplayName, user.Role.ToString(), user.SchoolId, user.CreatedAt, user.IsActive, user.ContactEmail);
     }
 

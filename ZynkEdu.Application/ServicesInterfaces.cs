@@ -96,8 +96,19 @@ public interface IResultService
         string slipFileName,
         byte[]? newsletterPdf = null,
         string? newsletterFileName = null,
+        byte[]? statementPdf = null,
+        string? statementFileName = null,
         int? schoolId = null,
         CancellationToken cancellationToken = default);
+    Task<BulkSlipSendResponse> SendTermSlipsAsync(
+        string className,
+        string term,
+        bool includeStatement,
+        bool sendEmail,
+        bool sendSms,
+        int? schoolId = null,
+        CancellationToken cancellationToken = default);
+    Task<ReportCardResponse> GetReportCardAsync(int studentId, string term, int? schoolId = null, CancellationToken cancellationToken = default);
     Task<ResultResponse> ApproveAsync(int id, CancellationToken cancellationToken = default);
     Task<ResultResponse> RejectAsync(int id, CancellationToken cancellationToken = default);
     Task<ResultResponse> ReopenAsync(int id, CancellationToken cancellationToken = default);

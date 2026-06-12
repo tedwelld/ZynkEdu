@@ -16,11 +16,13 @@ public sealed class TimetableService : ITimetableService
 
     private readonly ZynkEduDbContext _dbContext;
     private readonly ICurrentUserContext _currentUserContext;
+    private readonly IAuditLogService _auditLogService;
 
-    public TimetableService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext)
+    public TimetableService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext, IAuditLogService auditLogService)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
+        _auditLogService = auditLogService;
     }
 
     public async Task<IReadOnlyList<TimetableResponse>> GetMyTimetableAsync(string? term = null, CancellationToken cancellationToken = default)
@@ -71,7 +73,10 @@ public sealed class TimetableService : ITimetableService
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            return await MapTimetableAsync(BuildTimetableQuery(resolvedSchoolId, term), resolvedSchoolId, cancellationToken);
+            var result = await MapTimetableAsync(BuildTimetableQuery(resolvedSchoolId, term), resolvedSchoolId, cancellationToken);
+            await _auditLogService.LogAsync(resolvedSchoolId, "Generated", "Timetable", term,
+                $"Timetable generated for term '{term}' ({result.Count} slots).", cancellationToken);
+            return result;
         });
     }
 
@@ -99,7 +104,10 @@ public sealed class TimetableService : ITimetableService
         _dbContext.TimetableSlots.Add(slot);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return await MapTimetableSlotAsync(slot.Id, resolvedSchoolId, cancellationToken);
+        var created = await MapTimetableSlotAsync(slot.Id, resolvedSchoolId, cancellationToken);
+        await _auditLogService.LogAsync(resolvedSchoolId, "Created", "TimetableSlot", slot.Id.ToString(),
+            $"Timetable slot created: {created.SubjectName} for {created.Class} on {created.DayOfWeek} {created.StartTime}–{created.EndTime} (term {created.Term}).", cancellationToken);
+        return created;
     }
 
     public async Task<TimetableResponse> UpdateAsync(int id, UpsertTimetableSlotRequest request, int? schoolId = null, CancellationToken cancellationToken = default)
@@ -123,7 +131,10 @@ public sealed class TimetableService : ITimetableService
         slot.EndTime = endTime;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return await MapTimetableSlotAsync(slot.Id, resolvedSchoolId, cancellationToken);
+        var updated = await MapTimetableSlotAsync(slot.Id, resolvedSchoolId, cancellationToken);
+        await _auditLogService.LogAsync(resolvedSchoolId, "Updated", "TimetableSlot", slot.Id.ToString(),
+            $"Timetable slot updated: {updated.SubjectName} for {updated.Class} on {updated.DayOfWeek} (term {updated.Term}).", cancellationToken);
+        return updated;
     }
 
     public async Task DeleteAsync(int id, int? schoolId = null, CancellationToken cancellationToken = default)
@@ -134,13 +145,18 @@ public sealed class TimetableService : ITimetableService
 
         _dbContext.TimetableSlots.Remove(slot);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(resolvedSchoolId, "Deleted", "TimetableSlot", id.ToString(),
+            $"Timetable slot {id} deleted.", cancellationToken);
     }
 
     public async Task<TimetablePublicationResponse> PublishAsync(PublishTimetableRequest request, int? schoolId = null, CancellationToken cancellationToken = default)
     {
         var resolvedSchoolId = ResolveEditableSchoolId(schoolId);
         var term = NormalizeTerm(request.Term);
-        return await UpsertPublicationAsync(resolvedSchoolId, term, DateTime.UtcNow, null, createApprovalNotification: true, cancellationToken: cancellationToken);
+        var result = await UpsertPublicationAsync(resolvedSchoolId, term, DateTime.UtcNow, null, createApprovalNotification: true, cancellationToken: cancellationToken);
+        await _auditLogService.LogAsync(resolvedSchoolId, "Published", "Timetable", term,
+            $"Timetable for term '{term}' published.", cancellationToken);
+        return result;
     }
 
     private async Task<IReadOnlyList<TimetableResponse>> MapTimetableAsync(IQueryable<TimetableSlot> query, int? schoolId, CancellationToken cancellationToken)

@@ -1,0 +1,11 @@
+**/.git
+**/.gitignore
+**/bin
+**/obj
+**/*.user
+**/node_modules
+ZynkEdu.Web/dist
+tests/
+tmp/
+.claude/
+*.md

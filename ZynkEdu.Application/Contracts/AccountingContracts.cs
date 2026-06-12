@@ -76,6 +76,21 @@ public sealed record UpdateInvoiceRequest(
     string? Reference = null,
     string? Description = null);
 
+public sealed record BulkInvoiceRequest(
+    [Required, MinLength(1)] string ClassName,
+    [Required, MinLength(1)] string Term,
+    [Range(0, double.MaxValue)] decimal TotalAmount,
+    DateTime DueAt,
+    int? FeeStructureId = null,
+    string? Reference = null,
+    string? Description = null);
+
+public sealed record BulkInvoiceResponse(
+    int IssuedCount,
+    int SkippedCount,
+    int FailedCount,
+    IReadOnlyList<string> Failures);
+
 public sealed record CreatePaymentRequest(
     int StudentId,
     [Range(0, double.MaxValue)] decimal Amount,
@@ -114,6 +129,13 @@ public sealed record AccountingTransactionResponse(
     DateTime CreatedAt,
     DateTime? ApprovedAt);
 
+public sealed record PaymentAllocationResponse(
+    int Id,
+    int PaymentId,
+    int InvoiceId,
+    decimal AllocatedAmount,
+    DateTime CreatedAt);
+
 public sealed record InvoiceResponse(
     int Id,
     int SchoolId,
@@ -130,7 +152,9 @@ public sealed record InvoiceResponse(
     int CreatedByUserId,
     int? AccountingTransactionId,
     string? Reference,
-    string? Description);
+    string? Description,
+    decimal PaidAmount = 0m,
+    decimal BalanceDue = 0m);
 
 public sealed record StatementLineResponse(
     int TransactionId,
@@ -256,3 +280,20 @@ public sealed record StudentFinancialFlagResponse(
     decimal Balance,
     bool HasOverdueInvoice,
     DateTime? OldestOverdueSince);
+
+public sealed record PaymentReceiptResponse(
+    int PaymentId,
+    int SchoolId,
+    string SchoolName,
+    int StudentId,
+    string StudentName,
+    string StudentNumber,
+    string StudentClass,
+    decimal Amount,
+    string Currency,
+    string Method,
+    DateTime ReceivedAt,
+    string? Reference,
+    string? Description,
+    string IssuedByName,
+    DateTime GeneratedAt);

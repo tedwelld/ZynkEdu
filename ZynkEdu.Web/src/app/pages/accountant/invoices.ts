@@ -2,9 +2,10 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MessageService } from 'primeng/api';
+import { ButtonModule } from 'primeng/button';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { AcademicTermResponse, FeeStructureResponse, SchoolResponse, StudentResponse } from '../../core/api/api.models';
+import { AcademicTermResponse, BulkInvoiceResponse, FeeStructureResponse, SchoolResponse, StudentResponse } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { InvoicePdfData, ReportSchoolInfo, buildFeeStructuresPdf, buildInvoicePdf } from '../../shared/report/report-pdf';
 
@@ -15,7 +16,7 @@ type TermOption = {
 
 @Component({
     standalone: true,
-    imports: [CommonModule, FormsModule, AppDropdownComponent],
+    imports: [CommonModule, FormsModule, ButtonModule, AppDropdownComponent],
     template: `
         <section class="grid gap-6">
             <header class="workspace-card p-6 md:p-8">
@@ -70,6 +71,44 @@ type TermOption = {
                     <input class="md:col-span-2 rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" placeholder="Description" [(ngModel)]="draft.description" name="description" />
                     <button class="rounded-xl bg-primary text-white px-4 py-3 font-semibold md:col-span-4" type="submit">Issue invoice</button>
                 </form>
+            </section>
+
+            <section class="workspace-card p-6">
+                <h2 class="text-xl font-semibold mb-2">Bulk issue by class</h2>
+                <p class="text-sm text-muted-color mb-4">Generate one invoice per active student in a class for a given term. Students who already have an invoice for that term are skipped.</p>
+
+                <div class="grid gap-4 md:grid-cols-4 items-end">
+                    <label class="block">
+                        <span class="text-sm text-muted-color">Class</span>
+                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" [(ngModel)]="bulk.className" name="bulkClass" placeholder="e.g. Grade 10A" />
+                    </label>
+                    <label class="block">
+                        <span class="text-sm text-muted-color">Term</span>
+                        <app-dropdown [options]="termOptions" [(ngModel)]="bulk.term" optionLabel="label" optionValue="value" class="w-full mt-2" appendTo="body" [filter]="false" [showClear]="false"></app-dropdown>
+                    </label>
+                    <label class="block">
+                        <span class="text-sm text-muted-color">Amount</span>
+                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="number" [(ngModel)]="bulk.totalAmount" name="bulkAmount" />
+                    </label>
+                    <label class="block">
+                        <span class="text-sm text-muted-color">Due date</span>
+                        <input class="mt-2 w-full rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" type="date" [(ngModel)]="bulk.dueAt" name="bulkDueAt" />
+                    </label>
+                    <input class="md:col-span-2 rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" placeholder="Reference (optional)" [(ngModel)]="bulk.reference" name="bulkRef" />
+                    <input class="md:col-span-2 rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" placeholder="Description (optional)" [(ngModel)]="bulk.description" name="bulkDesc" />
+                    <button pButton type="button" label="Issue invoices for class" icon="pi pi-bolt" severity="info"
+                        class="md:col-span-4"
+                        (click)="submitBulkInvoice()"
+                        [disabled]="!bulk.className || !bulk.term || bulk.totalAmount <= 0 || issuingBulk">
+                    </button>
+                </div>
+
+                <div *ngIf="bulkResult" class="mt-4 rounded-2xl border p-4" [class.border-green-400]="bulkResult.failedCount === 0" [class.border-amber-400]="bulkResult.failedCount > 0">
+                    <div class="font-semibold mb-1">{{ bulkResult.issuedCount }} issued · {{ bulkResult.skippedCount }} skipped · {{ bulkResult.failedCount }} failed</div>
+                    <ul *ngIf="bulkResult.failures.length > 0" class="text-sm text-muted-color list-disc pl-4">
+                        <li *ngFor="let f of bulkResult.failures">{{ f }}</li>
+                    </ul>
+                </div>
             </section>
 
             <section class="workspace-card p-6">
@@ -146,11 +185,21 @@ export class AccountantInvoices implements OnInit {
     feeStructures: FeeStructureResponse[] = [];
     feeSearch = '';
     sendingNewsletter = false;
+    issuingBulk = false;
+    bulkResult: BulkInvoiceResponse | null = null;
     draft = {
         studentId: null as number | null,
         term: '',
         totalAmount: 0,
         dueAt: '',
+        reference: '',
+        description: ''
+    };
+    bulk = {
+        className: '',
+        term: '',
+        totalAmount: 0,
+        dueAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
         reference: '',
         description: ''
     };
@@ -242,6 +291,37 @@ export class AccountantInvoices implements OnInit {
             this.sendingNewsletter = false;
             this.messages.add({ severity: 'error', summary: 'Send failed', detail: 'The fee structure newsletter could not be created.' });
         }
+    }
+
+    submitBulkInvoice(): void {
+        if (!this.bulk.className || !this.bulk.term || this.bulk.totalAmount <= 0 || !this.bulk.dueAt) {
+            return;
+        }
+        this.issuingBulk = true;
+        this.bulkResult = null;
+        const schoolId = this.auth.schoolId();
+        this.api.bulkInvoice({
+            className: this.bulk.className,
+            term: this.bulk.term,
+            totalAmount: this.bulk.totalAmount,
+            dueAt: new Date(this.bulk.dueAt).toISOString(),
+            reference: this.bulk.reference || null,
+            description: this.bulk.description || null
+        }, schoolId).subscribe({
+            next: (result) => {
+                this.bulkResult = result;
+                if (result.failedCount === 0) {
+                    this.messages.add({ severity: 'success', summary: 'Bulk invoiced', detail: `${result.issuedCount} invoice(s) issued, ${result.skippedCount} skipped.` });
+                } else {
+                    this.messages.add({ severity: 'warn', summary: 'Partial issue', detail: `${result.issuedCount} issued, ${result.skippedCount} skipped, ${result.failedCount} failed.` });
+                }
+                this.issuingBulk = false;
+            },
+            error: () => {
+                this.messages.add({ severity: 'error', summary: 'Bulk invoice failed', detail: 'Could not issue invoices. Please try again.' });
+                this.issuingBulk = false;
+            }
+        });
     }
 
     submitInvoice(): void {

@@ -51,6 +51,7 @@ public sealed class ResultsController : ControllerBase
         [FromForm] SendResultSlipRequest request,
         [FromForm] IFormFile slipPdf,
         [FromForm] IFormFile? newsletterPdf,
+        [FromForm] IFormFile? statementPdf,
         [FromQuery] int? schoolId,
         CancellationToken cancellationToken)
     {
@@ -67,7 +68,42 @@ public sealed class ResultsController : ControllerBase
             newsletterFileName = newsletterPdf.FileName;
         }
 
-        return Ok(await _resultService.SendSlipAsync(id, request, stream.ToArray(), slipPdf.FileName, newsletterBytes, newsletterFileName, schoolId, cancellationToken));
+        byte[]? statementBytes = null;
+        string? statementFileName = null;
+        if (statementPdf is not null)
+        {
+            await using var statementStream = new MemoryStream();
+            await statementPdf.CopyToAsync(statementStream, cancellationToken);
+            statementBytes = statementStream.ToArray();
+            statementFileName = statementPdf.FileName;
+        }
+
+        return Ok(await _resultService.SendSlipAsync(id, request, stream.ToArray(), slipPdf.FileName, newsletterBytes, newsletterFileName, statementBytes, statementFileName, schoolId, cancellationToken));
+    }
+
+    [HttpPost("send-term-slips")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    public async Task<ActionResult<BulkSlipSendResponse>> SendTermSlips(
+        [FromQuery] string className,
+        [FromQuery] string term,
+        [FromQuery] bool includeStatement = false,
+        [FromQuery] bool sendEmail = true,
+        [FromQuery] bool sendSms = true,
+        [FromQuery] int? schoolId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Ok(await _resultService.SendTermSlipsAsync(className, term, includeStatement, sendEmail, sendSms, schoolId, cancellationToken));
+    }
+
+    [HttpGet("report-card")]
+    [Authorize(Roles = RoleNames.AdminTeacherOrPlatformAdmin)]
+    public async Task<ActionResult<ReportCardResponse>> GetReportCard(
+        [FromQuery] int studentId,
+        [FromQuery] string term,
+        [FromQuery] int? schoolId,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await _resultService.GetReportCardAsync(studentId, term, schoolId, cancellationToken));
     }
 
     [HttpPost("{id:int}/approve")]

@@ -14,7 +14,7 @@ import { SkeletonModule } from 'primeng/skeleton';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
-import { forkJoin } from 'rxjs';
+import { firstValueFrom, forkJoin } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ApiService } from '../../core/api/api.service';
 import { extractApiErrorMessage } from '../../core/api/api-error';
@@ -27,6 +27,7 @@ import {
     ResultResponse,
     SchoolClassResponse,
     SchoolResponse,
+    StudentDocumentResponse,
     StudentFinancialFlagResponse,
     StudentResponse,
     SubjectResponse,
@@ -524,6 +525,50 @@ type GuardianDraft = GuardianRequest & {
                                 <button pButton type="button" label="Archive" icon="pi pi-box" severity="danger" [disabled]="selectedStudent.status === 'Archived'" (click)="setSelectedStudentStatus('Archived')"></button>
                             </div>
                         </div>
+
+                        <!-- Student Documents -->
+                        <div class="workspace-card">
+                            <div class="flex items-center justify-between gap-3 mb-4">
+                                <div>
+                                    <h3 class="font-display font-bold mb-1">Documents</h3>
+                                    <p class="text-sm text-muted-color">Upload photos, certificates and other student files (JPEG, PNG, PDF).</p>
+                                </div>
+                                <label class="cursor-pointer">
+                                    <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" (change)="onDocumentFileSelected($event)" #docFileInput />
+                                    <button pButton type="button" icon="pi pi-upload" label="Upload" severity="secondary" size="small" (click)="docFileInput.click()"></button>
+                                </label>
+                            </div>
+
+                            <div *ngIf="docUploadType !== null" class="mb-4 flex flex-wrap items-center gap-3">
+                                <input pInputText type="text" [(ngModel)]="docUploadType" placeholder="Document type (e.g. Photo, Birth Certificate)" class="flex-1 min-w-0" />
+                                <input pInputText type="text" [(ngModel)]="docUploadNotes" placeholder="Notes (optional)" class="flex-1 min-w-0" />
+                                <button pButton type="button" icon="pi pi-check" label="Confirm" (click)="confirmDocUpload()" [disabled]="uploadingDoc || !docUploadType"></button>
+                                <button pButton type="button" icon="pi pi-times" severity="secondary" (click)="cancelDocUpload()"></button>
+                            </div>
+
+                            <div *ngIf="loadingDocs" class="space-y-2">
+                                <p-skeleton height="2.5rem" borderRadius="1rem"></p-skeleton>
+                                <p-skeleton height="2.5rem" borderRadius="1rem"></p-skeleton>
+                            </div>
+
+                            <div *ngIf="!loadingDocs && studentDocs.length === 0" class="text-muted-color text-sm py-4 text-center">No documents uploaded yet.</div>
+
+                            <div *ngIf="!loadingDocs && studentDocs.length > 0" class="space-y-2">
+                                <div *ngFor="let doc of studentDocs" class="flex items-center justify-between gap-3 rounded-2xl border border-surface-200 dark:border-surface-700 px-3 py-2">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <i class="pi" [class.pi-image]="doc.contentType.startsWith('image/')" [class.pi-file-pdf]="doc.contentType === 'application/pdf'" class="text-muted-color flex-shrink-0"></i>
+                                        <div class="min-w-0">
+                                            <div class="font-semibold text-sm truncate">{{ doc.originalFileName }}</div>
+                                            <div class="text-xs text-muted-color">{{ doc.documentType }} · {{ (doc.fileSizeBytes / 1024 | number:'1.0-0') }} KB</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex gap-2 flex-shrink-0">
+                                        <button pButton type="button" icon="pi pi-download" severity="secondary" size="small" class="p-button-text" (click)="downloadDoc(doc)"></button>
+                                        <button pButton type="button" icon="pi pi-trash" severity="danger" size="small" class="p-button-text" (click)="deleteDoc(doc.id)"></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <ng-template #emptyDrawer>
                         <div class="h-full flex items-center justify-center text-muted-color">Pick a student to view the detailed drawer.</div>
@@ -565,6 +610,13 @@ export class AdminStudents implements OnInit {
     draft: StudentDraft = this.createEmptyDraft();
     studentFinancialFlag: StudentFinancialFlagResponse | null = null;
     studentBorrowingEligibility: BorrowingEligibilityResponse | null = null;
+
+    studentDocs: StudentDocumentResponse[] = [];
+    loadingDocs = false;
+    uploadingDoc = false;
+    docUploadFile: File | null = null;
+    docUploadType: string | null = null;
+    docUploadNotes = '';
 
     get isPlatformAdmin(): boolean {
         return this.auth.role() === 'PlatformAdmin';
@@ -860,7 +912,11 @@ export class AdminStudents implements OnInit {
         this.editStudentId = null;
         this.studentFinancialFlag = null;
         this.studentBorrowingEligibility = null;
+        this.studentDocs = [];
+        this.docUploadType = null;
+        this.docUploadFile = null;
         this.drawerVisible = true;
+        void this.loadStudentDocs(student.id);
 
         this.api.getResultsByStudent(student.id).subscribe({
             next: (results) => {
@@ -1361,5 +1417,74 @@ export class AdminStudents implements OnInit {
                     }
                 ]
         };
+    }
+
+    async loadStudentDocs(studentId: number): Promise<void> {
+        this.loadingDocs = true;
+        try {
+            const schoolId = this.isPlatformAdmin ? this.selectedSchoolId : this.authSchoolId;
+            this.studentDocs = await firstValueFrom(this.api.getStudentDocuments(studentId, schoolId));
+        } catch {
+            this.studentDocs = [];
+        } finally {
+            this.loadingDocs = false;
+        }
+    }
+
+    onDocumentFileSelected(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        if (input.files && input.files.length > 0) {
+            this.docUploadFile = input.files[0];
+            this.docUploadType = '';
+            this.docUploadNotes = '';
+        }
+    }
+
+    cancelDocUpload(): void {
+        this.docUploadFile = null;
+        this.docUploadType = null;
+        this.docUploadNotes = '';
+    }
+
+    async confirmDocUpload(): Promise<void> {
+        if (!this.selectedStudent || !this.docUploadFile || !this.docUploadType) return;
+        this.uploadingDoc = true;
+        try {
+            const schoolId = this.isPlatformAdmin ? this.selectedSchoolId : this.authSchoolId;
+            const doc = await firstValueFrom(this.api.uploadStudentDocument(this.selectedStudent.id, this.docUploadType, this.docUploadFile, this.docUploadNotes || null, schoolId));
+            this.studentDocs = [doc, ...this.studentDocs];
+            this.cancelDocUpload();
+            this.messages.add({ severity: 'success', summary: 'Uploaded', detail: 'Document uploaded successfully.' });
+        } catch {
+            this.messages.add({ severity: 'error', summary: 'Upload failed', detail: 'Could not upload the document. Check file type and size (max 10 MB).' });
+        } finally {
+            this.uploadingDoc = false;
+        }
+    }
+
+    async downloadDoc(doc: StudentDocumentResponse): Promise<void> {
+        try {
+            const schoolId = this.isPlatformAdmin ? this.selectedSchoolId : this.authSchoolId;
+            const blob = await firstValueFrom(this.api.downloadStudentDocument(doc.id, schoolId));
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = doc.originalFileName;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch {
+            this.messages.add({ severity: 'error', summary: 'Download failed', detail: 'Could not download the document.' });
+        }
+    }
+
+    async deleteDoc(id: number): Promise<void> {
+        try {
+            const schoolId = this.isPlatformAdmin ? this.selectedSchoolId : this.authSchoolId;
+            await firstValueFrom(this.api.deleteStudentDocument(id, schoolId));
+            this.studentDocs = this.studentDocs.filter(d => d.id !== id);
+            this.messages.add({ severity: 'success', summary: 'Deleted', detail: 'Document removed.' });
+        } catch {
+            this.messages.add({ severity: 'error', summary: 'Delete failed', detail: 'Could not delete the document.' });
+        }
     }
 }

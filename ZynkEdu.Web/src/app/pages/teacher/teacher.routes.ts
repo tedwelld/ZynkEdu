@@ -8,6 +8,7 @@ export const teacherRoutes: Routes = [
     { path: 'results', loadComponent: () => import('./results').then((m) => m.TeacherResults) },
     { path: 'subjects', loadComponent: () => import('./subjects').then((m) => m.TeacherSubjects) },
     { path: 'timetable', loadComponent: () => import('./timetable').then((m) => m.TeacherTimetable) },
+    { path: 'exam-timetable', loadComponent: () => import('./exam-timetable').then((m) => m.TeacherExamTimetable) },
     { path: 'profile', loadComponent: () => import('./profile').then((m) => m.TeacherProfile) },
     { path: 'notifications', loadComponent: () => import('./notifications').then((m) => m.TeacherNotifications) }
 ];

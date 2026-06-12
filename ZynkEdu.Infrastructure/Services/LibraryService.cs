@@ -12,11 +12,22 @@ public sealed class LibraryService : ILibraryService
 {
     private readonly ZynkEduDbContext _dbContext;
     private readonly ICurrentUserContext _currentUserContext;
+    private readonly IAuditLogService _auditLogService;
+    private readonly IAccountingService _accountingService;
+    private readonly INotificationService _notificationService;
 
-    public LibraryService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext)
+    public LibraryService(
+        ZynkEduDbContext dbContext,
+        ICurrentUserContext currentUserContext,
+        IAuditLogService auditLogService,
+        IAccountingService accountingService,
+        INotificationService notificationService)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
+        _auditLogService = auditLogService;
+        _accountingService = accountingService;
+        _notificationService = notificationService;
     }
 
     public async Task<LibraryDashboardResponse> GetDashboardAsync(int? schoolId = null, CancellationToken cancellationToken = default)
@@ -112,6 +123,8 @@ public sealed class LibraryService : ILibraryService
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        await _auditLogService.LogAsync(targetSchoolId, "Created", "LibraryBook", book.Id.ToString(),
+            $"Book \"{book.Title}\" by {book.Author} added to library.", cancellationToken);
         return ToBookResponse(book);
     }
 
@@ -137,6 +150,8 @@ public sealed class LibraryService : ILibraryService
         book.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(book.SchoolId, "Updated", "LibraryBook", book.Id.ToString(),
+            $"Book \"{book.Title}\" by {book.Author} updated.", cancellationToken);
         return ToBookResponse(book);
     }
 
@@ -169,8 +184,12 @@ public sealed class LibraryService : ILibraryService
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        var bookSchoolId = book.SchoolId;
+        var bookTitle = book.Title;
         _dbContext.LibraryBooks.Remove(book);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await _auditLogService.LogAsync(bookSchoolId, "Deleted", "LibraryBook", id.ToString(),
+            $"Book \"{bookTitle}\" removed from library.", cancellationToken);
     }
 
     public async Task<IReadOnlyList<LibraryBookCopyResponse>> GetCopiesAsync(int bookId, int? schoolId = null, CancellationToken cancellationToken = default)
@@ -380,6 +399,9 @@ public sealed class LibraryService : ILibraryService
         _dbContext.LibraryLoans.Add(loan);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        await _auditLogService.LogAsync(targetSchoolId, "Issued", "LibraryLoan", loan.Id.ToString(),
+            $"Book \"{loan.BookTitleSnapshot}\" issued to {loan.BorrowerDisplayNameSnapshot}, due {loan.DueAt:yyyy-MM-dd}.",
+            cancellationToken);
         return ToLoanResponse(loan);
     }
 
@@ -417,6 +439,50 @@ public sealed class LibraryService : ILibraryService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var daysOverdue = loan.ReturnedAt.HasValue && loan.DueAt < loan.ReturnedAt.Value
+            ? (int)Math.Ceiling((loan.ReturnedAt.Value - loan.DueAt).TotalDays)
+            : 0;
+        var overdueNote = daysOverdue > 0 ? $" ({daysOverdue} day(s) overdue)" : string.Empty;
+        await _auditLogService.LogAsync(loan.SchoolId, "Returned", "LibraryLoan", loan.Id.ToString(),
+            $"Book \"{loan.BookTitleSnapshot}\" returned by {loan.BorrowerDisplayNameSnapshot}{overdueNote}.",
+            cancellationToken);
+
+        // Auto-charge overdue fine for student borrowers
+        if (daysOverdue > 0 && loan.BorrowerType == LibraryBorrowerType.Student && loan.StudentId.HasValue)
+        {
+            var school = await _dbContext.Schools.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == loan.SchoolId, cancellationToken);
+            var ratePerDay = school?.LibraryOverdueFineRatePerDay;
+            if (ratePerDay is > 0)
+            {
+                var fineAmount = daysOverdue * ratePerDay.Value;
+                try
+                {
+                    await _accountingService.PostFineAsync(new Application.Contracts.CreateFineRequest(
+                        loan.StudentId.Value,
+                        fineAmount,
+                        Reference: $"LIBRARY-OVERDUE-{loan.Id}",
+                        Description: $"Library overdue fine — \"{loan.BookTitleSnapshot}\" ({daysOverdue} day(s) at {ratePerDay:F2}/day)",
+                        TransactionDate: loan.ReturnedAt),
+                        loan.SchoolId, cancellationToken);
+
+                    await _notificationService.SendAsync(new Application.Contracts.SendNotificationRequest(
+                        Title: "Library Overdue Fine",
+                        Message: $"A library overdue fine of {fineAmount:F2} has been added to your account for returning \"{loan.BookTitleSnapshot}\" {daysOverdue} day(s) late.",
+                        Type: Domain.Enums.NotificationType.System,
+                        StudentIds: [loan.StudentId.Value],
+                        Audience: Application.Contracts.NotificationAudience.Individual,
+                        SchoolId: loan.SchoolId),
+                        cancellationToken);
+                }
+                catch
+                {
+                    // Fine posting is best-effort; do not fail the return operation
+                }
+            }
+        }
+
         return ToLoanResponse(loan);
     }
 

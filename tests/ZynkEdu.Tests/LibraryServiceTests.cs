@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Moq;
+using ZynkEdu.Application.Abstractions;
 using ZynkEdu.Application.Contracts;
 using ZynkEdu.Domain.Entities;
 using ZynkEdu.Domain.Enums;
@@ -48,7 +50,7 @@ public sealed class LibraryServiceTests
 
             await context.SaveChangesAsync();
 
-            var service = new LibraryService(context, currentUser);
+            var service = new LibraryService(context, currentUser, new NoOpAuditLogService(), new Mock<IAccountingService>().Object, new Mock<INotificationService>().Object);
             var book = await service.CreateBookAsync(new CreateLibraryBookRequest(
                 Title: "Mathematics Grade 10",
                 Author: "T. Teacher",

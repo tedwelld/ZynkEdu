@@ -10,7 +10,8 @@ import { TagModule } from 'primeng/tag';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
-import { ReportSchoolInfo, buildStudentStatementPdf } from '../../shared/report/report-pdf';
+import { ReportSchoolInfo } from '../../shared/report/report-pdf';
+import { buildStudentStatementPdf } from '../../shared/report/student-statement-pdf';
 import { CreateAdjustmentRequest, CreateFineRequest, CreateRefundRequest, InvoiceResponse, LibraryBorrowerSummaryResponse, SchoolResponse, StatementLineResponse, StudentResponse, StudentStatementResponse, UpdateInvoiceRequest } from '../../core/api/api.models';
 
 interface InvoiceDraft {
@@ -157,7 +158,10 @@ interface TxActionDraft {
                                     <h3 class="text-2xl font-display font-bold m-0">{{ selectedStudent.fullName }}</h3>
                                 <p class="text-muted-color mt-1">{{ selectedStudent.studentNumber }} - {{ selectedStudent.class }} - {{ selectedStudent.level }}</p>
                                 </div>
-                                <button pButton type="button" icon="pi pi-times" class="p-button-rounded p-button-text" (click)="studentModalVisible = false"></button>
+                                <div class="flex items-center gap-2">
+                                    <button pButton type="button" icon="pi pi-file-pdf" label="Export statement" severity="secondary" size="small" (click)="exportPdf()" [disabled]="!statement"></button>
+                                    <button pButton type="button" icon="pi pi-times" class="p-button-rounded p-button-text" (click)="studentModalVisible = false"></button>
+                                </div>
                             </div>
 
                             <div class="grid gap-3 md:grid-cols-3 mt-4 text-sm">
@@ -345,6 +349,54 @@ interface TxActionDraft {
                                     <button pButton type="button" icon="pi pi-check" label="Approve" class="p-button-sm p-button-success" (click)="approveTransaction(tx)"></button>
                                 </div>
                             </div>
+                        </section>
+
+                        <section class="workspace-card p-5">
+                            <div class="flex items-center justify-between gap-3 mb-4">
+                                <div>
+                                    <h4 class="text-lg font-display font-bold mb-0">Statement timeline</h4>
+                                    <p class="text-sm text-muted-color mt-1">All transactions for this student account in chronological order.</p>
+                                </div>
+                                <span *ngIf="statement" class="text-xs text-muted-color">{{ statement.transactions.length }} transaction(s)</span>
+                            </div>
+
+                            <ng-container *ngIf="statement; else noStatement">
+                                <p-table [value]="statement.transactions" [rows]="10" [paginator]="true" styleClass="p-datatable-sm" [scrollable]="true">
+                                    <ng-template pTemplate="header">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Type</th>
+                                            <th>Status</th>
+                                            <th>Reference</th>
+                                            <th class="text-right">Debit</th>
+                                            <th class="text-right">Credit</th>
+                                            <th class="text-right">Balance</th>
+                                        </tr>
+                                    </ng-template>
+                                    <ng-template pTemplate="body" let-tx>
+                                        <tr>
+                                            <td class="text-sm">{{ tx.transactionDate | date:'dd MMM yyyy' }}</td>
+                                            <td><p-tag [value]="tx.type" severity="info" class="text-xs"></p-tag></td>
+                                            <td>
+                                                <p-tag [value]="tx.status"
+                                                    [severity]="tx.status === 'Approved' ? 'success' : tx.status === 'Pending' ? 'warn' : 'danger'"
+                                                    class="text-xs">
+                                                </p-tag>
+                                            </td>
+                                            <td class="text-sm text-muted-color">{{ tx.reference || '—' }}</td>
+                                            <td class="text-right font-mono text-sm">{{ tx.debit > 0 ? (tx.debit | number:'1.2-2') : '—' }}</td>
+                                            <td class="text-right font-mono text-sm text-green-600 dark:text-green-400">{{ tx.credit > 0 ? (tx.credit | number:'1.2-2') : '—' }}</td>
+                                            <td class="text-right font-mono text-sm font-semibold">{{ tx.runningBalance | number:'1.2-2' }}</td>
+                                        </tr>
+                                    </ng-template>
+                                    <ng-template pTemplate="emptymessage">
+                                        <tr><td colspan="7" class="text-center text-muted-color py-6">No transactions found.</td></tr>
+                                    </ng-template>
+                                </p-table>
+                            </ng-container>
+                            <ng-template #noStatement>
+                                <p class="text-muted-color text-sm">Select a student above to load their statement.</p>
+                            </ng-template>
                         </section>
 
                         <section class="workspace-card p-5">
@@ -680,11 +732,8 @@ export class AccountantStudents implements OnInit {
             return;
         }
 
-        buildStudentStatementPdf(
-            this.statement,
-            this.schoolInfo,
-            `student-statement-${this.statement.studentName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
-        );
+        const fileName = `student-statement-${this.statement.studentName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`;
+        buildStudentStatementPdf(this.statement, this.schoolInfo, new Date(), fileName).save(fileName);
     }
 
     private createInvoiceDraft(invoice?: InvoiceResponse | null): InvoiceDraft {

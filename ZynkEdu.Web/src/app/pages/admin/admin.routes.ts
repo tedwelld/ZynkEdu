@@ -10,6 +10,7 @@ export const adminRoutes: Routes = [
     { path: 'subjects', loadComponent: () => import('./subjects').then((m) => m.AdminSubjects) },
     { path: 'assignments', loadComponent: () => import('./assignments').then((m) => m.AdminAssignments) },
     { path: 'timetable', loadComponent: () => import('./timetable').then((m) => m.AdminTimetable) },
+    { path: 'exam-timetable', loadComponent: () => import('./exam-timetable').then((m) => m.AdminExamTimetable) },
     { path: 'grading', loadComponent: () => import('./grading').then((m) => m.AdminGrading) },
     { path: 'progression', loadComponent: () => import('./progression').then((m) => m.AdminProgression) },
     { path: 'results', loadComponent: () => import('./results').then((m) => m.AdminResults) },
@@ -17,5 +18,6 @@ export const adminRoutes: Routes = [
     { path: 'calendar', loadComponent: () => import('./calendar').then((m) => m.AdminCalendar) },
     { path: 'reports', loadComponent: () => import('./reports').then((m) => m.AdminReports) },
     { path: 'accounting', loadComponent: () => import('./accounting').then((m) => m.AdminAccounting) },
-    { path: 'logs', loadComponent: () => import('./logs').then((m) => m.AdminLogs) }
+    { path: 'logs', loadComponent: () => import('./logs').then((m) => m.AdminLogs) },
+    { path: 'discipline', loadComponent: () => import('./discipline').then((m) => m.AdminDiscipline) }
 ];

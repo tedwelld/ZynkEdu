@@ -33,4 +33,6 @@ public interface IAccountingService
     Task<StudentFinancialFlagResponse> GetStudentFinancialFlagAsync(int studentId, int? schoolId = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<StudentFinancialFlagResponse>> GetStudentsWithOverdueInvoicesAsync(int? schoolId = null, CancellationToken cancellationToken = default);
     Task SendInvoicePdfAsync(int invoiceId, byte[]? invoicePdf, string? invoicePdfFileName, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<PaymentReceiptResponse> GetPaymentReceiptAsync(int transactionId, int? schoolId = null, CancellationToken cancellationToken = default);
+    Task<BulkInvoiceResponse> BulkInvoiceAsync(BulkInvoiceRequest request, int? schoolId = null, CancellationToken cancellationToken = default);
 }

@@ -4,11 +4,30 @@ import {
     AcademicTermResponse,
     AccountingTransactionResponse,
     AssignClassSubjectsRequest,
+    AssessmentStructureResponse,
     AuditLogResponse,
+    BulkCreateExamTimetableRequest,
+    CreateSchoolExpenseRequest,
+    ExpenseCategoryResponse,
+    ExpenseSummaryResponse,
+    SaveExpenseCategoryRequest,
+    SchoolExpenseResponse,
+    StudentDocumentResponse,
+    UpdateSchoolExpenseRequest,
+    CreateDisciplineIncidentRequest,
+    CreateExamTimetableEntryRequest,
+    DisciplineIncidentResponse,
+    ExamTimetableEntryResponse,
+    PublishExamTimetableRequest,
+    UpdateDisciplineIncidentRequest,
+    UpdateExamTimetableEntryRequest,
     BulkStudentSubjectEnrollmentResponse,
     AttendanceClassOptionResponse,
     AttendanceDailySummaryResponse,
     AttendanceRegisterResponse,
+    BulkInvoiceRequest,
+    BulkInvoiceResponse,
+    SaveAssessmentStructureRequest,
     ClassPerformanceDto,
     CollectionReportResponse,
     CreateAccountantRequest,
@@ -38,6 +57,8 @@ import {
     FeeStructureResponse,
     AgingReportResponse,
     InvoiceResponse,
+    PaymentReceiptResponse,
+    ReportCardResponse,
     RevenueByClassReportResponse,
     StudentStatementResponse,
     LoginRequest,
@@ -45,6 +66,7 @@ import {
     NotificationResponse,
     ResultResponse,
     ResultSlipSendResponse,
+    BulkSlipSendResponse,
     TimetableResponse,
     SchoolResponse,
     SchoolCalendarEventResponse,
@@ -405,6 +427,16 @@ export class ApiService {
     getStudentInvoices(studentId: number, schoolId?: number | null): Observable<InvoiceResponse[]> {
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.get<InvoiceResponse[]>(`${API_BASE_URL}/accounting/students/${studentId}/invoices${query}`);
+    }
+
+    getPaymentReceipt(transactionId: number, schoolId?: number | null): Observable<PaymentReceiptResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<PaymentReceiptResponse>(`${API_BASE_URL}/accounting/payments/receipt/${transactionId}${query}`);
+    }
+
+    bulkInvoice(request: BulkInvoiceRequest, schoolId?: number | null): Observable<BulkInvoiceResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<BulkInvoiceResponse>(`${API_BASE_URL}/accounting/invoices/bulk${query}`, request);
     }
 
     getFinancialStatement(
@@ -796,12 +828,198 @@ export class ApiService {
         return this.http.post<NotificationResponse>(`${API_BASE_URL}/notifications/send`, request);
     }
 
+    getDisciplineIncidents(schoolId?: number | null, studentId?: number | null, isResolved?: boolean | null): Observable<DisciplineIncidentResponse[]> {
+        const params: Record<string, string> = {};
+        if (schoolId != null) params['schoolId'] = String(schoolId);
+        if (studentId != null) params['studentId'] = String(studentId);
+        if (isResolved != null) params['isResolved'] = String(isResolved);
+        const query = new URLSearchParams(params).toString();
+        return this.http.get<DisciplineIncidentResponse[]>(`${API_BASE_URL}/discipline${query ? '?' + query : ''}`);
+    }
+
+    createDisciplineIncident(request: CreateDisciplineIncidentRequest, schoolId?: number | null): Observable<DisciplineIncidentResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<DisciplineIncidentResponse>(`${API_BASE_URL}/discipline${query}`, request);
+    }
+
+    updateDisciplineIncident(id: number, request: UpdateDisciplineIncidentRequest, schoolId?: number | null): Observable<DisciplineIncidentResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.put<DisciplineIncidentResponse>(`${API_BASE_URL}/discipline/${id}${query}`, request);
+    }
+
+    deleteDisciplineIncident(id: number, schoolId?: number | null): Observable<void> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.delete<void>(`${API_BASE_URL}/discipline/${id}${query}`);
+    }
+
+    getStudentDocuments(studentId: number, schoolId?: number | null): Observable<StudentDocumentResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<StudentDocumentResponse[]>(`${API_BASE_URL}/student-documents/${studentId}${query}`);
+    }
+
+    uploadStudentDocument(studentId: number, documentType: string, file: File, notes?: string | null, schoolId?: number | null): Observable<StudentDocumentResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        const formData = new FormData();
+        formData.append('studentId', String(studentId));
+        formData.append('documentType', documentType);
+        if (notes) formData.append('notes', notes);
+        formData.append('file', file, file.name);
+        return this.http.post<StudentDocumentResponse>(`${API_BASE_URL}/student-documents/upload${query}`, formData);
+    }
+
+    downloadStudentDocument(id: number, schoolId?: number | null): Observable<Blob> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get(`${API_BASE_URL}/student-documents/download/${id}${query}`, { responseType: 'blob' });
+    }
+
+    deleteStudentDocument(id: number, schoolId?: number | null): Observable<void> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.delete<void>(`${API_BASE_URL}/student-documents/${id}${query}`);
+    }
+
+    getExpenseCategories(schoolId?: number | null): Observable<ExpenseCategoryResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<ExpenseCategoryResponse[]>(`${API_BASE_URL}/expenses/categories${query}`);
+    }
+
+    createExpenseCategory(request: SaveExpenseCategoryRequest, schoolId?: number | null): Observable<ExpenseCategoryResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<ExpenseCategoryResponse>(`${API_BASE_URL}/expenses/categories${query}`, request);
+    }
+
+    updateExpenseCategory(id: number, request: SaveExpenseCategoryRequest, schoolId?: number | null): Observable<ExpenseCategoryResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.put<ExpenseCategoryResponse>(`${API_BASE_URL}/expenses/categories/${id}${query}`, request);
+    }
+
+    deleteExpenseCategory(id: number, schoolId?: number | null): Observable<void> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.delete<void>(`${API_BASE_URL}/expenses/categories/${id}${query}`);
+    }
+
+    getExpenses(schoolId?: number | null, categoryId?: number | null, from?: string | null, to?: string | null): Observable<SchoolExpenseResponse[]> {
+        const params: Record<string, string> = {};
+        if (schoolId != null) params['schoolId'] = String(schoolId);
+        if (categoryId != null) params['categoryId'] = String(categoryId);
+        if (from) params['from'] = from;
+        if (to) params['to'] = to;
+        const query = new URLSearchParams(params).toString();
+        return this.http.get<SchoolExpenseResponse[]>(`${API_BASE_URL}/expenses${query ? '?' + query : ''}`);
+    }
+
+    createExpense(request: CreateSchoolExpenseRequest, schoolId?: number | null): Observable<SchoolExpenseResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<SchoolExpenseResponse>(`${API_BASE_URL}/expenses${query}`, request);
+    }
+
+    updateExpense(id: number, request: UpdateSchoolExpenseRequest, schoolId?: number | null): Observable<SchoolExpenseResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.put<SchoolExpenseResponse>(`${API_BASE_URL}/expenses/${id}${query}`, request);
+    }
+
+    deleteExpense(id: number, schoolId?: number | null): Observable<void> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.delete<void>(`${API_BASE_URL}/expenses/${id}${query}`);
+    }
+
+    getExpenseSummary(schoolId?: number | null): Observable<ExpenseSummaryResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<ExpenseSummaryResponse>(`${API_BASE_URL}/expenses/summary${query}`);
+    }
+
+    getExamTimetable(schoolId?: number | null, term?: string | null, className?: string | null): Observable<ExamTimetableEntryResponse[]> {
+        const params: Record<string, string> = {};
+        if (schoolId != null) params['schoolId'] = String(schoolId);
+        if (term) params['term'] = term;
+        if (className) params['class'] = className;
+        const query = new URLSearchParams(params).toString();
+        return this.http.get<ExamTimetableEntryResponse[]>(`${API_BASE_URL}/exam-timetables${query ? '?' + query : ''}`);
+    }
+
+    getMyExamTimetable(term?: string | null): Observable<ExamTimetableEntryResponse[]> {
+        const query = term ? `?term=${encodeURIComponent(term)}` : '';
+        return this.http.get<ExamTimetableEntryResponse[]>(`${API_BASE_URL}/exam-timetables/me${query}`);
+    }
+
+    createExamTimetableEntry(request: CreateExamTimetableEntryRequest, schoolId?: number | null): Observable<ExamTimetableEntryResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<ExamTimetableEntryResponse>(`${API_BASE_URL}/exam-timetables${query}`, request);
+    }
+
+    updateExamTimetableEntry(id: number, request: UpdateExamTimetableEntryRequest, schoolId?: number | null): Observable<ExamTimetableEntryResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.put<ExamTimetableEntryResponse>(`${API_BASE_URL}/exam-timetables/${id}${query}`, request);
+    }
+
+    deleteExamTimetableEntry(id: number, schoolId?: number | null): Observable<void> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.delete<void>(`${API_BASE_URL}/exam-timetables/${id}${query}`);
+    }
+
+    publishExamTimetable(request: PublishExamTimetableRequest, schoolId?: number | null): Observable<ExamTimetableEntryResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.post<ExamTimetableEntryResponse[]>(`${API_BASE_URL}/exam-timetables/publish${query}`, request);
+    }
+
+    getAssessmentStructures(schoolId?: number | null): Observable<AssessmentStructureResponse[]> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.get<AssessmentStructureResponse[]>(`${API_BASE_URL}/assessment-structures${query}`);
+    }
+
+    getAssessmentStructureForLevel(level: string, subjectId?: number | null, schoolId?: number | null): Observable<AssessmentStructureResponse> {
+        const params: Record<string, string> = { level };
+        if (subjectId != null) params['subjectId'] = String(subjectId);
+        if (schoolId != null) params['schoolId'] = String(schoolId);
+        const query = new URLSearchParams(params).toString();
+        return this.http.get<AssessmentStructureResponse>(`${API_BASE_URL}/assessment-structures/for-level?${query}`);
+    }
+
+    saveAssessmentStructure(request: SaveAssessmentStructureRequest, id?: number | null, schoolId?: number | null): Observable<AssessmentStructureResponse> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        if (id) {
+            return this.http.put<AssessmentStructureResponse>(`${API_BASE_URL}/assessment-structures/${id}${query}`, request);
+        }
+        return this.http.post<AssessmentStructureResponse>(`${API_BASE_URL}/assessment-structures${query}`, request);
+    }
+
+    deleteAssessmentStructure(id: number, schoolId?: number | null): Observable<void> {
+        const query = schoolId ? `?schoolId=${schoolId}` : '';
+        return this.http.delete<void>(`${API_BASE_URL}/assessment-structures/${id}${query}`);
+    }
+
+    getReportCard(studentId: number, term: string, schoolId?: number | null): Observable<ReportCardResponse> {
+        const params: Record<string, string> = { studentId: String(studentId), term };
+        if (schoolId != null) params['schoolId'] = String(schoolId);
+        const query = new URLSearchParams(params).toString();
+        return this.http.get<ReportCardResponse>(`${API_BASE_URL}/results/report-card?${query}`);
+    }
+
+    sendTermSlips(
+        className: string,
+        term: string,
+        options: { includeStatement?: boolean; sendEmail?: boolean; sendSms?: boolean; schoolId?: number | null } = {}
+    ): Observable<BulkSlipSendResponse> {
+        const params: Record<string, string> = {
+            className,
+            term,
+            includeStatement: String(options.includeStatement ?? false),
+            sendEmail: String(options.sendEmail ?? true),
+            sendSms: String(options.sendSms ?? true)
+        };
+        if (options.schoolId != null) {
+            params['schoolId'] = String(options.schoolId);
+        }
+        const query = new URLSearchParams(params).toString();
+        return this.http.post<BulkSlipSendResponse>(`${API_BASE_URL}/results/send-term-slips?${query}`, null);
+    }
+
     sendResultSlip(
         studentId: number,
         request: SendResultSlipRequest,
         slipPdf: Blob,
         schoolId?: number | null,
-        newsletterPdf?: Blob | null
+        newsletterPdf?: Blob | null,
+        statementPdf?: Blob | null
     ): Observable<ResultSlipSendResponse> {
         const formData = new FormData();
         formData.append('sendEmail', String(request.sendEmail));
@@ -809,6 +1027,9 @@ export class ApiService {
         formData.append('slipPdf', slipPdf, `result-slip-${studentId}.pdf`);
         if (newsletterPdf) {
             formData.append('newsletterPdf', newsletterPdf, 'accounts-newsletter.pdf');
+        }
+        if (statementPdf) {
+            formData.append('statementPdf', statementPdf, `financial-statement-${studentId}.pdf`);
         }
         const query = schoolId ? `?schoolId=${schoolId}` : '';
         return this.http.post<ResultSlipSendResponse>(`${API_BASE_URL}/results/${studentId}/send-slip${query}`, formData);

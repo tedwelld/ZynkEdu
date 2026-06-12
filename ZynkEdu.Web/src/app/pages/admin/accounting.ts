@@ -11,6 +11,9 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
     imports: [CommonModule, FormsModule, AppDropdownComponent],
     template: `
         <section class="grid gap-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
             <header class="workspace-card p-6 md:p-8">
                 <p class="text-xs uppercase tracking-[0.28em] text-muted-color font-semibold">School setup</p>
                 <h1 class="text-3xl md:text-4xl font-display font-bold mt-3">Accounting administration</h1>
@@ -161,6 +164,9 @@ export class AdminAccounting implements OnInit {
         { label: 'Super Accountant',  value: 'AccountantSuper'  }
     ];
 
+    loading = false;
+    errorMessage: string | null = null;
+
     schools: SchoolResponse[] = [];
     accountants: UserResponse[] = [];
     feeStructures: FeeStructureResponse[] = [];
@@ -225,8 +231,16 @@ export class AdminAccounting implements OnInit {
 
     refresh(): void {
         const schoolId = this.isPlatformAdmin ? this.selectedSchoolId : this.auth.schoolId();
-        this.api.getAccountants(schoolId ?? undefined).subscribe((accountants) => (this.accountants = accountants));
-        this.api.getFeeStructures(schoolId ?? undefined).subscribe((fees) => (this.feeStructures = fees));
+        this.loading = true;
+        this.errorMessage = null;
+        this.api.getAccountants(schoolId ?? undefined).subscribe({
+            next: (accountants) => { this.accountants = accountants; this.loading = false; },
+            error: () => { this.errorMessage = 'Failed to load accountants.'; this.loading = false; }
+        });
+        this.api.getFeeStructures(schoolId ?? undefined).subscribe({
+            next: (fees) => (this.feeStructures = fees),
+            error: () => { if (!this.errorMessage) this.errorMessage = 'Failed to load fee structures.'; }
+        });
         this.api.getClasses(schoolId ?? undefined).subscribe((classes) => {
             const levels = Array.from(new Set(classes.map((schoolClass: SchoolClassResponse) => schoolClass.gradeLevel).filter((gradeLevel) => !!gradeLevel && gradeLevel.trim().length > 0)));
             this.gradeLevelOptions = levels.length > 0 ? levels.sort((left, right) => left.localeCompare(right)) : ['ZGC Level', "O'Level", "A'Level"];

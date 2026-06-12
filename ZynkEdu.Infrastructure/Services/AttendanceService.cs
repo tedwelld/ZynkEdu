@@ -11,11 +11,13 @@ public sealed class AttendanceService : IAttendanceService
 {
     private readonly ZynkEduDbContext _dbContext;
     private readonly ICurrentUserContext _currentUserContext;
+    private readonly IAuditLogService _auditLogService;
 
-    public AttendanceService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext)
+    public AttendanceService(ZynkEduDbContext dbContext, ICurrentUserContext currentUserContext, IAuditLogService auditLogService)
     {
         _dbContext = dbContext;
         _currentUserContext = currentUserContext;
+        _auditLogService = auditLogService;
     }
 
     public async Task<IReadOnlyList<AttendanceClassOptionResponse>> GetClassOptionsAsync(int? schoolId = null, CancellationToken cancellationToken = default)
@@ -325,7 +327,12 @@ public sealed class AttendanceService : IAttendanceService
 
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            return await LoadRegisterAsync(register.Id, cancellationToken);
+            var response = await LoadRegisterAsync(register.Id, cancellationToken);
+            await _auditLogService.LogAsync(resolvedSchoolId, "Saved", "AttendanceRegister",
+                register.Id.ToString(),
+                $"Attendance register saved for class {className} on {attendanceDate:yyyy-MM-dd} ({response.PresentCount} present, {response.AbsentCount} absent).",
+                cancellationToken);
+            return response;
         });
     }
 

@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Renderer2, ViewChild } from '@angular/core';
 import { NavigationEnd, Router, RouterModule } from '@angular/router';
 import { filter, Subscription } from 'rxjs';
+import { ToastModule } from 'primeng/toast';
 import { AppTopbar } from './app.topbar';
 import { AppSidebar } from './app.sidebar';
 import { AppFooter } from './app.footer';
@@ -10,8 +11,9 @@ import { LayoutService } from '../service/layout.service';
 @Component({
     selector: 'app-layout',
     standalone: true,
-    imports: [CommonModule, AppTopbar, AppSidebar, RouterModule, AppFooter],
+    imports: [CommonModule, AppTopbar, AppSidebar, RouterModule, AppFooter, ToastModule],
     template: `
+        <p-toast position="top-right" [breakpoints]="{ '920px': { width: '100%', right: '0', left: '0' } }"></p-toast>
         <div class="layout-wrapper" [ngClass]="containerClass">
             <app-topbar></app-topbar>
             <app-sidebar></app-sidebar>

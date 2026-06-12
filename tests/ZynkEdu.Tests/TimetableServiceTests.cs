@@ -130,7 +130,7 @@ public sealed class TimetableServiceTests
         );
         await context.SaveChangesAsync();
 
-        var service = new TimetableService(context, currentUser);
+        var service = new TimetableService(context, currentUser, new NoOpAuditLogService());
         var generated = await service.GenerateAsync(new GenerateTimetableRequest("Term 1"), 78);
 
         Assert.NotEmpty(generated);
@@ -216,7 +216,7 @@ public sealed class TimetableServiceTests
         );
         await context.SaveChangesAsync();
 
-        var service = new TimetableService(context, currentUser);
+        var service = new TimetableService(context, currentUser, new NoOpAuditLogService());
         var generated = await service.GenerateAsync(new GenerateTimetableRequest("Term 1"), 81);
 
         Assert.Equal(4, generated.Count);
@@ -315,7 +315,7 @@ public sealed class TimetableServiceTests
         );
         await context.SaveChangesAsync();
 
-        var service = new TimetableService(context, currentUser);
+        var service = new TimetableService(context, currentUser, new NoOpAuditLogService());
         var generated = await service.GenerateAsync(new GenerateTimetableRequest("Term 1"), 82);
 
         Assert.Equal(3, generated.Count);
@@ -342,7 +342,7 @@ public sealed class TimetableServiceTests
         var (connection, context) = await TestDatabase.CreateContextAsync(databasePath, currentUser);
         await using var _ = connection;
 
-        var service = new TimetableService(context, currentUser);
+        var service = new TimetableService(context, currentUser, new NoOpAuditLogService());
 
         await service.PublishAsync(new PublishTimetableRequest("Term 1"), 79);
 
@@ -481,7 +481,7 @@ public sealed class TimetableServiceTests
         );
         await context.SaveChangesAsync();
 
-        var service = new TimetableService(context, currentUser);
+        var service = new TimetableService(context, currentUser, new NoOpAuditLogService());
         var generated = await service.GenerateAsync(new GenerateTimetableRequest("Term 1"), 77);
 
         Assert.NotEmpty(generated);

@@ -7,5 +7,6 @@ export const accountantRoutes: Routes = [
     { path: 'payments', loadComponent: () => import('./payments').then((m) => m.AccountantPayments) },
     { path: 'invoices', loadComponent: () => import('./invoices').then((m) => m.AccountantInvoices) },
     { path: 'reports', loadComponent: () => import('./reports').then((m) => m.AccountantReports) },
-    { path: 'analytics', loadComponent: () => import('./analytics').then((m) => m.AccountantAnalytics) }
+    { path: 'analytics', loadComponent: () => import('./analytics').then((m) => m.AccountantAnalytics) },
+    { path: 'expenses', loadComponent: () => import('./expenses').then((m) => m.AccountantExpenses) }
 ];

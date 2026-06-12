@@ -91,6 +91,19 @@ public sealed class AccountingController : ControllerBase
         return Ok(await _accountingService.PostPaymentAsync(request, schoolId, cancellationToken));
     }
 
+    [HttpGet("payments/receipt/{transactionId:int}")]
+    public async Task<ActionResult<PaymentReceiptResponse>> GetPaymentReceipt(int transactionId, [FromQuery] int? schoolId, CancellationToken cancellationToken)
+    {
+        return Ok(await _accountingService.GetPaymentReceiptAsync(transactionId, schoolId, cancellationToken));
+    }
+
+    [HttpPost("invoices/bulk")]
+    [Authorize(Roles = RoleNames.AdminOrPlatformAdmin)]
+    public async Task<ActionResult<BulkInvoiceResponse>> BulkInvoice([FromQuery] int? schoolId, [FromBody] BulkInvoiceRequest request, CancellationToken cancellationToken)
+    {
+        return Ok(await _accountingService.BulkInvoiceAsync(request, schoolId, cancellationToken));
+    }
+
     [HttpPost("invoices")]
     public async Task<ActionResult<AccountingTransactionResponse>> PostInvoice([FromQuery] int? schoolId, [FromBody] CreateInvoiceRequest request, CancellationToken cancellationToken)
     {

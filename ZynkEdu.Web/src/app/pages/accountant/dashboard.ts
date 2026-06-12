@@ -71,6 +71,16 @@ type AgingChartSlice = {
     `],
     template: `
         <section class="grid gap-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
+
+            <div *ngIf="loading" class="workspace-card p-8 flex items-center justify-center gap-3 text-muted-color">
+                <i class="pi pi-spin pi-spinner text-2xl"></i>
+                <span>Loading dashboard…</span>
+            </div>
+
+            <ng-container *ngIf="!loading">
             <header class="workspace-card p-6 md:p-8">
                 <p class="text-xs uppercase tracking-[0.28em] text-muted-color font-semibold">Accounting workspace</p>
                 <h1 class="text-3xl md:text-4xl font-display font-bold mt-3">Finance dashboard</h1>
@@ -177,6 +187,7 @@ type AgingChartSlice = {
                     </table>
                 </div>
             </section>
+            </ng-container>
         </section>
     `
 })
@@ -184,6 +195,9 @@ export class AccountantDashboard implements OnInit {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
     private readonly agingPalette = ['#0f766e', '#0284c7', '#f59e0b', '#dc2626', '#7c3aed', '#475569'];
+
+    loading = true;
+    errorMessage: string | null = null;
 
     collection: CollectionReportResponse | null = null;
     aging: AgingReportResponse | null = null;
@@ -244,6 +258,8 @@ export class AccountantDashboard implements OnInit {
 
     ngOnInit(): void {
         const schoolId = this.auth.schoolId();
+        this.loading = true;
+        this.errorMessage = null;
         forkJoin({
             collection: this.api.getCollectionReport(schoolId).pipe(catchError(() => of(null as CollectionReportResponse | null))),
             aging: this.api.getAgingReport(schoolId).pipe(catchError(() => of(null as AgingReportResponse | null))),
@@ -257,6 +273,12 @@ export class AccountantDashboard implements OnInit {
                 this.revenue = revenue;
                 this.defaulters = defaulters;
                 this.overdueLibraryBorrowers = libraryBorrowers ?? [];
+                this.loading = false;
+            },
+            error: (err) => {
+                this.errorMessage = 'Failed to load dashboard data. Please refresh the page.';
+                this.loading = false;
+                console.error('Dashboard load error', err);
             }
         });
     }

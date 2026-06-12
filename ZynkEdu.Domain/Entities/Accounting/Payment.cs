@@ -14,4 +14,6 @@ public sealed class Payment : EntityBase, ISchoolScoped
     public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
     public int CapturedByUserId { get; set; }
     public int? AccountingTransactionId { get; set; }
+
+    public ICollection<PaymentAllocation> Allocations { get; set; } = [];
 }

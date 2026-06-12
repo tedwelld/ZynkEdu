@@ -4,16 +4,21 @@ import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
+import { MessageService } from 'primeng/api';
 import { ApiService } from '../../core/api/api.service';
-import { SchoolResponse, StudentResponse } from '../../core/api/api.models';
+import { AccountingTransactionResponse, SchoolResponse, StudentResponse } from '../../core/api/api.models';
 import { AuthService } from '../../core/auth/auth.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
+import { buildPaymentReceiptPdf } from '../../shared/report/report-pdf';
 
 @Component({
     standalone: true,
     imports: [CommonModule, FormsModule, ButtonModule, AppDropdownComponent, TableModule, TagModule],
     template: `
         <section class="grid gap-6">
+            <div *ngIf="errorMessage" class="workspace-card border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-2xl">
+                <i class="pi pi-exclamation-triangle mr-2"></i>{{ errorMessage }}
+            </div>
             <header class="workspace-card p-6 md:p-8">
                 <p class="text-xs uppercase tracking-[0.28em] text-muted-color font-semibold">Cash capture</p>
                 <h1 class="text-3xl md:text-4xl font-display font-bold mt-3">Payments</h1>
@@ -77,10 +82,20 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
                         </app-dropdown>
                     </label>
 
-                    <button pButton class="rounded-xl bg-primary text-white px-4 py-3 font-semibold" type="submit" label="Record payment"></button>
+                    <button pButton class="rounded-xl bg-primary text-white px-4 py-3 font-semibold" type="submit" [disabled]="submitting" [label]="submitting ? 'Recording…' : 'Record payment'" [icon]="submitting ? 'pi pi-spin pi-spinner' : ''"></button>
                     <input class="md:col-span-2 rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" placeholder="Reference" [(ngModel)]="draft.reference" name="reference" />
                     <input class="md:col-span-2 rounded-xl border border-surface-300 bg-surface-0 px-3 py-2" placeholder="Description" [(ngModel)]="draft.description" name="description" />
                 </form>
+
+                <div *ngIf="lastTransaction" class="mt-4 rounded-2xl border border-green-400/50 bg-green-50 dark:bg-green-950/30 p-4 flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                        <p class="font-semibold text-green-700 dark:text-green-400"><i class="pi pi-check-circle mr-1"></i>Payment recorded</p>
+                        <p class="text-sm text-muted-color mt-0.5">Transaction #{{ lastTransaction.id }} · {{ lastTransaction.amount | currency }}</p>
+                    </div>
+                    <button pButton type="button" label="Print receipt" icon="pi pi-print" severity="success" size="small"
+                        (click)="printReceipt()" [disabled]="printingReceipt">
+                    </button>
+                </div>
             </section>
 
             <section *ngIf="selectedStudent" class="workspace-card p-5">
@@ -133,7 +148,12 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
                     />
                 </div>
 
-                <div class="overflow-x-auto">
+                <div *ngIf="loading" class="flex items-center justify-center gap-3 py-8 text-muted-color">
+                    <i class="pi pi-spin pi-spinner text-2xl"></i>
+                    <span>Loading students…</span>
+                </div>
+
+                <div *ngIf="!loading" class="overflow-x-auto">
                     <p-table [value]="filteredStudents" [rows]="10" [paginator]="true" styleClass="p-datatable-sm">
                         <ng-template pTemplate="header">
                             <tr>
@@ -192,12 +212,19 @@ import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 export class AccountantPayments implements OnInit {
     private readonly api = inject(ApiService);
     private readonly auth = inject(AuthService);
+    private readonly messages = inject(MessageService);
 
     readonly methodOptions = [
         { label: 'Cash',         value: 'Cash' },
         { label: 'Bank',         value: 'Bank' },
         { label: 'Mobile Money', value: 'MobileMoney' }
     ];
+
+    loading = false;
+    submitting = false;
+    printingReceipt = false;
+    errorMessage: string | null = null;
+    lastTransaction: AccountingTransactionResponse | null = null;
 
     schools: SchoolResponse[] = [];
     students: StudentResponse[] = [];
@@ -273,11 +300,21 @@ export class AccountantPayments implements OnInit {
             return;
         }
 
-        this.api.getStudents(undefined, schoolId ?? undefined).subscribe((students) => {
-            this.students = students;
-            const firstCurrent = this.currentStudents[0];
-            this.draft.studentId = firstCurrent?.id ?? null;
-            this.selectedStudent = firstCurrent ?? null;
+        this.loading = true;
+        this.errorMessage = null;
+        this.api.getStudents(undefined, schoolId ?? undefined).subscribe({
+            next: (students) => {
+                this.students = students;
+                const firstCurrent = this.currentStudents[0];
+                this.draft.studentId = firstCurrent?.id ?? null;
+                this.selectedStudent = firstCurrent ?? null;
+                this.loading = false;
+            },
+            error: (err) => {
+                this.errorMessage = 'Failed to load students. Please try again.';
+                this.loading = false;
+                console.error('Payments: load students error', err);
+            }
         });
     }
 
@@ -308,6 +345,9 @@ export class AccountantPayments implements OnInit {
             return;
         }
 
+        this.submitting = true;
+        this.errorMessage = null;
+        this.lastTransaction = null;
         this.api.postPayment(
             {
                 studentId: this.draft.studentId,
@@ -318,10 +358,37 @@ export class AccountantPayments implements OnInit {
                 receivedAt: new Date().toISOString()
             },
             schoolId
-        ).subscribe(() => {
-            this.draft.amount = 0;
-            this.draft.reference = '';
-            this.draft.description = '';
+        ).subscribe({
+            next: (transaction) => {
+                this.lastTransaction = transaction;
+                this.draft.amount = 0;
+                this.draft.reference = '';
+                this.draft.description = '';
+                this.submitting = false;
+            },
+            error: (err) => {
+                this.errorMessage = 'Failed to record payment. Please try again.';
+                this.submitting = false;
+                console.error('Payments: submit error', err);
+            }
+        });
+    }
+
+    printReceipt(): void {
+        if (!this.lastTransaction) return;
+        this.printingReceipt = true;
+        const schoolId = this.resolveSchoolId();
+        this.api.getPaymentReceipt(this.lastTransaction.id, schoolId).subscribe({
+            next: (receipt) => {
+                const schoolInfo = { name: receipt.schoolName };
+                const doc = buildPaymentReceiptPdf(receipt, schoolInfo);
+                doc.save(`receipt-${receipt.paymentId}.pdf`);
+                this.printingReceipt = false;
+            },
+            error: () => {
+                this.messages.add({ severity: 'error', summary: 'Receipt failed', detail: 'Could not generate the payment receipt.' });
+                this.printingReceipt = false;
+            }
         });
     }
 

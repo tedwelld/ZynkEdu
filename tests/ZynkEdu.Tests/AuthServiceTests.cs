@@ -35,7 +35,8 @@ public sealed class AuthServiceTests
         var authService = new AuthService(
             context,
             hasher,
-            new JwtTokenService(TestDatabase.JwtOptions()));
+            new JwtTokenService(TestDatabase.JwtOptions()),
+            new NoOpAuditLogService());
 
         var response = await authService.LoginAsync(new LoginRequest("platform.admin", "Password123!", null));
 
