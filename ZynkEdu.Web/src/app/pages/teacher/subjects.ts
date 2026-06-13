@@ -13,6 +13,7 @@ import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
+import { keepSelection, stringFilterOptions } from '../../shared/ui/list-filters';
 
 interface TeacherSubjectRow {
     className: string;
@@ -46,10 +47,10 @@ interface QuickActionItem {
                     <p class="text-muted-color mt-2 max-w-2xl">This page shows the subjects you teach together with the approved timetable slots for the selected term.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <button pButton type="button" label="Dashboard" icon="pi pi-home" severity="secondary" routerLink="/teacher/dashboard"></button>
-                    <button pButton type="button" label="My timetable" icon="pi pi-calendar" severity="secondary" routerLink="/teacher/timetable"></button>
-                    <button pButton type="button" label="My classes" icon="pi pi-users" severity="secondary" routerLink="/teacher/classes"></button>
-                    <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="help" routerLink="/teacher/profile"></button>
+                    <button pButton type="button" label="Dashboard" icon="pi pi-home" severity="info" routerLink="/teacher/dashboard"></button>
+                    <button pButton type="button" label="My timetable" icon="pi pi-calendar" severity="info" routerLink="/teacher/timetable"></button>
+                    <button pButton type="button" label="My classes" icon="pi pi-users" severity="info" routerLink="/teacher/classes"></button>
+                    <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="info" routerLink="/teacher/profile"></button>
                 </div>
             </div>
 
@@ -66,7 +67,7 @@ interface QuickActionItem {
                         <h2 class="text-xl font-display font-bold mb-1">Quick actions</h2>
                         <p class="text-sm text-muted-color">Jump between your teacher workspaces.</p>
                     </div>
-                    <button pButton type="button" severity="secondary" class="p-button-text" routerLink="/teacher/notifications">
+                    <button pButton type="button" severity="info" class="p-button-text" routerLink="/teacher/notifications">
                         <span class="inline-flex items-center gap-2">
                             <i class="pi pi-bell"></i>
                             <span>Notifications</span>
@@ -96,9 +97,9 @@ interface QuickActionItem {
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         <app-dropdown [options]="termOptions" [(ngModel)]="selectedTermId" optionLabel="label" optionValue="value" class="w-44" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search terms" (ngModelChange)="onTermChange($event)"></app-dropdown>
-                        <app-dropdown [options]="classFilterOptions" [(ngModel)]="selectedClassFilter" optionLabel="label" optionValue="value" class="w-40" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes" (ngModelChange)="onFilterChange()"></app-dropdown>
-                        <app-dropdown [options]="levelFilterOptions" [(ngModel)]="selectedLevelFilter" optionLabel="label" optionValue="value" class="w-40" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search levels" (ngModelChange)="onFilterChange()"></app-dropdown>
-                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="help" [disabled]="displayedSubjectRows.length === 0" (click)="exportSubjectsPdf()"></button>
+                        <app-dropdown [options]="classFilterOptions" [(ngModel)]="selectedClassFilter" optionLabel="label" optionValue="value" class="w-40" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes" (ngModelChange)="syncSubjectFilters()"></app-dropdown>
+                        <app-dropdown [options]="levelFilterOptions" [(ngModel)]="selectedLevelFilter" optionLabel="label" optionValue="value" class="w-40" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search levels" (ngModelChange)="syncSubjectFilters()"></app-dropdown>
+                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" [disabled]="displayedSubjectRows.length === 0" (click)="exportSubjectsPdf()"></button>
                     </div>
                 </div>
 
@@ -176,13 +177,17 @@ export class TeacherSubjects implements OnInit {
     }
 
     get classFilterOptions(): { label: string; value: string }[] {
-        const classes = Array.from(new Set(this.assignments.map((assignment) => assignment.class))).sort();
-        return [{ label: 'All classes', value: 'All' }, ...classes.map((value) => ({ label: value, value }))];
+        const rows = this.selectedLevelFilter === 'All'
+            ? this.subjectRows
+            : this.subjectRows.filter((row) => row.gradeLevel === this.selectedLevelFilter);
+        return stringFilterOptions(rows.map((row) => row.className), 'All classes', 'All');
     }
 
     get levelFilterOptions(): { label: string; value: string }[] {
-        const levels = Array.from(new Set(this.assignments.map((assignment) => assignment.gradeLevel))).sort();
-        return [{ label: 'All levels', value: 'All' }, ...levels.map((value) => ({ label: value, value }))];
+        const rows = this.selectedClassFilter === 'All'
+            ? this.subjectRows
+            : this.subjectRows.filter((row) => row.className === this.selectedClassFilter);
+        return stringFilterOptions(rows.map((row) => row.gradeLevel), 'All levels', 'All');
     }
 
     get subjectRows(): TeacherSubjectRow[] {
@@ -253,6 +258,7 @@ export class TeacherSubjects implements OnInit {
                 this.api.getTeacherTimetable(selectedTerm).subscribe({
                     next: (timetable) => {
                         this.timetable = timetable;
+                        this.syncSubjectFilters();
                         this.loading = false;
                     },
                     error: () => {
@@ -269,13 +275,18 @@ export class TeacherSubjects implements OnInit {
         });
     }
 
+    syncSubjectFilters(): void {
+        this.selectedClassFilter = keepSelection(this.selectedClassFilter, this.classFilterOptions, 'All');
+        this.selectedLevelFilter = keepSelection(this.selectedLevelFilter, this.levelFilterOptions, 'All');
+    }
+
     onTermChange(termId: number | null): void {
         this.selectedTermId = termId;
         this.loadData();
     }
 
     onFilterChange(): void {
-        // Filters are computed from the current in-memory rows.
+        this.syncSubjectFilters();
     }
 
     exportSubjectsPdf(): void {

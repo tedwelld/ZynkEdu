@@ -46,7 +46,7 @@ interface GradingSchemeDraft {
                     <p class="text-muted-color mt-2 max-w-2xl">School admins can define the mark bands for each level. New results use these ranges immediately, while historic grades stay unchanged.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                     <button pButton type="button" label="Save grading" icon="pi pi-save" severity="info" (click)="saveScheme()" [disabled]="loading || saving || !canSave"></button>
                 </div>
             </div>
@@ -162,7 +162,7 @@ interface GradingSchemeDraft {
                         <h2 class="text-xl font-display font-bold mb-1">Assessment weights</h2>
                         <p class="text-sm text-muted-color">Configure component weights (test, CA, exam) per level. Teachers see these when entering results. Defaults are 30 / 20 / 50.</p>
                     </div>
-                    <button pButton type="button" label="Add weight rule" icon="pi pi-plus" severity="secondary" size="small" (click)="startAddStructure()"></button>
+                    <button pButton type="button" label="Add weight rule" icon="pi pi-plus" severity="success" size="small" (click)="startAddStructure()"></button>
                 </div>
 
                 <p-table *ngIf="assessmentStructures.length > 0; else noWeights" [value]="assessmentStructures" styleClass="p-datatable-sm">
@@ -185,7 +185,7 @@ interface GradingSchemeDraft {
                             <td class="text-right font-mono">{{ s.examWeight }}</td>
                             <td>
                                 <div class="flex gap-2">
-                                    <button pButton type="button" icon="pi pi-pencil" severity="secondary" size="small" class="p-button-text" (click)="editStructure(s)"></button>
+                                    <button pButton type="button" icon="pi pi-pencil" severity="warn" size="small" class="p-button-text" (click)="editStructure(s)"></button>
                                     <button pButton type="button" icon="pi pi-trash" severity="danger" size="small" class="p-button-text" (click)="deleteStructure(s.id)"></button>
                                 </div>
                             </td>
@@ -215,7 +215,7 @@ interface GradingSchemeDraft {
                     </label>
                     <div class="md:col-span-3 flex gap-2">
                         <button pButton type="button" label="Save" icon="pi pi-check" (click)="saveStructure()" [disabled]="savingStructure"></button>
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="cancelStructureEdit()"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="cancelStructureEdit()"></button>
                     </div>
                 </div>
             </article>

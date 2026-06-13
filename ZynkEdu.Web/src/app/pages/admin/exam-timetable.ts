@@ -22,6 +22,8 @@ import { AuthService } from '../../core/auth/auth.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
 import { extractApiErrorMessage } from '../../core/api/api-error';
+import { keepSelection, stringFilterOptions, uniqueSorted } from '../../shared/ui/list-filters';
+import { MODAL_DIALOG_STYLE } from '../../shared/ui/modal.constants';
 
 interface EntryDraft {
     class: string;
@@ -46,7 +48,7 @@ interface EntryDraft {
                     <p class="text-muted-color mt-2 max-w-2xl">Schedule exams per class and subject. Publish when ready to share with teachers.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                     <button pButton type="button" label="Add entry" icon="pi pi-plus" severity="info" (click)="openAddDialog()"></button>
                     <button pButton type="button" label="Publish term" icon="pi pi-send" severity="success" (click)="publishTerm()" [disabled]="!termFilter || publishing"></button>
                 </div>
@@ -71,7 +73,7 @@ interface EntryDraft {
                     [filter]="true"
                     filterBy="label"
                     [showClear]="false"
-                    (ngModelChange)="loadData()"
+                    (ngModelChange)="onSchoolFilterChange()"
                 ></app-dropdown>
                 <app-dropdown
                     [options]="termOptions"
@@ -82,7 +84,7 @@ interface EntryDraft {
                     class="w-48"
                     appendTo="body"
                     [showClear]="true"
-                    (ngModelChange)="loadData()"
+                    (ngModelChange)="onTermFilterChange()"
                 ></app-dropdown>
                 <app-dropdown
                     [options]="classFilterOptions"
@@ -93,7 +95,7 @@ interface EntryDraft {
                     class="w-48"
                     appendTo="body"
                     [showClear]="true"
-                    (ngModelChange)="loadData()"
+                    (ngModelChange)="onClassFilterChange()"
                 ></app-dropdown>
             </article>
 
@@ -126,7 +128,7 @@ interface EntryDraft {
                             <td><p-tag [value]="e.isPublished ? 'Published' : 'Draft'" [severity]="e.isPublished ? 'success' : 'secondary'"></p-tag></td>
                             <td>
                                 <div class="flex gap-2">
-                                    <button pButton type="button" icon="pi pi-pencil" severity="secondary" size="small" class="p-button-text" (click)="openEditDialog(e)"></button>
+                                    <button pButton type="button" icon="pi pi-pencil" severity="warn" size="small" class="p-button-text" (click)="openEditDialog(e)"></button>
                                     <button pButton type="button" icon="pi pi-trash" severity="danger" size="small" class="p-button-text" (click)="deleteEntry(e.id)"></button>
                                 </div>
                             </td>
@@ -140,7 +142,7 @@ interface EntryDraft {
         </section>
 
         <!-- Add / Edit dialog -->
-        <p-dialog [(visible)]="dialogVisible" [modal]="true" [style]="{width: '640px'}" [header]="editingId ? 'Edit exam entry' : 'Add exam entry'" [closable]="!saving">
+        <p-dialog [(visible)]="dialogVisible" [modal]="true" [style]="modalDialogStyle" [header]="editingId ? 'Edit exam entry' : 'Add exam entry'" [closable]="!saving">
             <div class="grid gap-4 p-2">
                 <div class="grid gap-4 md:grid-cols-2">
                     <label class="block">
@@ -202,7 +204,7 @@ interface EntryDraft {
                 </div>
             </div>
             <ng-template pTemplate="footer">
-                <button pButton type="button" label="Cancel" severity="secondary" (click)="dialogVisible = false" [disabled]="saving"></button>
+                <button pButton type="button" label="Cancel" severity="warn" (click)="dialogVisible = false" [disabled]="saving"></button>
                 <button pButton type="button" [label]="editingId ? 'Save changes' : 'Add entry'" icon="pi pi-check" (click)="saveEntry()" [disabled]="saving || !canSaveEntry"></button>
             </ng-template>
         </p-dialog>
@@ -224,6 +226,7 @@ export class AdminExamTimetable implements OnInit {
     subjects: SubjectResponse[] = [];
     terms: AcademicTermResponse[] = [];
     selectedSchoolId: number | null = null;
+    readonly modalDialogStyle = MODAL_DIALOG_STYLE;
     termFilter = '';
     classFilter = '';
     skeletonRows = Array.from({ length: 5 });
@@ -250,7 +253,11 @@ export class AdminExamTimetable implements OnInit {
     }
 
     get classFilterOptions(): { label: string; value: string }[] {
-        return [...new Set(this.entries.map(e => e.class))].map(v => ({ label: v, value: v }));
+        const scopedClasses = this.termFilter
+            ? uniqueSorted(this.entries.filter((entry) => entry.term === this.termFilter).map((entry) => entry.class))
+            : [];
+        const registryClasses = this.classes.map((schoolClass) => schoolClass.className);
+        return uniqueSorted([...registryClasses, ...scopedClasses]).map((value) => ({ label: value, value }));
     }
 
     get classOptions(): { label: string; value: string }[] {
@@ -271,6 +278,28 @@ export class AdminExamTimetable implements OnInit {
 
     get canSaveEntry(): boolean {
         return !!this.draft.term && !!this.draft.class && !!this.draft.subjectId && !!this.draft.examDate && !!this.draft.startTime && !!this.draft.endTime;
+    }
+
+    onSchoolFilterChange(): void {
+        this.termFilter = '';
+        this.classFilter = '';
+        void this.loadInitial();
+    }
+
+    onTermFilterChange(): void {
+        this.syncExamFilters();
+        void this.loadData();
+    }
+
+    onClassFilterChange(): void {
+        this.syncExamFilters();
+        void this.loadData();
+    }
+
+    syncExamFilters(): void {
+        if (this.classFilter) {
+            this.classFilter = keepSelection(this.classFilter, this.classFilterOptions, '');
+        }
     }
 
     async loadInitial(): Promise<void> {

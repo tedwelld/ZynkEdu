@@ -19,7 +19,7 @@ public sealed class AcademicCalendarController : ControllerBase
     }
 
     [HttpGet("terms")]
-    [Authorize(Roles = RoleNames.AdminTeacherOrPlatformAdmin)]
+    [Authorize(Roles = RoleNames.AdminTeacherAccountingOrPlatformAdmin)]
     public async Task<ActionResult<IReadOnlyList<AcademicTermResponse>>> GetTerms([FromQuery] int? schoolId, CancellationToken cancellationToken)
     {
         return Ok(await _calendarService.GetTermsAsync(schoolId, cancellationToken));

@@ -133,12 +133,14 @@ public sealed class LibraryController : ControllerBase
     }
 
     [HttpGet("borrowers/overdue-loans")]
+    [Authorize(Roles = RoleNames.AdminLibraryAccountingOrPlatformAdmin)]
     public async Task<ActionResult<IReadOnlyList<LibraryBorrowerSummaryResponse>>> GetBorrowersWithOverdueLoans([FromQuery] int? schoolId, CancellationToken cancellationToken)
     {
         return Ok(await _libraryService.GetBorrowersWithOverdueLoansAsync(schoolId, cancellationToken));
     }
 
     [HttpGet("students/overdue-invoices")]
+    [Authorize(Roles = RoleNames.AccountingOperators)]
     public async Task<ActionResult<IReadOnlyList<StudentFinancialFlagResponse>>> GetStudentsWithOverdueInvoices([FromQuery] int? schoolId, CancellationToken cancellationToken)
     {
         return Ok(await _accountingService.GetStudentsWithOverdueInvoicesAsync(schoolId, cancellationToken));

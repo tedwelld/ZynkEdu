@@ -56,8 +56,8 @@ interface TimetableReportRow {
                     <p class="text-muted-color mt-2 max-w-2xl">Review your timetable in a full-width table and open the bell icon whenever you want to read stored notices.</p>
                 </div>
                 <div class="flex gap-3">
-                    <button pButton type="button" icon="pi pi-bell" severity="secondary" class="p-button-text" (click)="openNotifications()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" icon="pi pi-bell" severity="info" class="p-button-text" (click)="openNotifications()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </div>
 
@@ -86,7 +86,7 @@ interface TimetableReportRow {
                         <h2 class="text-xl font-display font-bold mb-1">Quick actions</h2>
                         <p class="text-sm text-muted-color">Jump to the most common teacher tasks.</p>
                     </div>
-                    <button pButton type="button" severity="secondary" class="p-button-text" (click)="openNotifications()">
+                    <button pButton type="button" severity="info" class="p-button-text" (click)="openNotifications()">
                         <span class="inline-flex items-center gap-2">
                             <i class="pi pi-bell"></i>
                             <span>Notifications</span>
@@ -111,8 +111,8 @@ interface TimetableReportRow {
                         Page {{ quickActionsPage + 1 }} of {{ quickActionTotalPages }}
                     </span>
                     <div class="flex items-center gap-2">
-                        <button pButton type="button" icon="pi pi-chevron-left" severity="secondary" class="p-button-text p-button-sm" [disabled]="quickActionsPage === 0" (click)="previousQuickActionsPage()"></button>
-                        <button pButton type="button" icon="pi pi-chevron-right" severity="secondary" class="p-button-text p-button-sm" [disabled]="quickActionsPage >= quickActionTotalPages - 1" (click)="nextQuickActionsPage()"></button>
+                        <button pButton type="button" icon="pi pi-chevron-left" severity="info" class="p-button-text p-button-sm" [disabled]="quickActionsPage === 0" (click)="previousQuickActionsPage()"></button>
+                        <button pButton type="button" icon="pi pi-chevron-right" severity="info" class="p-button-text p-button-sm" [disabled]="quickActionsPage >= quickActionTotalPages - 1" (click)="nextQuickActionsPage()"></button>
                     </div>
                 </div>
             </article>
@@ -126,7 +126,7 @@ interface TimetableReportRow {
                     <div class="flex flex-wrap items-center gap-3">
                         <app-dropdown [options]="termOptions" [(ngModel)]="selectedTermId" optionLabel="label" optionValue="value" class="w-44" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search terms" (ngModelChange)="onTermChange($event)"></app-dropdown>
                         <app-dropdown [options]="dayFilterOptions" [(ngModel)]="selectedDayFilter" optionLabel="label" optionValue="value" class="w-40" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search days" (ngModelChange)="onDayChange($event)"></app-dropdown>
-                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="help" [disabled]="reportRows.length === 0" (click)="exportTimetablePdf()"></button>
+                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" [disabled]="reportRows.length === 0" (click)="exportTimetablePdf()"></button>
                     </div>
                 </div>
 
@@ -171,7 +171,7 @@ interface TimetableReportRow {
                         </div>
                         <div class="flex flex-wrap items-center gap-3">
                             <app-dropdown [options]="categoryOptions" [(ngModel)]="selectedCategory" optionLabel="label" optionValue="value" class="w-56" appendTo="body" (ngModelChange)="refreshInbox()"></app-dropdown>
-                            <button pButton type="button" label="Mark all read" icon="pi pi-check" severity="secondary" (click)="markAllRead()"></button>
+                            <button pButton type="button" label="Mark all read" icon="pi pi-check" severity="success" (click)="markAllRead()"></button>
                         </div>
                     </div>
 

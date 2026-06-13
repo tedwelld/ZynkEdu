@@ -30,7 +30,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 </div>
                 <div class="flex gap-3">
                     <button pButton type="button" label="Add School" icon="pi pi-building" (click)="openSchoolCreate()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </header>
 
@@ -91,7 +91,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         <input pInputText [(ngModel)]="schoolDraft.adminContactEmail" class="w-full" />
                     </div>
                     <div class="flex justify-end gap-3 pt-3">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="schoolDrawerVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="schoolDrawerVisible = false"></button>
                         <button pButton type="button" [label]="schoolDrawerMode === 'create' ? 'Save school' : 'Update school'" icon="pi pi-check" (click)="saveSchool()"></button>
                     </div>
                 </div>

@@ -49,7 +49,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         (opened)="loadData()"
                         (ngModelChange)="onSchoolChange($event)"
                     ></app-dropdown>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </div>
 

@@ -35,8 +35,8 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         </p>
                         <div class="flex flex-wrap gap-3">
                             <button pButton type="button" label="Add Student" icon="pi pi-user-plus" routerLink="/admin/students" class="p-button-raised"></button>
-                            <button pButton type="button" label="Assign Teacher" icon="pi pi-sitemap" severity="secondary" routerLink="/admin/assignments"></button>
-                            <button pButton type="button" label="Send Notification" icon="pi pi-bell" severity="help" routerLink="/admin/notifications"></button>
+                            <button pButton type="button" label="Assign Teacher" icon="pi pi-sitemap" severity="info" routerLink="/admin/assignments"></button>
+                            <button pButton type="button" label="Send Notification" icon="pi pi-bell" severity="info" routerLink="/admin/notifications"></button>
                         </div>
                     </div>
                     <div class="workspace-card metric-gradient border border-white/20 dark:border-surface-700/60">

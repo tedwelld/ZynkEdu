@@ -56,9 +56,9 @@ const ASSESSMENTS = [
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="contrast" (click)="exportClassPdf()"></button>
-                    <button pButton type="button" label="My classes" icon="pi pi-users" severity="secondary" routerLink="/teacher/classes"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadClassData()"></button>
+                    <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" (click)="exportClassPdf()"></button>
+                    <button pButton type="button" label="My classes" icon="pi pi-users" severity="info" routerLink="/teacher/classes"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadClassData()"></button>
                 </div>
             </div>
 

@@ -121,7 +121,7 @@ type ImportTargetMode = 'catalog' | 'school';
                         (click)="publishAllCatalogSubjectsToAllSchools()"
                     ></button>
 
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </div>
 
@@ -256,7 +256,7 @@ type ImportTargetMode = 'catalog' | 'school';
                         </span>
                     </label>
                     <div class="flex justify-end gap-3 pt-3">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="drawerVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="drawerVisible = false"></button>
                         <button pButton type="button" [label]="drawerMode === 'create' ? 'Save subject' : 'Update subject'" icon="pi pi-check" (click)="saveSchoolSubject()"></button>
                     </div>
                 </div>
@@ -291,7 +291,7 @@ type ImportTargetMode = 'catalog' | 'school';
                         </span>
                     </label>
                     <div class="flex justify-end gap-3 pt-3">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="catalogDrawerVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="catalogDrawerVisible = false"></button>
                         <button pButton type="button" [label]="catalogDrawerMode === 'create' ? 'Save catalog subject' : 'Update catalog subject'" icon="pi pi-check" (click)="saveCatalogSubject()"></button>
                     </div>
                 </div>
@@ -378,7 +378,7 @@ type ImportTargetMode = 'catalog' | 'school';
                     </div>
 
                     <div class="flex justify-end gap-3 pt-2">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="importDialogVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="importDialogVisible = false"></button>
                         <button pButton type="button" label="Import subjects" icon="pi pi-upload" [loading]="importLoading" [disabled]="importLoading" (click)="importSelectedSubjects()"></button>
                     </div>
                 </div>

@@ -14,6 +14,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { getClassLevel } from '../../core/school-levels';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
+import { keepNullableSelection, keepSelection } from '../../shared/ui/list-filters';
 import { BulkSlipSendResponse, ParentPreviewReportResponse, ReportCardResponse, ResultResponse, SchoolResponse, StudentResponse, UserResponse } from '../../core/api/api.models';
 import { ReportSchoolInfo, buildAdminResultsReportPdf, buildParentPreviewReportPdf, buildReportCardPdf } from '../../shared/report/report-pdf';
 import { buildStudentStatementPdf } from '../../shared/report/student-statement-pdf';
@@ -47,7 +48,7 @@ interface PreviewRow {
                     <p class="text-muted-color mt-2 max-w-2xl">Generate exports by year, class, student name, and teacher name from the current live results data. Class-grouped PDFs and guardian slips keep the report flow safe and readable.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                     <button pButton type="button" label="Generate PDF" icon="pi pi-file-pdf" (click)="generateReport()" [disabled]="loading || filteredResults.length === 0"></button>
                     <button pButton type="button" label="Export Excel" icon="pi pi-file-excel" severity="success" (click)="exportExcel()" [disabled]="loading || filteredResults.length === 0"></button>
                 </div>
@@ -164,7 +165,7 @@ interface PreviewRow {
                 <div class="flex flex-wrap gap-3 pt-4">
                     <button pButton type="button" label="Generate PDF" icon="pi pi-download" (click)="generateReport()" [disabled]="loading || filteredResults.length === 0"></button>
                     <button pButton type="button" label="Export Excel" icon="pi pi-file-excel" severity="success" (click)="exportExcel()" [disabled]="loading || filteredResults.length === 0"></button>
-                    <button pButton type="button" label="Clear filters" severity="secondary" (click)="resetFilters()"></button>
+                    <button pButton type="button" label="Clear filters" severity="warn" (click)="resetFilters()"></button>
                 </div>
             </article>
 
@@ -294,7 +295,7 @@ interface PreviewRow {
                     </div>
 
                     <div class="mt-4">
-                        <button pButton type="button" label="Load report card" icon="pi pi-id-card" severity="secondary"
+                        <button pButton type="button" label="Load report card" icon="pi pi-id-card" severity="info"
                             (click)="loadReportCard()" [disabled]="!rcStudentId || !rcTerm || loadingReportCard">
                         </button>
                     </div>
@@ -332,7 +333,7 @@ interface PreviewRow {
                                 </ng-template>
                             </p-table>
                             <div class="mt-3 flex gap-2">
-                                <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="secondary" size="small" (click)="downloadReportCardPdf()"></button>
+                                <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" size="small" (click)="downloadReportCardPdf()"></button>
                             </div>
                         </div>
                     </ng-container>
@@ -423,18 +424,21 @@ export class AdminReports implements OnInit {
     }
 
     get classOptions(): { label: string; value: string }[] {
-        const values = Array.from(new Set(this.baseResults.map((result) => result.studentClass).filter((value) => value.trim().length > 0))).sort((a, b) => a.localeCompare(b));
+        const values = Array.from(new Set(this.resultsForYear().map((result) => result.studentClass).filter((value) => value.trim().length > 0))).sort((a, b) => a.localeCompare(b));
         return [{ label: 'All classes', value: '' }, ...values.map((value) => ({ label: value, value }))];
     }
 
     get studentOptions(): { label: string; value: number | null }[] {
-        const values = this.uniqueStudents(this.baseResults)
+        const values = this.uniqueStudents(this.resultsForClass())
             .sort((a, b) => a.label.localeCompare(b.label));
         return [{ label: 'All students', value: null }, ...values];
     }
 
     get teacherOptions(): { label: string; value: number | null }[] {
-        const values = this.uniqueTeachers(this.baseResults)
+        const source = this.selectedStudentId == null
+            ? this.resultsForClass()
+            : this.resultsForClass().filter((result) => result.studentId === this.selectedStudentId);
+        const values = this.uniqueTeachers(source)
             .sort((a, b) => a.label.localeCompare(b.label));
         return [{ label: 'All teachers', value: null }, ...values];
     }
@@ -565,6 +569,15 @@ export class AdminReports implements OnInit {
         this.selectedClass = '';
         this.selectedStudentId = null;
         this.selectedTeacherId = null;
+        this.syncFilters();
+    }
+
+    private resultsForYear(): ResultResponse[] {
+        return this.baseResults.filter((result) => this.selectedYear == null || result.resultYear === this.selectedYear);
+    }
+
+    private resultsForClass(): ResultResponse[] {
+        return this.resultsForYear().filter((result) => !this.selectedClass || result.studentClass === this.selectedClass);
     }
 
     generateReport(): void {
@@ -745,10 +758,10 @@ export class AdminReports implements OnInit {
     }
 
     private syncFilters(): void {
-        this.selectedYear = this.yearOptions.some((option) => option.value === this.selectedYear) ? this.selectedYear : null;
-        this.selectedClass = this.classOptions.some((option) => option.value === this.selectedClass) ? this.selectedClass : '';
-        this.selectedStudentId = this.studentOptions.some((option) => option.value === this.selectedStudentId) ? this.selectedStudentId : null;
-        this.selectedTeacherId = this.teacherOptions.some((option) => option.value === this.selectedTeacherId) ? this.selectedTeacherId : null;
+        this.selectedYear = keepNullableSelection(this.selectedYear, this.yearOptions, null);
+        this.selectedClass = keepSelection(this.selectedClass, this.classOptions, '');
+        this.selectedStudentId = keepNullableSelection(this.selectedStudentId, this.studentOptions, null);
+        this.selectedTeacherId = keepNullableSelection(this.selectedTeacherId, this.teacherOptions, null);
     }
 
     private groupedResultsBySchoolAndClass(): { schoolName: string; classes: { className: string; rows: ResultResponse[] }[] }[] {

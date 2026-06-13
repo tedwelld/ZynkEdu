@@ -923,6 +923,14 @@ html.app-dark .auth-login-control .p-password-input {
 .p-dialog,
 .p-drawer {
     z-index: 5100;
+    min-width: min(96vw, max(45vw, 28rem)) !important;
+    max-width: 96vw !important;
+}
+
+.p-dialog.zynk-modal-wide,
+.p-drawer.zynk-modal-wide {
+    min-width: min(98vw, max(75vw, 45vw)) !important;
+    max-width: 98vw !important;
 }
 
 /* Dropdowns, calendars, menus etc MUST be highest */

@@ -62,12 +62,12 @@ const DEFAULT_PREFERENCES: AccountNotificationPreferences = {
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <button pButton type="button" label="Dashboard" icon="pi pi-home" severity="secondary" [routerLink]="homeRoute"></button>
-                    <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="secondary" routerLink="/teacher/attendance" *ngIf="isTeacher"></button>
+                    <button pButton type="button" label="Dashboard" icon="pi pi-home" severity="info" [routerLink]="homeRoute"></button>
+                    <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="info" routerLink="/teacher/attendance" *ngIf="isTeacher"></button>
                     <button pButton type="button" label="Results" icon="pi pi-table" routerLink="/teacher/results" *ngIf="isTeacher"></button>
-                    <button pButton type="button" label="My classes" icon="pi pi-users" severity="secondary" routerLink="/teacher/classes" *ngIf="isTeacher"></button>
-                    <button pButton type="button" label="Timetable" icon="pi pi-calendar" severity="secondary" routerLink="/teacher/timetable" *ngIf="isTeacher"></button>
-                    <button pButton type="button" label="Subjects" icon="pi pi-book" severity="secondary" routerLink="/teacher/subjects" *ngIf="isTeacher"></button>
+                    <button pButton type="button" label="My classes" icon="pi pi-users" severity="info" routerLink="/teacher/classes" *ngIf="isTeacher"></button>
+                    <button pButton type="button" label="Timetable" icon="pi pi-calendar" severity="info" routerLink="/teacher/timetable" *ngIf="isTeacher"></button>
+                    <button pButton type="button" label="Subjects" icon="pi pi-book" severity="info" routerLink="/teacher/subjects" *ngIf="isTeacher"></button>
                 </div>
             </header>
 
@@ -155,7 +155,7 @@ const DEFAULT_PREFERENCES: AccountNotificationPreferences = {
                             <i class="pi pi-info-circle mr-2"></i>Platform admin profiles are managed at the system level and cannot be edited here.
                         </div>
                         <div class="flex justify-end gap-3 pt-2" *ngIf="canEditProfile">
-                            <button pButton type="button" label="Reset" severity="secondary" (click)="resetDraft()"></button>
+                            <button pButton type="button" label="Reset" severity="warn" (click)="resetDraft()"></button>
                             <button pButton type="button" label="Save changes" icon="pi pi-check" (click)="saveProfile()"></button>
                         </div>
                     </div>
@@ -170,7 +170,7 @@ const DEFAULT_PREFERENCES: AccountNotificationPreferences = {
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         <app-dropdown [options]="termOptions" [(ngModel)]="selectedTermId" optionLabel="label" optionValue="value" class="w-44" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search terms" (ngModelChange)="onTermChange($event)"></app-dropdown>
-                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="help" [disabled]="sortedTimetable.length === 0" (click)="exportTimetablePdf()"></button>
+                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" [disabled]="sortedTimetable.length === 0" (click)="exportTimetablePdf()"></button>
                     </div>
                 </div>
 
@@ -220,7 +220,7 @@ const DEFAULT_PREFERENCES: AccountNotificationPreferences = {
                                 <i class="pi pi-clock text-xs"></i> Saved locally — server sync coming soon
                             </span>
                         </div>
-                        <button pButton type="button" label="Save preferences" icon="pi pi-save" severity="secondary" (click)="savePreferences()"></button>
+                        <button pButton type="button" label="Save preferences" icon="pi pi-save" severity="success" (click)="savePreferences()"></button>
                     </div>
 
                     <div class="space-y-3">

@@ -159,7 +159,7 @@ interface TxActionDraft {
                                 <p class="text-muted-color mt-1">{{ selectedStudent.studentNumber }} - {{ selectedStudent.class }} - {{ selectedStudent.level }}</p>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <button pButton type="button" icon="pi pi-file-pdf" label="Export statement" severity="secondary" size="small" (click)="exportPdf()" [disabled]="!statement"></button>
+                                    <button pButton type="button" icon="pi pi-file-pdf" label="Export statement" severity="success" size="small" (click)="exportPdf()" [disabled]="!statement"></button>
                                     <button pButton type="button" icon="pi pi-times" class="p-button-rounded p-button-text" (click)="studentModalVisible = false"></button>
                                 </div>
                             </div>
@@ -326,7 +326,7 @@ interface TxActionDraft {
                                     </div>
 
                                     <div class="mt-4 flex flex-wrap gap-3 justify-end">
-                                        <button pButton type="button" label="Cancel" severity="secondary" (click)="cancelInvoiceEdit()"></button>
+                                        <button pButton type="button" label="Cancel" severity="warn" (click)="cancelInvoiceEdit()"></button>
                                         <button pButton type="button" label="Save amendment" icon="pi pi-check" (click)="saveInvoice()"></button>
                                     </div>
                                 </section>

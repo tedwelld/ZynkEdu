@@ -21,6 +21,7 @@ import {
 } from '../../core/api/api.models';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
+import { MODAL_DIALOG_STYLE } from '../../shared/ui/modal.constants';
 import { extractApiErrorMessage } from '../../core/api/api-error';
 import { AuthService } from '../../core/auth/auth.service';
 
@@ -48,8 +49,8 @@ interface ExpenseDraft {
                     <p class="text-muted-color mt-2 max-w-2xl">Track outgoing school expenses by category. Use this for P&amp;L reporting alongside revenue.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
-                    <button pButton type="button" label="Record expense" icon="pi pi-plus" severity="info" (click)="openAddExpense()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
+                    <button pButton type="button" label="Record expense" icon="pi pi-plus" severity="success" (click)="openAddExpense()"></button>
                 </div>
             </div>
 
@@ -123,7 +124,7 @@ interface ExpenseDraft {
                                 <td class="text-sm">{{ e.recordedByName }}</td>
                                 <td>
                                     <div class="flex gap-2">
-                                        <button pButton type="button" icon="pi pi-pencil" severity="secondary" size="small" class="p-button-text" (click)="openEditExpense(e)"></button>
+                                        <button pButton type="button" icon="pi pi-pencil" severity="warn" size="small" class="p-button-text" (click)="openEditExpense(e)"></button>
                                         <button pButton type="button" icon="pi pi-trash" severity="danger" size="small" class="p-button-text" (click)="deleteExpense(e.id)"></button>
                                     </div>
                                 </td>
@@ -164,7 +165,7 @@ interface ExpenseDraft {
                 <article class="workspace-card">
                     <div class="flex items-center justify-between gap-4 mb-4">
                         <h2 class="text-xl font-display font-bold m-0">Expense categories</h2>
-                        <button pButton type="button" label="Add category" icon="pi pi-plus" severity="secondary" size="small" (click)="openAddCategory()"></button>
+                        <button pButton type="button" label="Add category" icon="pi pi-plus" severity="success" size="small" (click)="openAddCategory()"></button>
                     </div>
                     <p-table [value]="categories" styleClass="p-datatable-sm">
                         <ng-template pTemplate="header">
@@ -184,7 +185,7 @@ interface ExpenseDraft {
                                 <td class="text-right font-mono text-sm">{{ c.totalSpent | number:'1.2-2' }}</td>
                                 <td>
                                     <div class="flex gap-2">
-                                        <button pButton type="button" icon="pi pi-pencil" severity="secondary" size="small" class="p-button-text" (click)="openEditCategory(c)"></button>
+                                        <button pButton type="button" icon="pi pi-pencil" severity="warn" size="small" class="p-button-text" (click)="openEditCategory(c)"></button>
                                         <button pButton type="button" icon="pi pi-trash" severity="danger" size="small" class="p-button-text" (click)="deleteCategory(c.id)" [disabled]="c.expenseCount > 0"></button>
                                     </div>
                                 </td>
@@ -199,7 +200,7 @@ interface ExpenseDraft {
         </section>
 
         <!-- Expense dialog -->
-        <p-dialog [(visible)]="expenseDialogVisible" [modal]="true" [style]="{width:'580px'}" [header]="editingExpenseId ? 'Edit expense' : 'Record expense'" [closable]="!saving">
+        <p-dialog [(visible)]="expenseDialogVisible" [modal]="true" [style]="modalDialogStyle" [header]="editingExpenseId ? 'Edit expense' : 'Record expense'" [closable]="!saving">
             <div class="grid gap-4 p-2">
                 <label class="block">
                     <span class="text-sm font-medium text-muted-color">Category</span>
@@ -239,13 +240,13 @@ interface ExpenseDraft {
                 </div>
             </div>
             <ng-template pTemplate="footer">
-                <button pButton type="button" label="Cancel" severity="secondary" (click)="expenseDialogVisible = false" [disabled]="saving"></button>
+                <button pButton type="button" label="Cancel" severity="warn" (click)="expenseDialogVisible = false" [disabled]="saving"></button>
                 <button pButton type="button" [label]="editingExpenseId ? 'Save changes' : 'Record'" icon="pi pi-check" (click)="saveExpense()" [disabled]="saving || !canSaveExpense"></button>
             </ng-template>
         </p-dialog>
 
         <!-- Category dialog -->
-        <p-dialog [(visible)]="categoryDialogVisible" [modal]="true" [style]="{width:'460px'}" [header]="editingCategoryId ? 'Edit category' : 'Add category'" [closable]="!saving">
+        <p-dialog [(visible)]="categoryDialogVisible" [modal]="true" [style]="modalDialogStyle" [header]="editingCategoryId ? 'Edit category' : 'Add category'" [closable]="!saving">
             <div class="grid gap-4 p-2">
                 <label class="block">
                     <span class="text-sm font-medium text-muted-color">Category name</span>
@@ -257,7 +258,7 @@ interface ExpenseDraft {
                 </label>
             </div>
             <ng-template pTemplate="footer">
-                <button pButton type="button" label="Cancel" severity="secondary" (click)="categoryDialogVisible = false" [disabled]="saving"></button>
+                <button pButton type="button" label="Cancel" severity="warn" (click)="categoryDialogVisible = false" [disabled]="saving"></button>
                 <button pButton type="button" [label]="editingCategoryId ? 'Save changes' : 'Add'" icon="pi pi-check" (click)="saveCategory()" [disabled]="saving || !categoryDraft.name"></button>
             </ng-template>
         </p-dialog>
@@ -284,6 +285,7 @@ export class AccountantExpenses implements OnInit {
     toFilter = '';
     skeletonRows = Array.from({ length: 5 });
 
+    readonly modalDialogStyle = MODAL_DIALOG_STYLE;
     expenseDialogVisible = false;
     editingExpenseId: number | null = null;
     expenseDraft: ExpenseDraft = { categoryId: null, amount: null, currency: 'USD', expenseDate: '', reference: '', description: '' };

@@ -42,7 +42,7 @@ interface CalendarEventDraft {
                         <button pButton type="button" label="Month" class="p-button-text p-button-sm" [severity]="viewMode === 'month' ? 'primary' : 'secondary'" (click)="viewMode = 'month'"></button>
                         <button pButton type="button" label="Week" class="p-button-text p-button-sm" [severity]="viewMode === 'week' ? 'primary' : 'secondary'" (click)="viewMode = 'week'"></button>
                     </div>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </div>
 
@@ -97,7 +97,7 @@ interface CalendarEventDraft {
                             <label class="block text-sm font-semibold mb-2">Date</label>
                             <input pInputText type="date" [(ngModel)]="eventDraft.eventDate" class="w-full" />
                         </div>
-                        <button pButton type="button" label="Add event" icon="pi pi-plus" severity="help" class="w-full" (click)="createEvent()"></button>
+                        <button pButton type="button" label="Add event" icon="pi pi-plus" severity="success" class="w-full" (click)="createEvent()"></button>
                     </div>
                 </article>
 

@@ -15,6 +15,8 @@ import { AttendanceDailySummaryResponse, AttendanceRegisterResponse, AttendanceS
 import { AuthService } from '../../core/auth/auth.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
+import { keepSelection, stringFilterOptions } from '../../shared/ui/list-filters';
+import { MODAL_DIALOG_STYLE_WIDE } from '../../shared/ui/modal.constants';
 
 @Component({
     standalone: true,
@@ -28,7 +30,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                     <h1 class="text-3xl font-display font-bold m-0">Attendance review</h1>
                     <p class="text-muted-color mt-2 max-w-2xl">Review each class register, see the daily counts, and open any row for the full register.</p>
                 </div>
-                <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
             </header>
 
             <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -50,11 +52,11 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Class filter</label>
-                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClassFilter" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes" (opened)="loadData()"></app-dropdown>
+                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClassFilter" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes" (opened)="loadData()" (ngModelChange)="syncAttendanceFilters()"></app-dropdown>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Teacher filter</label>
-                        <app-dropdown [options]="teacherOptions" [(ngModel)]="selectedTeacherFilter" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search teachers" (opened)="loadData()"></app-dropdown>
+                        <app-dropdown [options]="teacherOptions" [(ngModel)]="selectedTeacherFilter" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search teachers" (opened)="loadData()" (ngModelChange)="syncAttendanceFilters()"></app-dropdown>
                     </div>
                 </div>
                 <div class="text-sm text-muted-color" *ngIf="selectedSchoolLabel">
@@ -107,7 +109,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 </div>
             </article>
 
-            <p-dialog [(visible)]="detailVisible" [modal]="true" [draggable]="false" [style]="{ width: 'min(72rem, 96vw)' }" header="Attendance register" appendTo="body">
+            <p-dialog [(visible)]="detailVisible" [modal]="true" [draggable]="false" [style]="attendanceDialogStyle" styleClass="zynk-modal-wide" header="Attendance register" appendTo="body">
                 <div *ngIf="detailLoading" class="space-y-3">
                     <p-skeleton height="5rem" borderRadius="1.5rem"></p-skeleton>
                     <p-skeleton height="22rem" borderRadius="1.5rem"></p-skeleton>
@@ -185,8 +187,8 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                     </p-table>
 
                     <div class="flex flex-wrap justify-end gap-3">
-                        <button pButton type="button" label="Edit register" icon="pi pi-pencil" severity="secondary" *ngIf="!editMode" (click)="editMode = true"></button>
-                        <button pButton type="button" label="Cancel edits" icon="pi pi-times" severity="secondary" *ngIf="editMode" (click)="cancelEdits()"></button>
+                        <button pButton type="button" label="Edit register" icon="pi pi-pencil" severity="warn" *ngIf="!editMode" (click)="editMode = true"></button>
+                        <button pButton type="button" label="Cancel edits" icon="pi pi-times" severity="warn" *ngIf="editMode" (click)="cancelEdits()"></button>
                         <button pButton type="button" label="Save override" icon="pi pi-save" *ngIf="editMode" (click)="saveOverride()"></button>
                     </div>
                 </div>
@@ -210,17 +212,24 @@ export class AdminAttendance implements OnInit {
     schools: SchoolResponse[] = [];
     selectedSchoolId: number | null = this.auth.schoolId();
     attendanceDate = new Date();
+    readonly attendanceDialogStyle = MODAL_DIALOG_STYLE_WIDE;
     selectedClassFilter = 'All';
     selectedTeacherFilter = 'All';
 
     get classOptions(): { label: string; value: string }[] {
-        const classes = Array.from(new Set(this.summaries.map((summary) => summary.className))).sort();
-        return [{ label: 'All classes', value: 'All' }, ...classes.map((value) => ({ label: value, value }))];
+        return stringFilterOptions(this.summaries.map((summary) => summary.className), 'All classes', 'All');
     }
 
     get teacherOptions(): { label: string; value: string }[] {
-        const teachers = Array.from(new Set(this.summaries.map((summary) => summary.teacherName))).sort();
-        return [{ label: 'All teachers', value: 'All' }, ...teachers.map((value) => ({ label: value, value }))];
+        const source = this.selectedClassFilter === 'All'
+            ? this.summaries
+            : this.summaries.filter((summary) => summary.className === this.selectedClassFilter);
+        return stringFilterOptions(source.map((summary) => summary.teacherName), 'All teachers', 'All');
+    }
+
+    syncAttendanceFilters(): void {
+        this.selectedClassFilter = keepSelection(this.selectedClassFilter, this.classOptions, 'All');
+        this.selectedTeacherFilter = keepSelection(this.selectedTeacherFilter, this.teacherOptions, 'All');
     }
 
     get statusOptions(): { label: string; value: AttendanceStatus }[] {
@@ -310,6 +319,7 @@ export class AdminAttendance implements OnInit {
         this.api.getAttendanceDailySummaries(this.serializeDate(this.attendanceDate), schoolId).subscribe({
             next: (summaries) => {
                 this.summaries = summaries;
+                this.syncAttendanceFilters();
                 this.loading = false;
             },
             error: (error) => {

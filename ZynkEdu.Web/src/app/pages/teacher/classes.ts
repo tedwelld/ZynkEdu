@@ -39,8 +39,8 @@ interface ClassStudentModalState {
                     <p class="text-muted-color mt-2 max-w-2xl">Use the dropdown to switch classes, then jump straight into attendance or results from the summary and quick actions.</p>
                 </div>
                 <div class="flex gap-3">
-                    <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="contrast" (click)="exportClassPdf()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadClassData()"></button>
+                    <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" (click)="exportClassPdf()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadClassData()"></button>
                 </div>
             </div>
 
@@ -58,10 +58,10 @@ interface ClassStudentModalState {
                     </div>
                     <div class="flex flex-wrap items-center gap-3 xl:justify-end">
                         <span class="text-sm text-muted-color">{{ selectedClass || 'No class selected' }} - {{ classStudents.length }} students - {{ classResults.length }} results</span>
-                        <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="secondary" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
+                        <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="info" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
                         <button pButton type="button" label="Enter results" icon="pi pi-table" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></button>
-                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="contrast" (click)="exportClassPdf()"></button>
-                        <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="help" routerLink="/teacher/profile"></button>
+                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" (click)="exportClassPdf()"></button>
+                        <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="info" routerLink="/teacher/profile"></button>
                     </div>
                 </div>
 
@@ -114,7 +114,7 @@ interface ClassStudentModalState {
                                 <td class="text-right">
                                     <div class="flex flex-wrap items-center justify-end gap-1">
                                         <button pButton type="button" icon="pi pi-eye" label="View" class="p-button-text p-button-sm" (click)="openStudent(student)"></button>
-                                        <button pButton type="button" icon="pi pi-check-square" label="Attendance" severity="secondary" class="p-button-text p-button-sm" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
+                                        <button pButton type="button" icon="pi pi-check-square" label="Attendance" severity="info" class="p-button-text p-button-sm" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
                                         <button pButton type="button" icon="pi pi-table" label="Results" class="p-button-text p-button-sm" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></button>
                                     </div>
                                 </td>
@@ -169,10 +169,10 @@ interface ClassStudentModalState {
                     </div>
 
                     <div class="flex flex-wrap justify-end gap-3">
-                        <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="secondary" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
+                        <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="info" routerLink="/teacher/attendance" [queryParams]="{ class: selectedClass }"></button>
                         <button pButton type="button" label="Enter results" icon="pi pi-table" routerLink="/teacher/results" [queryParams]="{ class: selectedClass }"></button>
-                        <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="help" routerLink="/teacher/profile"></button>
-                        <button pButton type="button" label="Close" severity="secondary" (click)="studentModalVisible = false"></button>
+                        <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="info" routerLink="/teacher/profile"></button>
+                        <button pButton type="button" label="Close" severity="warn" (click)="studentModalVisible = false"></button>
                     </div>
                 </div>
             </p-dialog>

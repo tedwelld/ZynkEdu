@@ -39,7 +39,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 <div class="flex flex-wrap gap-3">
                     <app-dropdown *ngIf="isPlatformAdmin" [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-64" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (opened)="refreshData()" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
                     <button pButton type="button" label="Add Teacher" icon="pi pi-plus" (click)="openCreate()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </div>
 
@@ -61,7 +61,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         <app-dropdown [options]="statusOptions" [(ngModel)]="statusFilter" optionLabel="label" optionValue="value" class="w-full" appendTo="body" placeholder="All statuses" (ngModelChange)="null"></app-dropdown>
                     </div>
                     <div class="flex items-end">
-                        <button pButton type="button" label="Clear filters" severity="secondary" class="w-full" (click)="clearFilters()"></button>
+                        <button pButton type="button" label="Clear filters" severity="warn" class="w-full" (click)="clearFilters()"></button>
                     </div>
                 </div>
             </article>
@@ -212,7 +212,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         </div>
                     </div>
                     <div class="flex justify-end gap-3 pt-3">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="drawerVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="drawerVisible = false"></button>
                         <button pButton type="button" [label]="drawerMode === 'create' ? 'Save teacher' : 'Update teacher'" icon="pi pi-check" (click)="saveTeacher()"></button>
                     </div>
                 </div>

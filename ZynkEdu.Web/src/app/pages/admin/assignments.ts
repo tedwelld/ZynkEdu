@@ -61,8 +61,8 @@ interface MissingCoverageEntry {
                 <div class="flex flex-wrap items-center gap-3">
                     <app-dropdown *ngIf="isPlatformAdmin" [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-64" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (opened)="refreshLookups()" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
                     <app-dropdown [options]="termOptions" [(ngModel)]="selectedTermId" optionLabel="label" optionValue="value" class="w-44" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search terms" (opened)="refreshLookups()"></app-dropdown>
-                    <button pButton type="button" label="Generate timetable" icon="pi pi-calendar-plus" severity="help" (click)="generateTimetable()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Generate timetable" icon="pi pi-calendar-plus" severity="success" (click)="generateTimetable()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </div>
 
@@ -75,7 +75,7 @@ interface MissingCoverageEntry {
                             These class-subject pairs must be assigned to teachers before the timetable can be generated. Choose a teacher, then save the assignment.
                         </p>
                     </div>
-                    <button pButton type="button" label="Clear prefill" severity="secondary" icon="pi pi-times" (click)="clearPendingCoverage()"></button>
+                    <button pButton type="button" label="Clear prefill" severity="warn" icon="pi pi-times" (click)="clearPendingCoverage()"></button>
                 </div>
                 <div class="mt-4 flex flex-wrap gap-2">
                     <p-tag *ngFor="let item of pendingCoverage" [value]="coverageLabelFor(item)" severity="warning"></p-tag>
@@ -99,8 +99,8 @@ interface MissingCoverageEntry {
                         </div>
                     </div>
                     <div class="grid gap-2">
-                        <button pButton type="button" label="View current assignments" icon="pi pi-table" severity="secondary" class="w-full" (click)="assignmentsDrawerVisible = true"></button>
-                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="help" class="w-full" (click)="exportAssignmentsPdf()"></button>
+                        <button pButton type="button" label="View current assignments" icon="pi pi-table" severity="info" class="w-full" (click)="assignmentsDrawerVisible = true"></button>
+                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" class="w-full" (click)="exportAssignmentsPdf()"></button>
                     </div>
                 </article>
             </section>
@@ -177,7 +177,7 @@ interface MissingCoverageEntry {
                     <p class="text-sm text-muted-color">Manage subjects directly or jump to the full subject library.</p>
                     <div class="flex flex-wrap gap-2">
                         <button pButton type="button" label="Add subject" icon="pi pi-plus" (click)="openSubjectCreator()"></button>
-                        <button pButton type="button" label="View all subjects" icon="pi pi-book" severity="secondary" (click)="openSubjectsLibrary()"></button>
+                        <button pButton type="button" label="View all subjects" icon="pi pi-book" severity="info" (click)="openSubjectsLibrary()"></button>
                     </div>
                 </div>
                 <div *ngIf="loading" class="space-y-3">

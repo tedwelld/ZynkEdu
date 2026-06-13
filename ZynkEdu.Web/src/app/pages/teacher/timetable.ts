@@ -44,10 +44,10 @@ interface QuickActionItem {
                     <p class="text-muted-color mt-2 max-w-2xl">This page shows the full timetable approved by the school admin for the selected term, and it remains visible until the term ends.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <button pButton type="button" label="Dashboard" icon="pi pi-home" severity="secondary" routerLink="/teacher/dashboard"></button>
-                    <button pButton type="button" label="My subjects" icon="pi pi-book" severity="secondary" routerLink="/teacher/subjects"></button>
-                    <button pButton type="button" label="My classes" icon="pi pi-users" severity="secondary" routerLink="/teacher/classes"></button>
-                    <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="help" routerLink="/teacher/profile"></button>
+                    <button pButton type="button" label="Dashboard" icon="pi pi-home" severity="info" routerLink="/teacher/dashboard"></button>
+                    <button pButton type="button" label="My subjects" icon="pi pi-book" severity="info" routerLink="/teacher/subjects"></button>
+                    <button pButton type="button" label="My classes" icon="pi pi-users" severity="info" routerLink="/teacher/classes"></button>
+                    <button pButton type="button" label="Profile" icon="pi pi-id-card" severity="info" routerLink="/teacher/profile"></button>
                 </div>
             </div>
 
@@ -64,7 +64,7 @@ interface QuickActionItem {
                         <h2 class="text-xl font-display font-bold mb-1">Quick actions</h2>
                         <p class="text-sm text-muted-color">Open the profile pages that support your approved timetable.</p>
                     </div>
-                    <button pButton type="button" severity="secondary" class="p-button-text" routerLink="/teacher/notifications">
+                    <button pButton type="button" severity="info" class="p-button-text" routerLink="/teacher/notifications">
                         <span class="inline-flex items-center gap-2">
                             <i class="pi pi-bell"></i>
                             <span>Notifications</span>
@@ -95,7 +95,7 @@ interface QuickActionItem {
                     <div class="flex flex-wrap items-center gap-3">
                         <app-dropdown [options]="termOptions" [(ngModel)]="selectedTermId" optionLabel="label" optionValue="value" class="w-44" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search terms" (ngModelChange)="onTermChange($event)"></app-dropdown>
                         <app-dropdown [options]="dayFilterOptions" [(ngModel)]="selectedDayFilter" optionLabel="label" optionValue="value" class="w-40" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search days" (ngModelChange)="onDayChange($event)"></app-dropdown>
-                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="help" [disabled]="reportRows.length === 0" (click)="exportTimetablePdf()"></button>
+                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" [disabled]="reportRows.length === 0" (click)="exportTimetablePdf()"></button>
                     </div>
                 </div>
 

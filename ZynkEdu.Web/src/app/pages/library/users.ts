@@ -40,7 +40,7 @@ type LibraryAdminDraft = {
                 <div class="flex flex-wrap gap-3 items-center">
                     <app-dropdown *ngIf="isPlatformAdmin" [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-72" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (ngModelChange)="loadData()"></app-dropdown>
                     <button *ngIf="canManage" pButton type="button" label="Add library admin" icon="pi pi-user-plus" (click)="openCreate()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </header>
 
@@ -117,7 +117,7 @@ type LibraryAdminDraft = {
                         </div>
                     </div>
                     <div class="flex justify-end gap-3 pt-3">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="drawerVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="drawerVisible = false"></button>
                         <button pButton type="button" [label]="drawerMode === 'create' ? 'Save admin' : 'Update admin'" icon="pi pi-check" (click)="saveAdmin()"></button>
                     </div>
                 </div>

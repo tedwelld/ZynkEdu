@@ -43,10 +43,10 @@ interface TeacherClassInsight {
                         </p>
                     </div>
                     <div class="flex flex-wrap gap-3">
-                        <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="secondary" routerLink="/teacher/attendance"></button>
+                        <button pButton type="button" label="Attendance" icon="pi pi-check-square" severity="info" routerLink="/teacher/attendance"></button>
                         <button pButton type="button" label="Results" icon="pi pi-table" routerLink="/teacher/results"></button>
-                        <button pButton type="button" label="Classes" icon="pi pi-users" severity="secondary" routerLink="/teacher/classes"></button>
-                        <button pButton type="button" label="Settings" icon="pi pi-cog" severity="help" routerLink="/account/settings"></button>
+                        <button pButton type="button" label="Classes" icon="pi pi-users" severity="info" routerLink="/teacher/classes"></button>
+                        <button pButton type="button" label="Settings" icon="pi pi-cog" severity="info" routerLink="/account/settings"></button>
                     </div>
                 </div>
             </header>

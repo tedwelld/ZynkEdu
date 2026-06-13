@@ -49,8 +49,8 @@ interface ActiveSchoolRow {
                         </p>
                         <div class="flex flex-wrap gap-3">
                             <button pButton type="button" label="Schools" icon="pi pi-building" routerLink="/platform/schools"></button>
-                            <button pButton type="button" label="Admins" icon="pi pi-user" severity="secondary" routerLink="/platform/admins"></button>
-                            <button pButton type="button" label="System reports" icon="pi pi-file-pdf" severity="contrast" routerLink="/platform/reports"></button>
+                            <button pButton type="button" label="Admins" icon="pi pi-user" severity="info" routerLink="/platform/admins"></button>
+                            <button pButton type="button" label="System reports" icon="pi pi-file-pdf" severity="info" routerLink="/platform/reports"></button>
                         </div>
                     </div>
 

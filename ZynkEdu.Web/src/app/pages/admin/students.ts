@@ -37,6 +37,8 @@ import {
 import { getLevelCode } from '../../core/school-levels';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
+import { keepSelection, stringFilterOptions } from '../../shared/ui/list-filters';
+import { MODAL_DIALOG_STYLE } from '../../shared/ui/modal.constants';
 
 type PerformanceBand = 'Excellent' | 'Stable' | 'At risk';
 type StudentDrawerMode = 'view' | 'create' | 'edit';
@@ -91,8 +93,6 @@ const GUARDIAN_RELATIONSHIP_OPTIONS = [
     { label: 'Other', value: 'Other' }
 ];
 
-const ALL_CLASS_LEVELS = [...new Set(Object.values(LEVEL_CLASS_MAP).flat())];
-
 interface StudentDraft {
     schoolId: number | null;
     fullName: string;
@@ -126,14 +126,14 @@ type GuardianDraft = GuardianRequest & {
                 <div class="flex flex-wrap gap-3">
                     <app-dropdown *ngIf="isPlatformAdmin" [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-64" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (opened)="loadData()" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
                     <ng-container *ngIf="isPlatformAdmin; else schoolBulkAction">
-                        <button pButton type="button" label="Enroll selected school" icon="pi pi-users" severity="secondary" [disabled]="!selectedSchoolId || bulkEnrollmentLoading" (click)="confirmEnrollAllSubjects(false)"></button>
-                        <button pButton type="button" label="Enroll all schools" icon="pi pi-globe" severity="secondary" [disabled]="bulkEnrollmentLoading" (click)="confirmEnrollAllSubjects(true)"></button>
+                        <button pButton type="button" label="Enroll selected school" icon="pi pi-users" severity="success" [disabled]="!selectedSchoolId || bulkEnrollmentLoading" (click)="confirmEnrollAllSubjects(false)"></button>
+                        <button pButton type="button" label="Enroll all schools" icon="pi pi-globe" severity="success" [disabled]="bulkEnrollmentLoading" (click)="confirmEnrollAllSubjects(true)"></button>
                     </ng-container>
                     <ng-template #schoolBulkAction>
-                        <button pButton type="button" label="Enroll all students" icon="pi pi-users" severity="secondary" [disabled]="bulkEnrollmentLoading" (click)="confirmEnrollAllSubjects(false)"></button>
+                        <button pButton type="button" label="Enroll all students" icon="pi pi-users" severity="success" [disabled]="bulkEnrollmentLoading" (click)="confirmEnrollAllSubjects(false)"></button>
                     </ng-template>
                     <button pButton type="button" label="Add Student" icon="pi pi-user-plus" (click)="openCreateDrawer()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </div>
 
@@ -148,19 +148,19 @@ type GuardianDraft = GuardianRequest & {
                 <div class="grid gap-4 xl:grid-cols-[1.1fr_0.4fr_0.4fr] items-end">
                     <div>
                         <label class="block text-sm font-semibold mb-2">Search</label>
-                        <input pInputText [(ngModel)]="searchTerm" placeholder="Student name or number" class="w-full" />
+                        <input pInputText [(ngModel)]="searchTerm" (ngModelChange)="syncStudentFilters()" placeholder="Student name or number" class="w-full" />
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Class</label>
-                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClass" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes" (opened)="loadData()"></app-dropdown>
+                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClass" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search classes" (opened)="loadData()" (ngModelChange)="syncStudentFilters()"></app-dropdown>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Performance</label>
-                        <app-dropdown [options]="performanceOptions" [(ngModel)]="selectedPerformance" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search performance" (opened)="loadData()"></app-dropdown>
+                        <app-dropdown [options]="performanceOptions" [(ngModel)]="selectedPerformance" optionLabel="label" optionValue="value" class="w-full" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search performance" (opened)="loadData()" (ngModelChange)="syncStudentFilters()"></app-dropdown>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Status</label>
-                        <app-dropdown [options]="statusOptions" [(ngModel)]="selectedStatus" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()"></app-dropdown>
+                        <app-dropdown [options]="statusOptions" [(ngModel)]="selectedStatus" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()" (ngModelChange)="syncStudentFilters()"></app-dropdown>
                     </div>
                 </div>
             </div>
@@ -229,7 +229,7 @@ type GuardianDraft = GuardianRequest & {
                 </p-table>
             </article>
 
-            <p-dialog [(visible)]="drawerVisible" [modal]="true" [draggable]="false" [dismissableMask]="true" [style]="{ width: 'min(46rem, 96vw)' }" [header]="drawerHeader" appendTo="body">
+            <p-dialog [(visible)]="drawerVisible" [modal]="true" [draggable]="false" [dismissableMask]="true" [style]="modalDialogStyle" [header]="drawerHeader" appendTo="body">
                 <ng-container *ngIf="drawerMode === 'create' || drawerMode === 'edit'; else viewMode">
                     <div class="space-y-4">
                         <div *ngIf="isPlatformAdmin">
@@ -297,7 +297,7 @@ type GuardianDraft = GuardianRequest & {
                                     <label class="block text-sm font-semibold mb-1">Guardians</label>
                                     <p class="text-xs text-muted-color m-0">Add one or more guardians. The first valid guardian is treated as primary.</p>
                                 </div>
-                                <button pButton type="button" label="Add guardian" icon="pi pi-user-plus" severity="secondary" class="p-button-sm" (click)="addGuardian()"></button>
+                                <button pButton type="button" label="Add guardian" icon="pi pi-user-plus" severity="success" class="p-button-sm" (click)="addGuardian()"></button>
                             </div>
 
                             <div *ngFor="let guardian of draft.guardians; let index = index" class="rounded-3xl border border-surface-200 dark:border-surface-700 p-4 space-y-4">
@@ -376,7 +376,7 @@ type GuardianDraft = GuardianRequest & {
                         </div>
 
                         <div class="flex justify-end gap-3 pt-3">
-                            <button pButton type="button" label="Cancel" severity="secondary" (click)="drawerVisible = false"></button>
+                            <button pButton type="button" label="Cancel" severity="warn" (click)="drawerVisible = false"></button>
                             <button pButton type="button" [label]="drawerMode === 'create' ? 'Save student' : 'Update student'" icon="pi pi-check" (click)="saveStudent()"></button>
                         </div>
                     </div>
@@ -521,7 +521,7 @@ type GuardianDraft = GuardianRequest & {
                             </div>
                             <div class="grid gap-3 md:grid-cols-3">
                                 <button pButton type="button" label="Reactivate" icon="pi pi-play" severity="success" [disabled]="selectedStudent.status === 'Active'" (click)="setSelectedStudentStatus('Active')"></button>
-                                <button pButton type="button" label="Suspend" icon="pi pi-pause" severity="secondary" [disabled]="selectedStudent.status === 'Suspended'" (click)="setSelectedStudentStatus('Suspended')"></button>
+                                <button pButton type="button" label="Suspend" icon="pi pi-pause" severity="warn" [disabled]="selectedStudent.status === 'Suspended'" (click)="setSelectedStudentStatus('Suspended')"></button>
                                 <button pButton type="button" label="Archive" icon="pi pi-box" severity="danger" [disabled]="selectedStudent.status === 'Archived'" (click)="setSelectedStudentStatus('Archived')"></button>
                             </div>
                         </div>
@@ -535,7 +535,7 @@ type GuardianDraft = GuardianRequest & {
                                 </div>
                                 <label class="cursor-pointer">
                                     <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" class="hidden" (change)="onDocumentFileSelected($event)" #docFileInput />
-                                    <button pButton type="button" icon="pi pi-upload" label="Upload" severity="secondary" size="small" (click)="docFileInput.click()"></button>
+                                    <button pButton type="button" icon="pi pi-upload" label="Upload" severity="info" size="small" (click)="docFileInput.click()"></button>
                                 </label>
                             </div>
 
@@ -543,7 +543,7 @@ type GuardianDraft = GuardianRequest & {
                                 <input pInputText type="text" [(ngModel)]="docUploadType" placeholder="Document type (e.g. Photo, Birth Certificate)" class="flex-1 min-w-0" />
                                 <input pInputText type="text" [(ngModel)]="docUploadNotes" placeholder="Notes (optional)" class="flex-1 min-w-0" />
                                 <button pButton type="button" icon="pi pi-check" label="Confirm" (click)="confirmDocUpload()" [disabled]="uploadingDoc || !docUploadType"></button>
-                                <button pButton type="button" icon="pi pi-times" severity="secondary" (click)="cancelDocUpload()"></button>
+                                <button pButton type="button" icon="pi pi-times" severity="warn" (click)="cancelDocUpload()"></button>
                             </div>
 
                             <div *ngIf="loadingDocs" class="space-y-2">
@@ -563,7 +563,7 @@ type GuardianDraft = GuardianRequest & {
                                         </div>
                                     </div>
                                     <div class="flex gap-2 flex-shrink-0">
-                                        <button pButton type="button" icon="pi pi-download" severity="secondary" size="small" class="p-button-text" (click)="downloadDoc(doc)"></button>
+                                        <button pButton type="button" icon="pi pi-download" severity="info" size="small" class="p-button-text" (click)="downloadDoc(doc)"></button>
                                         <button pButton type="button" icon="pi pi-trash" severity="danger" size="small" class="p-button-text" (click)="deleteDoc(doc.id)"></button>
                                     </div>
                                 </div>
@@ -605,6 +605,7 @@ export class AdminStudents implements OnInit {
     studentResults: ResultResponse[] = [];
     studentChartData!: ChartData<'line'>;
     studentChartOptions!: ChartOptions<'line'>;
+    readonly modalDialogStyle = MODAL_DIALOG_STYLE;
     skeletonRows = Array.from({ length: 5 });
     bulkEnrollmentLoading = false;
     draft: StudentDraft = this.createEmptyDraft();
@@ -666,13 +667,23 @@ export class AdminStudents implements OnInit {
     }
 
     get classOptions(): { label: string; value: string }[] {
-        const classes = new Set<string>(ALL_CLASS_LEVELS);
-        this.students.forEach((student) => classes.add(student.class));
+        const classes = this.studentsForClassOptions().map((student) => student.class);
+        return stringFilterOptions(classes, 'All classes', 'All');
+    }
 
-        return [
-            { label: 'All classes', value: 'All' },
-            ...Array.from(classes).sort().map((value) => ({ label: value, value }))
-        ];
+    private studentsForClassOptions(): StudentResponse[] {
+        return this.students.filter((student) => {
+            const query = `${student.fullName} ${student.studentNumber} ${student.level} ${student.class} ${student.subjects.join(' ')}`.toLowerCase();
+            const matchesSearch = query.includes(this.searchTerm.trim().toLowerCase());
+            const performance = this.bandFor(student.id);
+            const matchesPerformance = this.selectedPerformance === 'All' || performance === this.selectedPerformance;
+            const matchesStatus = this.selectedStatus === 'All' || student.status === this.selectedStatus;
+            return matchesSearch && matchesPerformance && matchesStatus;
+        });
+    }
+
+    syncStudentFilters(): void {
+        this.selectedClass = keepSelection(this.selectedClass, this.classOptions, 'All');
     }
 
     get classOptionsForDraft(): { label: string; value: string }[] {
@@ -722,14 +733,8 @@ export class AdminStudents implements OnInit {
     }
 
     get filteredStudents(): StudentResponse[] {
-        return this.students.filter((student) => {
-            const query = `${student.fullName} ${student.studentNumber} ${student.level} ${student.class} ${student.subjects.join(' ')}`.toLowerCase();
-            const matchesSearch = query.includes(this.searchTerm.trim().toLowerCase());
-            const matchesClass = this.selectedClass === 'All' || student.class === this.selectedClass;
-            const performance = this.bandFor(student.id);
-            const matchesPerformance = this.selectedPerformance === 'All' || performance === this.selectedPerformance;
-            const matchesStatus = this.selectedStatus === 'All' || student.status === this.selectedStatus;
-            return matchesSearch && matchesClass && matchesPerformance && matchesStatus;
+        return this.studentsForClassOptions().filter((student) => {
+            return this.selectedClass === 'All' || student.class === this.selectedClass;
         });
     }
 
@@ -816,6 +821,7 @@ export class AdminStudents implements OnInit {
                     this.draft.schoolId = this.authSchoolId;
                 }
                 this.openPendingStudentFocus();
+                this.syncStudentFilters();
                 this.loading = false;
             },
             error: () => {

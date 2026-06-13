@@ -21,6 +21,7 @@ import {
 import { AuthService } from '../../core/auth/auth.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
+import { MODAL_DIALOG_STYLE } from '../../shared/ui/modal.constants';
 import { extractApiErrorMessage } from '../../core/api/api-error';
 
 interface IncidentDraft {
@@ -53,7 +54,7 @@ const SEVERITY_OPTIONS = [
                     <p class="text-muted-color mt-2 max-w-2xl">Record and manage student disciplinary incidents. Track severity, actions taken, and resolution status.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                     <button pButton type="button" label="Log incident" icon="pi pi-plus" severity="danger" (click)="openAddDialog()"></button>
                 </div>
             </div>
@@ -121,8 +122,8 @@ const SEVERITY_OPTIONS = [
                             <td class="text-sm text-muted-color">{{ i.recordedByName }}</td>
                             <td>
                                 <div class="flex gap-2">
-                                    <button pButton type="button" icon="pi pi-eye" severity="secondary" size="small" class="p-button-text" (click)="openViewDialog(i)"></button>
-                                    <button pButton type="button" icon="pi pi-pencil" severity="secondary" size="small" class="p-button-text" (click)="openEditDialog(i)"></button>
+                                    <button pButton type="button" icon="pi pi-eye" severity="info" size="small" class="p-button-text" (click)="openViewDialog(i)"></button>
+                                    <button pButton type="button" icon="pi pi-pencil" severity="warn" size="small" class="p-button-text" (click)="openEditDialog(i)"></button>
                                     <button pButton type="button" icon="pi pi-trash" severity="danger" size="small" class="p-button-text" (click)="deleteIncident(i.id)"></button>
                                 </div>
                             </td>
@@ -136,7 +137,7 @@ const SEVERITY_OPTIONS = [
         </section>
 
         <!-- View dialog -->
-        <p-dialog [(visible)]="viewDialogVisible" [modal]="true" [style]="{width:'600px'}" header="Incident details" [closable]="true">
+        <p-dialog [(visible)]="viewDialogVisible" [modal]="true" [style]="modalDialogStyle" header="Incident details" [closable]="true">
             <div *ngIf="viewingIncident" class="space-y-4 p-2">
                 <div class="grid gap-3 md:grid-cols-2">
                     <div><span class="text-xs text-muted-color uppercase font-semibold">Student</span><div class="font-semibold mt-1">{{ viewingIncident.studentName }} ({{ viewingIncident.studentClass }})</div></div>
@@ -154,7 +155,7 @@ const SEVERITY_OPTIONS = [
         </p-dialog>
 
         <!-- Add / Edit dialog -->
-        <p-dialog [(visible)]="editDialogVisible" [modal]="true" [style]="{width:'620px'}" [header]="editingId ? 'Edit incident' : 'Log incident'" [closable]="!saving">
+        <p-dialog [(visible)]="editDialogVisible" [modal]="true" [style]="modalDialogStyle" [header]="editingId ? 'Edit incident' : 'Log incident'" [closable]="!saving">
             <div class="grid gap-4 p-2">
                 <label *ngIf="!editingId" class="block">
                     <span class="text-sm font-medium text-muted-color">Student</span>
@@ -205,7 +206,7 @@ const SEVERITY_OPTIONS = [
                 </label>
             </div>
             <ng-template pTemplate="footer">
-                <button pButton type="button" label="Cancel" severity="secondary" (click)="editDialogVisible = false" [disabled]="saving"></button>
+                <button pButton type="button" label="Cancel" severity="warn" (click)="editDialogVisible = false" [disabled]="saving"></button>
                 <button pButton type="button" [label]="editingId ? 'Save changes' : 'Log incident'" icon="pi pi-check" (click)="saveIncident()" [disabled]="saving || !canSave"></button>
             </ng-template>
         </p-dialog>
@@ -230,6 +231,7 @@ export class AdminDiscipline implements OnInit {
     viewingIncident: DisciplineIncidentResponse | null = null;
     severityOptions = SEVERITY_OPTIONS;
 
+    readonly modalDialogStyle = MODAL_DIALOG_STYLE;
     draft: IncidentDraft = this.emptyDraft();
 
     ngOnInit(): void {

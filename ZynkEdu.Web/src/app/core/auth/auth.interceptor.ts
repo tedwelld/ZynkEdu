@@ -1,13 +1,11 @@
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { catchError, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (request, next) => {
     const auth = inject(AuthService);
-    const router = inject(Router);
     const messageService = inject(MessageService);
     const token = auth.token();
 
@@ -26,7 +24,12 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
             if (err.status === 401) {
                 auth.logout();
             } else if (err.status === 403) {
-                router.navigate(['/auth/access']);
+                messageService.add({
+                    severity: 'warn',
+                    summary: 'Access denied',
+                    detail: 'You do not have permission to perform this action.',
+                    life: 4000
+                });
             } else if (err.status === 429) {
                 messageService.add({
                     severity: 'warn',

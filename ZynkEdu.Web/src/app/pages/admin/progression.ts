@@ -54,7 +54,7 @@ interface TransferDraft {
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </div>
 
@@ -139,7 +139,7 @@ interface TransferDraft {
                         <input pInputText type="date" [(ngModel)]="batchEffectiveDate" class="w-full" />
                     </div>
                     <div class="xl:col-span-3 flex items-end">
-                        <button pButton type="button" [label]="includeInactive ? 'Hide archived placements' : 'Show archived placements'" severity="secondary" class="w-full" (click)="toggleInactive()"></button>
+                        <button pButton type="button" [label]="includeInactive ? 'Hide archived placements' : 'Show archived placements'" severity="warn" class="w-full" (click)="toggleInactive()"></button>
                     </div>
                 </div>
 
@@ -255,7 +255,7 @@ interface TransferDraft {
                         <input pInputText type="text" [(ngModel)]="transferDraft.notes" class="w-full" placeholder="Optional notes" />
                     </div>
                     <div class="flex items-center gap-3 pt-7">
-                        <button pButton type="button" [label]="transferDraft.copySubjects ? 'Copy subjects: yes' : 'Copy subjects: no'" severity="secondary" (click)="transferDraft.copySubjects = !transferDraft.copySubjects"></button>
+                        <button pButton type="button" [label]="transferDraft.copySubjects ? 'Copy subjects: yes' : 'Copy subjects: no'" severity="warn" (click)="transferDraft.copySubjects = !transferDraft.copySubjects"></button>
                         <span class="text-sm text-muted-color">Copy subjects when the destination school shares the same curriculum.</span>
                     </div>
                 </div>

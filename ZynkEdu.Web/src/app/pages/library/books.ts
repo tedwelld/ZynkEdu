@@ -64,7 +64,7 @@ type CopyDraft = {
                 <div class="flex flex-wrap items-center gap-3">
                     <app-dropdown *ngIf="isPlatformAdmin" [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-72" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (ngModelChange)="loadData()"></app-dropdown>
                     <button pButton type="button" label="Add book" icon="pi pi-plus" (click)="openCreateBook()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </header>
 
@@ -142,8 +142,8 @@ type CopyDraft = {
                             <p class="text-muted-color mt-2">Inspect the record, update details, or manage copies from here.</p>
                         </div>
                         <div class="flex flex-wrap justify-end gap-3">
-                            <button pButton type="button" label="Edit book" icon="pi pi-pencil" severity="secondary" (click)="openEditBook(selectedBook)"></button>
-                            <button pButton type="button" label="Add copy" icon="pi pi-plus" severity="secondary" (click)="openCreateCopy()"></button>
+                            <button pButton type="button" label="Edit book" icon="pi pi-pencil" severity="warn" (click)="openEditBook(selectedBook)"></button>
+                            <button pButton type="button" label="Add copy" icon="pi pi-plus" severity="success" (click)="openCreateCopy()"></button>
                             <button pButton type="button" label="Delete book" icon="pi pi-trash" severity="danger" (click)="deleteBook(selectedBook)"></button>
                         </div>
                     </div>
@@ -289,7 +289,7 @@ type CopyDraft = {
                     </div>
                 </div>
                 <div class="flex justify-end gap-3 pt-6">
-                    <button pButton type="button" label="Cancel" severity="secondary" (click)="bookDialogVisible = false"></button>
+                    <button pButton type="button" label="Cancel" severity="warn" (click)="bookDialogVisible = false"></button>
                     <button pButton type="button" [label]="bookDialogMode === 'create' ? 'Save book' : 'Update book'" icon="pi pi-check" (click)="saveBook()"></button>
                 </div>
             </p-dialog>
@@ -313,7 +313,7 @@ type CopyDraft = {
                         <label class="text-sm font-medium">{{ copyDraft.isActive ? 'Active' : 'Inactive' }}</label>
                     </div>
                     <div class="flex justify-end gap-3 pt-3">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="copyDialogVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="copyDialogVisible = false"></button>
                         <button pButton type="button" [label]="copyDialogMode === 'create' ? 'Save copy' : 'Update copy'" icon="pi pi-check" (click)="saveCopy()"></button>
                     </div>
                 </div>

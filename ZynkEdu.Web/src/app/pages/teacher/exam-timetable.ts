@@ -24,7 +24,7 @@ import { extractApiErrorMessage } from '../../core/api/api-error';
                     <h1 class="text-3xl font-display font-bold m-0">Exam timetable</h1>
                     <p class="text-muted-color mt-2">Your published exam schedule for the selected term.</p>
                 </div>
-                <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
             </div>
 
             <article class="workspace-card flex flex-wrap items-center gap-4">

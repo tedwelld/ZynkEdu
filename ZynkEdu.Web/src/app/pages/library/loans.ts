@@ -55,7 +55,7 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                     <button pButton type="button" label="Issue book" icon="pi pi-plus" (click)="openIssue()"></button>
                     <button pButton type="button" label="Overdue items" icon="pi pi-exclamation-triangle" severity="danger" (click)="openOverdueModal()"></button>
                     <button pButton type="button" label="Borrowers" icon="pi pi-users" severity="success" (click)="openBorrowersModal()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </header>
 
@@ -104,7 +104,7 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                         </label>
                         <div class="flex gap-3 flex-wrap">
                             <button pButton type="button" label="Search" icon="pi pi-search" (click)="applyOverdueSearch()"></button>
-                            <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="secondary" (click)="exportOverduePdf()"></button>
+                            <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" (click)="exportOverduePdf()"></button>
                         </div>
                     </div>
 
@@ -171,7 +171,7 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                         </label>
                         <div class="flex gap-3 flex-wrap">
                             <button pButton type="button" label="Search" icon="pi pi-search" (click)="applyBorrowerSearch()"></button>
-                            <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="secondary" (click)="exportBorrowersPdf()"></button>
+                            <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" (click)="exportBorrowersPdf()"></button>
                         </div>
                     </div>
 
@@ -285,7 +285,7 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                         <input pInputText [(ngModel)]="issueDraft.notes" class="w-full" />
                     </div>
                     <div class="flex justify-end gap-3 pt-3">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="issueVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="issueVisible = false"></button>
                         <button pButton type="button" label="Issue" icon="pi pi-check" [disabled]="issueBlocked" (click)="saveIssue()"></button>
                     </div>
                 </div>
@@ -299,7 +299,7 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                         <input pInputText [(ngModel)]="returnNotes" class="w-full" />
                     </div>
                     <div class="flex justify-end gap-3 pt-3">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="returnVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="returnVisible = false"></button>
                         <button pButton type="button" label="Return" icon="pi pi-check" (click)="saveReturn()"></button>
                     </div>
                 </div>
@@ -317,7 +317,7 @@ type BorrowerSelection = StudentResponse | UserResponse | null;
                         <input pInputText [(ngModel)]="renewNotes" class="w-full" />
                     </div>
                     <div class="flex justify-end gap-3 pt-3">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="renewVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="renewVisible = false"></button>
                         <button pButton type="button" label="Renew" icon="pi pi-check" (click)="saveRenew()"></button>
                     </div>
                 </div>

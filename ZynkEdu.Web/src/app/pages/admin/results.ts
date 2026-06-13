@@ -14,6 +14,7 @@ import { DashboardResponse, ResultResponse, SchoolPerformanceDto } from '../../c
 import { LayoutService } from '../../layout/service/layout.service';
 import { AppDropdownComponent } from '../../shared/ui/app-dropdown.component';
 import { MetricCardComponent } from '../../shared/ui/metric-card.component';
+import { keepSelection, stringFilterOptions } from '../../shared/ui/list-filters';
 
 interface SchoolComparisonRow extends SchoolPerformanceDto {
     rank: number;
@@ -36,8 +37,8 @@ interface SchoolComparisonRow extends SchoolPerformanceDto {
                     <p class="text-muted-color mt-2 max-w-2xl">Compare every school in the system with the same chart layout, side by side, from one clean view and approve the submitted result rows below.</p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                    <button pButton type="button" label="Open Reports" icon="pi pi-file-pdf" severity="contrast" routerLink="/admin/reports"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Open Reports" icon="pi pi-file-pdf" severity="info" routerLink="/admin/reports"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </div>
 
@@ -137,19 +138,19 @@ interface SchoolComparisonRow extends SchoolPerformanceDto {
                 <div class="grid gap-4 xl:grid-cols-4 mb-4">
                     <div>
                         <label class="block text-sm font-semibold mb-2">Class</label>
-                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClass" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()"></app-dropdown>
+                        <app-dropdown [options]="classOptions" [(ngModel)]="selectedClass" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()" (ngModelChange)="syncResultFilters()"></app-dropdown>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Subject</label>
-                        <app-dropdown [options]="subjectOptions" [(ngModel)]="selectedSubject" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()"></app-dropdown>
+                        <app-dropdown [options]="subjectOptions" [(ngModel)]="selectedSubject" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()" (ngModelChange)="syncResultFilters()"></app-dropdown>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Term</label>
-                        <app-dropdown [options]="termOptions" [(ngModel)]="selectedTerm" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()"></app-dropdown>
+                        <app-dropdown [options]="termOptions" [(ngModel)]="selectedTerm" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()" (ngModelChange)="syncResultFilters()"></app-dropdown>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold mb-2">Approval</label>
-                        <app-dropdown [options]="approvalOptions" [(ngModel)]="selectedApproval" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()"></app-dropdown>
+                        <app-dropdown [options]="approvalOptions" [(ngModel)]="selectedApproval" optionLabel="label" optionValue="value" class="w-full" appendTo="body" (opened)="loadData()" (ngModelChange)="syncResultFilters()"></app-dropdown>
                     </div>
                 </div>
 
@@ -212,9 +213,6 @@ export class AdminResults implements OnInit {
     selectedSubject = 'All';
     selectedTerm = 'All';
     selectedApproval = 'All';
-    classOptions: { label: string; value: string }[] = [{ label: 'All classes', value: 'All' }];
-    subjectOptions: { label: string; value: string }[] = [{ label: 'All subjects', value: 'All' }];
-    termOptions: { label: string; value: string }[] = [{ label: 'All terms', value: 'All' }];
     approvalOptions: { label: string; value: string }[] = [
         { label: 'All approvals', value: 'All' },
         { label: 'Pending', value: 'Pending' },
@@ -276,9 +274,7 @@ export class AdminResults implements OnInit {
                 this.bestSchoolName = this.comparisonRows[0]?.schoolName ?? 'No data yet';
                 this.bestSchoolScore = `${this.comparisonRows[0]?.averageScore.toFixed(1) ?? '0.0'}%`;
                 this.resultCountTotal = this.comparisonRows.reduce((total, row) => total + row.resultCount, 0).toString();
-                this.classOptions = [{ label: 'All classes', value: 'All' }, ...Array.from(new Set(this.filteredResultsSource().map((result) => this.classForResult(result)))).sort().map((value) => ({ label: value, value }))];
-                this.subjectOptions = [{ label: 'All subjects', value: 'All' }, ...Array.from(new Set(this.filteredResultsSource().map((result) => result.subjectName))).sort().map((value) => ({ label: value, value }))];
-                this.termOptions = [{ label: 'All terms', value: 'All' }, ...Array.from(new Set(this.filteredResultsSource().map((result) => result.term))).sort().map((value) => ({ label: value, value }))];
+                this.syncResultFilters();
                 this.buildCharts();
                 this.loading = false;
             },
@@ -290,11 +286,51 @@ export class AdminResults implements OnInit {
     }
 
     get filteredResults(): ResultResponse[] {
+        return this.resultsMatching({
+            className: this.selectedClass,
+            subjectName: this.selectedSubject,
+            term: this.selectedTerm,
+            approvalStatus: this.selectedApproval
+        });
+    }
+
+    get classOptions(): { label: string; value: string }[] {
+        return stringFilterOptions(
+            this.filteredResultsSource().map((result) => this.classForResult(result)),
+            'All classes',
+            'All'
+        );
+    }
+
+    get subjectOptions(): { label: string; value: string }[] {
+        return stringFilterOptions(
+            this.resultsMatching({ className: this.selectedClass }).map((result) => result.subjectName),
+            'All subjects',
+            'All'
+        );
+    }
+
+    get termOptions(): { label: string; value: string }[] {
+        return stringFilterOptions(
+            this.resultsMatching({ className: this.selectedClass, subjectName: this.selectedSubject }).map((result) => result.term),
+            'All terms',
+            'All'
+        );
+    }
+
+    syncResultFilters(): void {
+        this.selectedClass = keepSelection(this.selectedClass, this.classOptions, 'All');
+        this.selectedSubject = keepSelection(this.selectedSubject, this.subjectOptions, 'All');
+        this.selectedTerm = keepSelection(this.selectedTerm, this.termOptions, 'All');
+        this.selectedApproval = keepSelection(this.selectedApproval, this.approvalOptions, 'All');
+    }
+
+    private resultsMatching(filters: Partial<{ className: string; subjectName: string; term: string; approvalStatus: string }>): ResultResponse[] {
         return this.filteredResultsSource().filter((result) => {
-            const matchesClass = this.selectedClass === 'All' || this.classForResult(result) === this.selectedClass;
-            const matchesSubject = this.selectedSubject === 'All' || result.subjectName === this.selectedSubject;
-            const matchesTerm = this.selectedTerm === 'All' || result.term === this.selectedTerm;
-            const matchesApproval = this.selectedApproval === 'All' || result.approvalStatus === this.selectedApproval;
+            const matchesClass = !filters.className || filters.className === 'All' || this.classForResult(result) === filters.className;
+            const matchesSubject = !filters.subjectName || filters.subjectName === 'All' || result.subjectName === filters.subjectName;
+            const matchesTerm = !filters.term || filters.term === 'All' || result.term === filters.term;
+            const matchesApproval = !filters.approvalStatus || filters.approvalStatus === 'All' || result.approvalStatus === filters.approvalStatus;
             return matchesClass && matchesSubject && matchesTerm && matchesApproval;
         });
     }

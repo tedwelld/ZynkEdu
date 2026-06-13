@@ -60,11 +60,11 @@ interface TimetableReportRow {
                 <div class="flex flex-wrap items-center gap-3">
                     <app-dropdown *ngIf="isPlatformAdmin" [options]="schoolOptions" [(ngModel)]="selectedSchoolId" optionLabel="label" optionValue="value" class="w-64" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search schools" (opened)="loadData()" (ngModelChange)="onSchoolChange($event)"></app-dropdown>
                     <app-dropdown [options]="termOptions" [(ngModel)]="selectedTermId" optionLabel="label" optionValue="value" class="w-44" appendTo="body" [filter]="true" filterBy="label" filterPlaceholder="Search terms" (opened)="loadData()" (ngModelChange)="onTermChange($event)"></app-dropdown>
-                    <button pButton type="button" label="Generate" icon="pi pi-sparkles" severity="help" (click)="generateTimetable()"></button>
-                    <button pButton type="button" label="Approve" icon="pi pi-check" severity="secondary" (click)="publishTimetable()"></button>
-                    <button pButton type="button" label="View timetable" icon="pi pi-eye" severity="secondary" [disabled]="displayedTimetable.length === 0" (click)="openTimetablePreview()"></button>
-                    <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="help" [disabled]="displayedTimetable.length === 0" (click)="exportTimetablePdf()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Generate" icon="pi pi-sparkles" severity="success" (click)="generateTimetable()"></button>
+                    <button pButton type="button" label="Approve" icon="pi pi-check" severity="success" (click)="publishTimetable()"></button>
+                    <button pButton type="button" label="View timetable" icon="pi pi-eye" severity="info" [disabled]="displayedTimetable.length === 0" (click)="openTimetablePreview()"></button>
+                    <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" [disabled]="displayedTimetable.length === 0" (click)="exportTimetablePdf()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </div>
 
@@ -84,7 +84,7 @@ interface TimetableReportRow {
                             The timetable cannot be generated until each listed class-subject pair has a teacher. Open assignments to prefill the exact gaps.
                         </p>
                     </div>
-                    <button pButton type="button" label="Open assignments" icon="pi pi-arrow-right" severity="secondary" (click)="openAssignmentsForMissingCoverage()"></button>
+                    <button pButton type="button" label="Open assignments" icon="pi pi-arrow-right" severity="info" (click)="openAssignmentsForMissingCoverage()"></button>
                 </div>
                 <div class="mt-4 flex flex-wrap gap-2">
                     <p-tag *ngFor="let item of missingCoverage" [value]="coverageLabelFor(item)" severity="warning"></p-tag>
@@ -147,7 +147,7 @@ interface TimetableReportRow {
                             <div class="text-xl font-display font-bold">{{ previewTitle }}</div>
                             <div class="text-sm text-muted-color">{{ previewSubtitle }}</div>
                         </div>
-                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="help" [disabled]="displayedTimetable.length === 0" (click)="exportTimetablePdf()"></button>
+                        <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" [disabled]="displayedTimetable.length === 0" (click)="exportTimetablePdf()"></button>
                     </div>
 
                     <div *ngIf="previewRows.length === 0" class="rounded-2xl border border-dashed border-surface-300 dark:border-surface-700 p-6 text-center text-muted-color">

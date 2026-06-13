@@ -20,6 +20,7 @@ public static class RoleNames
     public const string AdminTeacherLibraryAccountingOrPlatformAdmin = "Admin,Teacher,LibraryAdmin,AccountantSuper,AccountantSenior,AccountantJunior,PlatformAdmin";
     public const string AccountingOperators = "Admin,AccountantSuper,AccountantSenior,AccountantJunior,PlatformAdmin";
     public const string AccountantWorkspace = "AccountantSuper,AccountantSenior,AccountantJunior,PlatformAdmin";
+    public const string AdminLibraryAccountingOrPlatformAdmin = "Admin,LibraryAdmin,AccountantSuper,AccountantSenior,AccountantJunior,PlatformAdmin";
     public const string Student = nameof(Student);
     public const string AdminTeacherStudentOrPlatformAdmin = "Admin,Teacher,Student,PlatformAdmin";
 }

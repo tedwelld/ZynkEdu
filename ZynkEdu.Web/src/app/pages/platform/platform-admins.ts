@@ -33,7 +33,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                 </div>
                 <div class="flex gap-3">
                     <button pButton type="button" label="Add Admin" icon="pi pi-user-plus" (click)="openAdminCreate()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </header>
 
@@ -113,7 +113,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         </div>
                     </div>
                     <div class="flex justify-end gap-3 pt-3">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="adminDrawerVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="adminDrawerVisible = false"></button>
                         <button pButton type="button" [label]="adminDrawerMode === 'create' ? 'Save admin' : 'Update admin'" icon="pi pi-check" (click)="saveAdmin()"></button>
                     </div>
                 </div>

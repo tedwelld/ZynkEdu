@@ -52,7 +52,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         (ngModelChange)="onSchoolChange($event)"
                     ></app-dropdown>
                     <button pButton type="button" label="Add class" icon="pi pi-plus" (click)="openCreate()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                 </div>
             </div>
 
@@ -171,7 +171,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         </div>
                     </div>
                     <div class="flex justify-end gap-3 pt-3">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="drawerVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="drawerVisible = false"></button>
                         <button pButton type="button" [label]="drawerMode === 'create' ? 'Save class' : 'Update class'" icon="pi pi-check" (click)="saveClass()"></button>
                     </div>
                 </div>
@@ -201,7 +201,7 @@ import { MetricCardComponent } from '../../shared/ui/metric-card.component';
                         <p class="mt-2 text-sm text-muted-color">Only subjects that belong to the same level can be assigned. General subjects are also allowed.</p>
                     </div>
                     <div class="flex justify-end gap-3 pt-2">
-                        <button pButton type="button" label="Cancel" severity="secondary" (click)="subjectsVisible = false"></button>
+                        <button pButton type="button" label="Cancel" severity="warn" (click)="subjectsVisible = false"></button>
                         <button pButton type="button" label="Save subjects" icon="pi pi-check" (click)="saveSubjects()"></button>
                     </div>
                 </div>

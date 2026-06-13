@@ -34,8 +34,8 @@ type AttendanceStatusTone = 'success' | 'secondary' | 'warning' | 'danger';
                 </div>
                 <div class="flex flex-wrap gap-3">
                     <button pButton type="button" label="Mark all present" icon="pi pi-check" severity="success" [disabled]="!register || register.isLocked" (click)="markAllPresent()"></button>
-                    <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="secondary" (click)="exportPdf()"></button>
-                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="secondary" (click)="loadData()"></button>
+                    <button pButton type="button" label="Export PDF" icon="pi pi-file-pdf" severity="success" (click)="exportPdf()"></button>
+                    <button pButton type="button" label="Reload" icon="pi pi-refresh" severity="info" (click)="loadData()"></button>
                     <button *ngIf="canSave" pButton type="button" label="Save register" icon="pi pi-save" (click)="saveRegister(false)"></button>
                 </div>
             </header>
